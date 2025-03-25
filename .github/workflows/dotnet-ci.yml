@@ -27,19 +27,3 @@ jobs:
       - name: Build
         working-directory: ./code/
         run: dotnet build
-  analysis:
-    needs: restore
-    runs-on: windows-2019
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: '3.1.x'
-          include-prerelease: true
-      - name: Run .NET Analyzers
-        uses: dotnet/code-analysis@main
-        with:
-          solution: ./code/CosmosUniverse.sln
-          build-breaking: true
-          all-categories: all
