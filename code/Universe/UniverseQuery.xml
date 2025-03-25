@@ -16,9 +16,6 @@
         <member name="M:Universe.Exception.UniverseException.#ctor(System.String,System.Exception)">
             <summary>Custom exception</summary>
         </member>
-        <member name="M:Universe.Exception.UniverseException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
-            <summary>Custom exception</summary>
-        </member>
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement Universe</summary>
         </member>
