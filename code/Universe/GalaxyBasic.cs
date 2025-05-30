@@ -5,27 +5,17 @@ using Universe.Response;
 namespace Universe;
 
 /// <summary>Inherit repositories to implement the very basic Universe</summary>
-public class GalaxyBasic<T> : IDisposable, IGalaxyBasic<T> where T : class, ICosmicEntity
+public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosmicEntity
 {
-    internal readonly Container _container;
     internal readonly UniverseBuilder<T> _qBuilder;
 
-    internal readonly bool _recordQuery;
-    internal readonly bool _allowBulk;
-
     /// <summary></summary>
-    protected GalaxyBasic(CosmosClient client, string database, string container, string partitionKey, bool recordQueries = false)
-    {
-        if (string.IsNullOrWhiteSpace(container) || string.IsNullOrWhiteSpace(partitionKey))
-            throw new UniverseException("Container name and PartitionKey are required");
-
-        _recordQuery = recordQueries;
-        if (client.ClientOptions is not null)
-            _allowBulk = client.ClientOptions.AllowBulkExecution;
-        _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(container, partitionKey).GetAwaiter().GetResult();
-
-        _qBuilder = new(_recordQuery);
-    }
+    protected GalaxyBasic(
+        CosmosClient client,
+        string database,
+        string container,
+        string partitionKey,
+        bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => _qBuilder = new(_recordQuery);
 
     async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
     {
@@ -131,29 +121,4 @@ public class GalaxyBasic<T> : IDisposable, IGalaxyBasic<T> where T : class, ICos
             throw;
         }
     }
-
-    #region Dispose Pattern
-    private bool _disposedValue;
-
-    /// <summary></summary>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_disposedValue) return;
-        if (disposing)
-        {
-        }
-
-        _disposedValue = true;
-    }
-
-    /// <summary></summary>
-    ~GalaxyBasic() => Dispose(disposing: false);
-
-    /// <summary></summary>
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-    #endregion
 }

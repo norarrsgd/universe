@@ -24,9 +24,4 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
     /// Get a paginated list from the database
     /// </summary>
     Task<(Gravity g, IList<T> T)> Paged(Q.Page page, IList<Cluster> clusters, ColumnOptions? columnOptions = null, IList<Sorting.Option> sorting = null, IList<string> group = null);
-
-    /// <summary>
-    /// Execute a stored procedure
-    /// </summary>
-    Task<(Gravity g, T T)> ExecSProc(string procedureName, string partitionKey, params object[] parameters);
 }

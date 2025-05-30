@@ -5,7 +5,7 @@ using Universe.Response;
 
 namespace Universe;
 
-/// <summary>Inherit repositories to implement Universe</summary>
+/// <summary>Inherit repositories to implement a more advanced Universe</summary>
 public abstract class Galaxy<T>(
     CosmosClient client,
     string database,
@@ -86,39 +86,6 @@ public abstract class Galaxy<T>(
             }
 
             return (new(requestUnit, continuationToken, _recordQuery ? (query.QueryText, query.GetQueryParameters()) : default), collection);
-        }
-        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
-        {
-            throw;
-        }
-    }
-
-    async Task<(Gravity g, T T)> IGalaxy<T>.ExecSProc(string procedureName, string partitionKey, params object[] parameters)
-    {
-        foreach (object param in parameters)
-        {
-            try
-            {
-                JsonSerializer.Serialize(param);
-            }
-            catch (System.Exception ex)
-            {
-                throw new UniverseException($"Stored procedure parameter is not serializable: {param?.GetType().Name}", ex);
-            }
-        }
-
-        try
-        {
-            StoredProcedureExecuteResponse<T> response = await _container.Scripts.ExecuteStoredProcedureAsync<T>(
-                procedureName,
-                new PartitionKey(partitionKey),
-                parameters
-            );
-            return (new(response.RequestCharge, null), response.Resource);
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
-            throw new UniverseException($"{procedureName} does not exist.");
         }
         catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
         {
