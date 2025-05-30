@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Text.Json;
 using Microsoft.Azure.Cosmos.Scripts;
 using Universe.Response;
 
@@ -94,6 +95,18 @@ public abstract class Galaxy<T>(
 
     async Task<(Gravity g, T T)> IGalaxy<T>.ExecSProc(string procedureName, string partitionKey, params object[] parameters)
     {
+        foreach (object param in parameters)
+        {
+            try
+            {
+                JsonSerializer.Serialize(param);
+            }
+            catch (System.Exception ex)
+            {
+                throw new UniverseException($"Stored procedure parameter is not serializable: {param?.GetType().Name}", ex);
+            }
+        }
+
         try
         {
             StoredProcedureExecuteResponse<T> response = await _container.Scripts.ExecuteStoredProcedureAsync<T>(
