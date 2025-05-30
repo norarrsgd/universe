@@ -3,6 +3,16 @@
 /// <summary>Query Options</summary>
 public struct Q
 {
+    /// <summary>Query Limits</summary>
+    public struct Limits
+    {
+        /// <summary>Maximum number of items to return</summary>
+        public const int MaxItems = 1000;
+
+        /// <summary>Maximum number of RU per query</summary>
+        public const int MaxRU = 1000;
+    }
+
     /// <summary>Page definition for paginated queries</summary>
     public record Page(int Size, string ContinuationToken = null);
 
@@ -48,10 +58,10 @@ public struct Q
 
         /// <summary>Not Like</summary>
         NotLike,
-        
+
         /// <summary>IS_DEFINED</summary>
         Defined,
-        
+
         /// <summary>NOT IS_DEFINED</summary>
         NotDefined
     }
