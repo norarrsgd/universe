@@ -17,14 +17,14 @@
 		<Description>A simpler way of querying a CosmosDb Namespace</Description>
 		<Copyright>kuromukira 2023</Copyright>
 		<RepositoryUrl>https://github.com/kuromukira/universe</RepositoryUrl>
-		<PackageTags>cosmos simple query</PackageTags>
+		<PackageTags>cosmos cosmosdb wrapper azure simple query</PackageTags>
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.0.0</Version>
+		<Version>3.0.1</Version>
 		<PackageReleaseNotes>View release on https://github.com/kuromukira/universe/releases</PackageReleaseNotes>
-		<AssemblyVersion>3.0.0.0</AssemblyVersion>
-		<FileVersion>3.0.0.0</FileVersion>
+		<AssemblyVersion>3.0.1.0</AssemblyVersion>
+		<FileVersion>3.0.1.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
