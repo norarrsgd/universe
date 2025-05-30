@@ -5,8 +5,8 @@
 		<Nullable>disable</Nullable>
 		<LangVersion>13.0</LangVersion>
 		<Description>A simpler way of querying a CosmosDb Namespace</Description>
-		<Copyright>Nor Gelera 2023</Copyright>
-		<Owners>Nor Gelera</Owners>
+		<Copyright>kuromukira 2023</Copyright>
+		<Owners>kuromukira</Owners>
 		<PackageReleaseNotes>View release on https://github.com/kuromukira/universe/releases</PackageReleaseNotes>
 		<RootNamespace>Universe</RootNamespace>
 		<Configurations>Release;Debug</Configurations>
@@ -15,16 +15,16 @@
 	<PropertyGroup>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<Description>A simpler way of querying a CosmosDb Namespace</Description>
-		<Copyright>Nor Gelera 2023</Copyright>
+		<Copyright>kuromukira 2023</Copyright>
 		<RepositoryUrl>https://github.com/kuromukira/universe</RepositoryUrl>
 		<PackageTags>cosmos simple query</PackageTags>
 		<RepositoryType>Git</RepositoryType>
-		<Authors>Nor Gelera</Authors>
+		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>2.2.0</Version>
+		<Version>2.2.1</Version>
 		<PackageReleaseNotes>View release on https://github.com/kuromukira/universe/releases</PackageReleaseNotes>
-		<AssemblyVersion>2.2.0.0</AssemblyVersion>
-		<FileVersion>2.2.0.0</FileVersion>
+		<AssemblyVersion>2.2.1.0</AssemblyVersion>
+		<FileVersion>2.2.1.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
