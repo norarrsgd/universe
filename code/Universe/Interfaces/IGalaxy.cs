@@ -8,11 +8,6 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
     /// <summary>
     /// Get one model from the database
     /// </summary>
-    Task<(Gravity g, T T)> Get(string id, string partitionKey);
-
-    /// <summary>
-    /// Get one model from the database
-    /// </summary>
     Task<(Gravity g, T T)> Get(IList<Cluster> clusters, IList<string> columns = null);
 
     /// <summary>

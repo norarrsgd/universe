@@ -29,4 +29,9 @@ public interface IGalaxyBasic<T> where T : ICosmicEntity
     /// Remove one model from the database
     /// </summary>
     Task<Gravity> Remove(string id, string partitionKey);
+
+    /// <summary>
+    /// Get one model from the database
+    /// </summary>
+    Task<(Gravity g, T T)> Get(string id, string partitionKey);
 }

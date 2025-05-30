@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading.Tasks.Dataflow;
 using Universe.Builder;
 using Universe.Response;
 
@@ -32,21 +33,41 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         if (!_allowBulk)
             throw new UniverseException("Bulk create of documents is not configured properly.");
 
-        Gravity gravity = new(0, string.Empty);
-        List<Task> tasks = new(models.Count);
+        List<Task<double>> tasks = new(models.Count);
 
-        foreach (T model in models)
+        IEnumerable<IGrouping<string, T>> partitionGroups = models.GroupBy(m => m.PartitionKey);
+        foreach (IGrouping<string, T> group in partitionGroups)
         {
-            if (string.IsNullOrWhiteSpace(model.id))
-                model.id = Guid.NewGuid().ToString();
-            model.AddedOn = DateTime.UtcNow;
+            if (string.IsNullOrWhiteSpace(group.Key))
+                throw new UniverseException("PartitionKey cannot be null or empty.");
 
-            tasks.Add(_container.CreateItemAsync(model, new PartitionKey(model.PartitionKey))
-                .ContinueWith(response => gravity = new(gravity.RU + response.Result.RequestCharge, string.Empty)));
+            TransactionalBatch batch = _container.CreateTransactionalBatch(new PartitionKey(group.Key));
+
+            foreach (T model in group)
+            {
+                if (string.IsNullOrWhiteSpace(model.id))
+                    model.id = Guid.NewGuid().ToString();
+                model.AddedOn = DateTime.UtcNow;
+
+                batch.CreateItem(model);
+            }
+
+            tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
+            {
+                if (!t.IsCompletedSuccessfully)
+                    throw new UniverseException(t.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+
+                if (t.Result.IsSuccessStatusCode)
+                    return t.Result.RequestCharge;
+                else
+                    throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}. Message: {t.Result.ErrorMessage}");
+            }));
         }
 
         await Task.WhenAll(tasks);
-        return gravity;
+        double totalRu = tasks.Sum(t => t.Result);
+
+        return new(totalRu, string.Empty);
     }
 
     async Task<(Gravity, T)> IGalaxyBasic<T>.Modify(T model)
@@ -75,25 +96,39 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             if (!_allowBulk)
                 throw new UniverseException("Bulk modify of documents is not configured properly.");
 
-            Gravity gravity = new(0, string.Empty);
-            List<Task> tasks = new(models.Count);
+            List<Task<double>> tasks = new(models.Count);
 
-            foreach (T model in models)
+            IEnumerable<IGrouping<string, T>> partitionGroups = models.GroupBy(m => m.PartitionKey);
+            foreach (IGrouping<string, T> group in partitionGroups)
             {
-                model.ModifiedOn = DateTime.UtcNow;
+                if (string.IsNullOrWhiteSpace(group.Key))
+                    throw new UniverseException("PartitionKey cannot be null or empty.");
 
-                tasks.Add(_container.ReplaceItemAsync(model, model.id, new PartitionKey(model.PartitionKey))
-                    .ContinueWith(response =>
-                    {
-                        if (!response.IsCompletedSuccessfully)
-                            throw new UniverseException(response.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+                TransactionalBatch batch = _container.CreateTransactionalBatch(new PartitionKey(group.Key));
 
-                        gravity = new(gravity.RU + response.Result.RequestCharge, string.Empty);
-                    }));
+                foreach (T model in group)
+                {
+                    model.ModifiedOn = DateTime.UtcNow;
+
+                    batch.ReplaceItem(model.id, model);
+                }
+
+                tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
+                {
+                    if (!t.IsCompletedSuccessfully)
+                        throw new UniverseException(t.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+
+                    if (t.Result.IsSuccessStatusCode)
+                        return t.Result.RequestCharge;
+                    else
+                        throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}. Message: {t.Result.ErrorMessage}");
+                }));
             }
 
             await Task.WhenAll(tasks);
-            return gravity;
+            double totalRu = tasks.Sum(t => t.Result);
+
+            return new(totalRu, string.Empty);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -111,6 +146,22 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, new PartitionKey(partitionKey));
             return new(response.RequestCharge, null);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UniverseException($"{typeof(T).Name} does not exist.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw;
+        }
+    }
+    async Task<(Gravity, T)> IGalaxyBasic<T>.Get(string id, string partitionKey)
+    {
+        try
+        {
+            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new PartitionKey(partitionKey));
+            return (new(response.RequestCharge, null), response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
