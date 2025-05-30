@@ -1,15 +1,15 @@
-﻿namespace Universe.Options.Query;
+﻿namespace Universe.Builder.Options;
 
 /// <summary></summary>
 /// <param name="Names">List of column names to be part of the query</param>
 /// <param name="IsDistinct">Adds DISTINCT in the generated query</param>
 /// <param name="Top">Only select the specified number of top rows</param>
-/// <param name="Count">
-///     Count the number of rows. Please note that the column <paramref name="Names"/>
-///     will be added as part of the GROUP BY clause
+/// <param name="Aggregates">
+///         List of aggregates to be applied to the query.
+///         If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
 /// </param>
 public record struct ColumnOptions(
     IList<string> Names,
     bool IsDistinct = false,
     int Top = 0,
-    bool Count = false);
+    Dictionary<string, Q.Aggregate> Aggregates = null);

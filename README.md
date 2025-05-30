@@ -69,6 +69,33 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
 
 5. Inject your `IGalaxy<MyModel>` dependency into your classes and enjoy a simpler way to query CosmosDb
 
+## Understanding the Gravity Object
+
+The `Gravity` object is returned by all operations and contains valuable information:
+
+```csharp
+(Gravity gravity, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
+
+// Request Units consumed by the operation
+double requestUnits = gravity.RU;
+
+// Continuation token for pagination (only populated in Paged queries)
+string continuationToken = gravity.ContinuationToken;
+
+// Query information (only available when debug mode is enabled)
+if (gravity.Query.HasValue)
+{
+    string queryText = gravity.Query.Value.Text;
+    IEnumerable<(string, object)> parameters = gravity.Query.Value.Parameters;
+    
+    Console.WriteLine($"Query: {queryText}");
+    foreach ((string name, object value) in parameters)
+    {
+        Console.WriteLine($"Parameter: {name} = {value}");
+    }
+}
+```
+
 ## Basic Operations
 
 ### Simple Query Operations
@@ -272,7 +299,7 @@ string continuationToken = gravity.ContinuationToken;
 );
 ```
 
-### Group By Queries
+### Aggregation and Group By Queries
 
 ```csharp
 // Group by a property
@@ -281,42 +308,86 @@ string continuationToken = gravity.ContinuationToken;
     group: new List<string> { nameof(MyModel.Category) }
 );
 
-// Group by with COUNT
+// Using aggregation functions with ColumnOptions.Aggregates
 (Gravity gravity, IList<MyModel> results) = await galaxy.List(
     clusters: new List<Cluster>() { /* query conditions */ },
     columnOptions: new ColumnOptions(
         Names: new List<string> { nameof(MyModel.Category) },
-        Count: true
+        Aggregates: new Dictionary<string, Q.Aggregate> {
+            { nameof(MyModel.Price), Q.Aggregate.Sum },
+            { nameof(MyModel.Quantity), Q.Aggregate.Count }
+        }
+    )
+);
+
+// Multiple aggregation functions in one query
+(Gravity gravity, IList<MyModel> results) = await galaxy.List(
+    clusters: new List<Cluster>() { /* query conditions */ },
+    columnOptions: new ColumnOptions(
+        Names: new List<string> { nameof(MyModel.Category) },
+        Aggregates: new Dictionary<string, Q.Aggregate> {
+            { nameof(MyModel.Price), Q.Aggregate.Sum },
+            { nameof(MyModel.Price), Q.Aggregate.Avg },
+            { nameof(MyModel.Quantity), Q.Aggregate.Max }
+        }
     )
 );
 ```
 
-## Understanding the Gravity Object
+The `Aggregates` parameter in `ColumnOptions` supports the following aggregate functions:
 
-The `Gravity` object is returned by all operations and contains valuable information:
+- `Q.Aggregate.Count`: Counts the number of items
+- `Q.Aggregate.Sum`: Calculates the sum of the specified column
+- `Q.Aggregate.Min`: Finds the minimum value of the specified column
+- `Q.Aggregate.Max`: Finds the maximum value of the specified column
+- `Q.Aggregate.Avg`: Calculates the average of the specified column
+
+When using aggregates, the query will automatically be grouped by the columns specified in the `Names` parameter. The output column names will be suffixed with the aggregate function name (e.g., `Price_Sum`, `Price_Avg`, `Quantity_Max`).
+
+## Stored Procedures
+
+You can manage and execute Cosmos DB stored procedures using the `IGalaxyProcedure` interface. Inject your repository as `IGalaxyProcedure` and use its methods for full stored procedure lifecycle management and execution.
 
 ```csharp
-(Gravity gravity, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
+IGalaxyProcedure galaxyProcedure = ...; // Injected or resolved from DI
 
-// Request Units consumed by the operation
-double requestUnits = gravity.RU;
+// Execute a stored procedure and get a result of type T
+(Gravity gravity, MyModel result) = await galaxyProcedure.ExecSProc<MyModel>(
+    procedureName: "myStoredProcedure",
+    partitionKey: "partition-key-value",
+    parameters: new object[] { /* procedure parameters */ }
+);
 
-// Continuation token for pagination (only populated in Paged queries)
-string continuationToken = gravity.ContinuationToken;
+// Create a new stored procedure
+Gravity createResult = await galaxyProcedure.CreateSProc(
+    procedureName: "myStoredProcedure",
+    body: "function (...) { /* JS code */ }"
+);
 
-// Query information (only available when debug mode is enabled)
-if (gravity.Query.HasValue)
-{
-    string queryText = gravity.Query.Value.Text;
-    IEnumerable<(string, object)> parameters = gravity.Query.Value.Parameters;
-    
-    Console.WriteLine($"Query: {queryText}");
-    foreach ((string name, object value) in parameters)
-    {
-        Console.WriteLine($"Parameter: {name} = {value}");
-    }
-}
+// Read a stored procedure's body
+(Gravity readGravity, string body) = await galaxyProcedure.ReadSProc("myStoredProcedure");
+
+// Replace an existing stored procedure
+Gravity replaceResult = await galaxyProcedure.ReplaceSProc(
+    procedureName: "myStoredProcedure",
+    newBody: "function (...) { /* new JS code */ }"
+);
+
+// Delete a stored procedure
+Gravity deleteResult = await galaxyProcedure.DeleteSProc("myStoredProcedure");
+
+// List all stored procedure names
+(Gravity listGravity, IList<string> names) = await galaxyProcedure.ListSProcs();
 ```
+
+- `ExecSProc<T>`: Executes a stored procedure and returns a tuple of `Gravity` and the deserialized result of type `T`.
+- `CreateSProc`: Creates a new stored procedure with the given name and body.
+- `ReadSProc`: Reads the body of a stored procedure.
+- `ReplaceSProc`: Replaces the body of an existing stored procedure.
+- `DeleteSProc`: Deletes a stored procedure by name.
+- `ListSProcs`: Lists all stored procedure names in the container.
+
+The `Gravity` object provides RU and diagnostic information for each operation.
 
 ## Error Handling
 

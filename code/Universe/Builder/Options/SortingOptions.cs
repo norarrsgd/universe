@@ -1,4 +1,4 @@
-﻿namespace Universe.Options.Query;
+﻿namespace Universe.Builder.Options;
 
 /// <summary></summary>
 public struct Sorting
