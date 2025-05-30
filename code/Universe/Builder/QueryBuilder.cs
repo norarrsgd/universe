@@ -43,9 +43,6 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
                     columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery)
                         ? toAppend
                         : $"{columnsInQuery}, {toAppend}";
-
-                    if (!groups.Contains(aggregate.Key) && aggregate.Value is not Q.Aggregate.Count)
-                        groups.Add(aggregate.Key);
                 }
 
                 groups = [.. groups.Distinct()];

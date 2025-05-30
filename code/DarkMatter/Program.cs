@@ -160,9 +160,10 @@ Console.WriteLine($"Deleted item, RU: {g5d.RU}");
 Console.WriteLine("\n=== EXAMPLE 6: Bulk Operations ===\n");
 
 // Create multiple items
-List<MyObject> bulkItems = new();
+List<MyObject> bulkItems = [];
 for (int i = 1; i <= 3; i++)
-{    bulkItems.Add(new MyObject
+{
+    bulkItems.Add(new MyObject
     {
         Code = "BULK-" + i,
         Name = $"Bulk Item {i}",
@@ -178,7 +179,7 @@ Gravity g6 = await galaxy.Create(bulkItems);
 Console.WriteLine($"Created {bulkItems.Count} items in bulk, RU: {g6.RU}");
 
 // Clean up bulk items (in a real application, you might not want to do this immediately)
-foreach (var item in bulkItems)
+foreach (MyObject item in bulkItems)
 {
     await galaxy.Remove(item.id, item.Code);
 }
@@ -187,7 +188,7 @@ foreach (var item in bulkItems)
 Console.WriteLine("\n=== EXAMPLE 7: Advanced Aggregation by Category ===\n");
 
 // First create some sample data with categories
-List<MyObject> categoryItems = new();
+List<MyObject> categoryItems = [];
 string[] categories = ["Electronics", "Books", "Clothing", "Toys"];
 Random random = new();
 
@@ -232,7 +233,7 @@ if (g7b.Query != default)
     Console.WriteLine($"Query: {g7b.Query.Text}");
 }
 
-foreach (var item in results7)
+foreach (MyObject item in results7)
 {
     // Note: With GROUP BY queries, you'd typically access the dynamic properties
     // based on the column name + aggregate function suffix
@@ -241,7 +242,7 @@ foreach (var item in results7)
 }
 
 // Clean up category items
-foreach (var item in categoryItems)
+foreach (MyObject item in categoryItems)
 {
     await galaxy.Remove(item.id, item.Code);
 }
@@ -250,7 +251,7 @@ foreach (var item in categoryItems)
 Console.WriteLine("\n=== EXAMPLE 8: Sales Analysis Scenario ===\n");
 
 // Create sample sales data
-List<MyObject> salesData = new();
+List<MyObject> salesData = [];
 string[] regions = ["North", "South", "East", "West"];
 string[] products = ["Laptop", "Phone", "Tablet", "Desktop"];
 DateTime today = DateTime.Today;
@@ -261,7 +262,7 @@ for (int i = 1; i <= 20; i++)
     int daysAgo = random.Next(0, 30);
     string region = regions[random.Next(regions.Length)];
     string product = products[random.Next(products.Length)];
-    
+
     salesData.Add(new MyObject
     {
         Code = $"SALE-{i}",
@@ -343,7 +344,7 @@ Console.WriteLine("Older Sales (7-30 days ago):");
 PrintQueryResults(g8d, olderSales);
 
 // Clean up sales data
-foreach (var item in salesData)
+foreach (MyObject item in salesData)
 {
     await galaxy.Remove(item.id, item.Code);
 }
@@ -355,22 +356,22 @@ Console.ReadLine();
 void PrintQueryResults(Gravity g, IList<MyObject> results)
 {
     Console.WriteLine($"RU Spent: {g.RU}");
-    
+
     // Display query information if available
     if (g.Query != default)
     {
         Console.WriteLine($"Query: {g.Query.Text}");
-        foreach (var p in g.Query.Parameters)
+        foreach ((string, object) p in g.Query.Parameters)
             Console.WriteLine($"  Parameter: {p.Item1} = {p.Item2}");
     }
-    
+
     Console.WriteLine($"Result Count: {results.Count}");
-    
+
     // Print first few results if any
     int displayCount = Math.Min(results.Count, 3);
     for (int i = 0; i < displayCount; i++)
     {
-        Console.WriteLine($"  Item {i+1}: {results[i].id} - {results[i].Name}");
+        Console.WriteLine($"  Item {i + 1}: {results[i].id} - {results[i].Name}");
     }
 }
 
@@ -391,12 +392,12 @@ class MyObject : ICosmicEntity
     public string Description { get; set; }
 
     public string[] Links { get; set; }
-    
+
     // Numeric properties for aggregation examples
     public double Price { get; set; }
-    
+
     public int Quantity { get; set; }
-    
+
     public string Category { get; set; }
 }
 
