@@ -13,23 +13,6 @@ public abstract class Galaxy<T>(
     string partitionKey,
     bool recordQueries = false) : GalaxyBasic<T>(client, database, container, partitionKey, recordQueries), IGalaxy<T> where T : class, ICosmicEntity
 {
-    async Task<(Gravity, T)> IGalaxy<T>.Get(string id, string partitionKey)
-    {
-        try
-        {
-            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new PartitionKey(partitionKey));
-            return (new(response.RequestCharge, null), response.Resource);
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
-            throw new UniverseException($"{typeof(T).Name} does not exist.");
-        }
-        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
-        {
-            throw;
-        }
-    }
-
     async Task<(Gravity, T)> IGalaxy<T>.Get(IList<Cluster> clusters, IList<string> columns)
     {
         try
