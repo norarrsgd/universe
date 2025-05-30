@@ -1,4 +1,4 @@
-﻿namespace Universe.Options.Query;
+﻿namespace Universe.Builder.Options;
 
 /// <summary>Query Options</summary>
 public struct Q

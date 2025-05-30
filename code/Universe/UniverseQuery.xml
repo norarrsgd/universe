@@ -4,6 +4,214 @@
         <name>UniverseQuery</name>
     </assembly>
     <members>
+        <member name="T:Universe.Builder.Options.ColumnOptions">
+            <summary></summary>
+            <param name="Names">List of column names to be part of the query</param>
+            <param name="IsDistinct">Adds DISTINCT in the generated query</param>
+            <param name="Top">Only select the specified number of top rows</param>
+            <param name="Count">
+                Count the number of rows. Please note that the column <paramref name="Names"/>
+                will be added as part of the GROUP BY clause
+            </param>
+        </member>
+        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Boolean)">
+            <summary></summary>
+            <param name="Names">List of column names to be part of the query</param>
+            <param name="IsDistinct">Adds DISTINCT in the generated query</param>
+            <param name="Top">Only select the specified number of top rows</param>
+            <param name="Count">
+                Count the number of rows. Please note that the column <paramref name="Names"/>
+                will be added as part of the GROUP BY clause
+            </param>
+        </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.Names">
+            <summary>List of column names to be part of the query</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.IsDistinct">
+            <summary>Adds DISTINCT in the generated query</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.Top">
+            <summary>Only select the specified number of top rows</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.Count">
+            <summary>
+                Count the number of rows. Please note that the column <paramref name="Names"/>
+                will be added as part of the GROUP BY clause
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Catalyst">
+            <summary>
+            Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
+            </summary>
+            <param name="Column">Column name</param>
+            <param name="Value">Value for the where clause associated with the Column</param>
+            <param name="Where">Where operator (eg AND / OR)</param>
+            <param name="Operator">Boolean expression operator</param>
+        </member>
+        <member name="M:Universe.Builder.Options.Catalyst.#ctor(System.String,System.Object,Universe.Builder.Options.Q.Where,Universe.Builder.Options.Q.Operator)">
+            <summary>
+            Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
+            </summary>
+            <param name="Column">Column name</param>
+            <param name="Value">Value for the where clause associated with the Column</param>
+            <param name="Where">Where operator (eg AND / OR)</param>
+            <param name="Operator">Boolean expression operator</param>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.Column">
+            <summary>Column name</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.Value">
+            <summary>Value for the where clause associated with the Column</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.Where">
+            <summary>Where operator (eg AND / OR)</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.Operator">
+            <summary>Boolean expression operator</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.Catalyst.RuleViolations">
+            <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.CatalystExtension">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.CatalystExtension.ParameterName(Universe.Builder.Options.Catalyst)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Q">
+            <summary>Query Options</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Q.Limits">
+            <summary>Query Limits</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Limits.MaxItems">
+            <summary>Maximum number of items to return</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Limits.MaxRU">
+            <summary>Maximum number of RU per query</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Q.Page">
+            <summary>Page definition for paginated queries</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.Q.Page.#ctor(System.Int32,System.String)">
+            <summary>Page definition for paginated queries</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Q.Where">
+            <summary>AND / OR where clause operators</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Where.And">
+            <summary></summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Where.Or">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Q.Operator">
+            <summary>Equality operator</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Eq">
+            <summary>Equal</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotEq">
+            <summary>Not Equal</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Gt">
+            <summary>Greater Than</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Gte">
+            <summary>Greater Than Or Equal</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Lt">
+            <summary>Lower Than</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Lte">
+            <summary>Lower Than Or Equal</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.In">
+            <summary>In</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotIn">
+            <summary>Not In</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Like">
+            <summary>Like</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotLike">
+            <summary>Not Like</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Defined">
+            <summary>IS_DEFINED</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotDefined">
+            <summary>NOT IS_DEFINED</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.WhereExtension">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.WhereExtension.Value(Universe.Builder.Options.Q.Where)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.OperatorExtension">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.OperatorExtension.Value(Universe.Builder.Options.Q.Operator)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Sorting">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Sorting.Direction">
+            <summary></summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Sorting.Direction.ASC">
+            <summary>Ascending</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Sorting.Direction.DESC">
+            <summary>Descending</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Sorting.Option">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.Sorting.Option.#ctor(System.String,Universe.Builder.Options.Sorting.Direction)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.SortOptionDirectionExtension">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.SortOptionDirectionExtension.Value(Universe.Builder.Options.Sorting.Direction)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.UniverseSerializer">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.UniverseSerializer.#ctor">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.UniverseSerializer.FromStream``1(System.IO.Stream)">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.UniverseSerializer.ToStream``1(``0)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.Cluster">
+            <summary>
+            Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
+            </summary>
+            <param name="Catalysts">Catalysts under one group / cluster</param>
+            <param name="Where">Where operator (eg AND / OR)</param>
+        </member>
+        <member name="M:Universe.Builder.Options.Cluster.#ctor(System.Collections.Generic.IList{Universe.Builder.Options.Catalyst},Universe.Builder.Options.Q.Where)">
+            <summary>
+            Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
+            </summary>
+            <param name="Catalysts">Catalysts under one group / cluster</param>
+            <param name="Where">Where operator (eg AND / OR)</param>
+        </member>
+        <member name="P:Universe.Builder.Options.Cluster.Catalysts">
+            <summary>Catalysts under one group / cluster</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Cluster.Where">
+            <summary>Where operator (eg AND / OR)</summary>
+        </member>
         <member name="T:Universe.Exception.UniverseException">
             <summary></summary>
         </member>
@@ -18,17 +226,25 @@
         </member>
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement Universe</summary>
+            <remarks></remarks>
         </member>
         <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
+            <summary>Inherit repositories to implement Universe</summary>
+            <remarks></remarks>
+        </member>
+        <member name="T:Universe.GalaxyBasic`1">
+            <summary>Inherit repositories to implement the very basic Universe</summary>
+        </member>
+        <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
             <summary></summary>
         </member>
-        <member name="M:Universe.Galaxy`1.Dispose(System.Boolean)">
+        <member name="M:Universe.GalaxyBasic`1.Dispose(System.Boolean)">
             <summary></summary>
         </member>
-        <member name="M:Universe.Galaxy`1.Finalize">
+        <member name="M:Universe.GalaxyBasic`1.Finalize">
             <summary></summary>
         </member>
-        <member name="M:Universe.Galaxy`1.Dispose">
+        <member name="M:Universe.GalaxyBasic`1.Dispose">
             <summary></summary>
         </member>
         <member name="T:Universe.Interfaces.ICosmicEntity">
@@ -49,249 +265,53 @@
         <member name="T:Universe.Interfaces.IGalaxy`1">
             <summary></summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Create(`0)">
-            <summary>
-            Create a new model in the database
-            </summary>
-        </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Create(System.Collections.Generic.IList{`0})">
-            <summary>
-            Bulk create new models in the database
-            </summary>
-        </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Modify(`0)">
-            <summary>
-            Modify a model in the database
-            </summary>
-        </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Modify(System.Collections.Generic.IList{`0})">
-            <summary>
-            Bulk modify models in the database
-            </summary>
-        </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Remove(System.String,System.String)">
-            <summary>
-            Remove one model from the database
-            </summary>
-        </member>
         <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.String,System.String)">
             <summary>
             Get one model from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IList{Universe.Options.Query.Cluster},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
             <summary>
             Get one model from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IList{Universe.Options.Query.Cluster},System.Nullable{Universe.Options.Query.ColumnOptions},System.Collections.Generic.IList{Universe.Options.Query.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
             <summary>
             Get list from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Options.Query.Q.Page,System.Collections.Generic.IList{Universe.Options.Query.Cluster},System.Nullable{Universe.Options.Query.ColumnOptions},System.Collections.Generic.IList{Universe.Options.Query.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
             <summary>
             Get a paginated list from the database
             </summary>
         </member>
-        <member name="T:Universe.Options.Query.ColumnOptions">
+        <member name="T:Universe.Interfaces.IGalaxyBasic`1">
             <summary></summary>
-            <param name="Names">List of column names to be part of the query</param>
-            <param name="IsDistinct">Adds DISTINCT in the generated query</param>
-            <param name="Top">Only select the specified number of top rows</param>
-            <param name="Count">
-                Count the number of rows. Please note that the column <paramref name="Names"/>
-                will be added as part of the GROUP BY clause
-            </param>
         </member>
-        <member name="M:Universe.Options.Query.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Boolean)">
-            <summary></summary>
-            <param name="Names">List of column names to be part of the query</param>
-            <param name="IsDistinct">Adds DISTINCT in the generated query</param>
-            <param name="Top">Only select the specified number of top rows</param>
-            <param name="Count">
-                Count the number of rows. Please note that the column <paramref name="Names"/>
-                will be added as part of the GROUP BY clause
-            </param>
-        </member>
-        <member name="P:Universe.Options.Query.ColumnOptions.Names">
-            <summary>List of column names to be part of the query</summary>
-        </member>
-        <member name="P:Universe.Options.Query.ColumnOptions.IsDistinct">
-            <summary>Adds DISTINCT in the generated query</summary>
-        </member>
-        <member name="P:Universe.Options.Query.ColumnOptions.Top">
-            <summary>Only select the specified number of top rows</summary>
-        </member>
-        <member name="P:Universe.Options.Query.ColumnOptions.Count">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Create(`0)">
             <summary>
-                Count the number of rows. Please note that the column <paramref name="Names"/>
-                will be added as part of the GROUP BY clause
+            Create a new model in the database
             </summary>
         </member>
-        <member name="T:Universe.Options.Query.Catalyst">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Create(System.Collections.Generic.IList{`0})">
             <summary>
-            Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
+            Bulk create new models in the database
             </summary>
-            <param name="Column">Column name</param>
-            <param name="Value">Value for the where clause associated with the Column</param>
-            <param name="Where">Where operator (eg AND / OR)</param>
-            <param name="Operator">Boolean expression operator</param>
         </member>
-        <member name="M:Universe.Options.Query.Catalyst.#ctor(System.String,System.Object,Universe.Options.Query.Q.Where,Universe.Options.Query.Q.Operator)">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Modify(`0)">
             <summary>
-            Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
+            Modify a model in the database
             </summary>
-            <param name="Column">Column name</param>
-            <param name="Value">Value for the where clause associated with the Column</param>
-            <param name="Where">Where operator (eg AND / OR)</param>
-            <param name="Operator">Boolean expression operator</param>
         </member>
-        <member name="P:Universe.Options.Query.Catalyst.Column">
-            <summary>Column name</summary>
-        </member>
-        <member name="P:Universe.Options.Query.Catalyst.Value">
-            <summary>Value for the where clause associated with the Column</summary>
-        </member>
-        <member name="P:Universe.Options.Query.Catalyst.Where">
-            <summary>Where operator (eg AND / OR)</summary>
-        </member>
-        <member name="P:Universe.Options.Query.Catalyst.Operator">
-            <summary>Boolean expression operator</summary>
-        </member>
-        <member name="M:Universe.Options.Query.Catalyst.RuleViolations">
-            <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
-        </member>
-        <member name="T:Universe.Options.Query.CatalystExtension">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.Query.CatalystExtension.ParameterName(Universe.Options.Query.Catalyst)">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.Q">
-            <summary>Query Options</summary>
-        </member>
-        <member name="T:Universe.Options.Query.Q.Page">
-            <summary>Page definition for paginated queries</summary>
-        </member>
-        <member name="M:Universe.Options.Query.Q.Page.#ctor(System.Int32,System.String)">
-            <summary>Page definition for paginated queries</summary>
-        </member>
-        <member name="T:Universe.Options.Query.Q.Where">
-            <summary>AND / OR where clause operators</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Where.And">
-            <summary></summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Where.Or">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.Q.Operator">
-            <summary>Equality operator</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Eq">
-            <summary>Equal</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.NotEq">
-            <summary>Not Equal</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Gt">
-            <summary>Greater Than</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Gte">
-            <summary>Greater Than Or Equal</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Lt">
-            <summary>Lower Than</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Lte">
-            <summary>Lower Than Or Equal</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.In">
-            <summary>In</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.NotIn">
-            <summary>Not In</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Like">
-            <summary>Like</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.NotLike">
-            <summary>Not Like</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.Defined">
-            <summary>IS_DEFINED</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Q.Operator.NotDefined">
-            <summary>NOT IS_DEFINED</summary>
-        </member>
-        <member name="T:Universe.Options.Query.WhereExtension">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.Query.WhereExtension.Value(Universe.Options.Query.Q.Where)">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.OperatorExtension">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.Query.OperatorExtension.Value(Universe.Options.Query.Q.Operator)">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.Sorting">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.Sorting.Direction">
-            <summary></summary>
-        </member>
-        <member name="F:Universe.Options.Query.Sorting.Direction.ASC">
-            <summary>Ascending</summary>
-        </member>
-        <member name="F:Universe.Options.Query.Sorting.Direction.DESC">
-            <summary>Descending</summary>
-        </member>
-        <member name="T:Universe.Options.Query.Sorting.Option">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.Query.Sorting.Option.#ctor(System.String,Universe.Options.Query.Sorting.Direction)">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.SortOptionDirectionExtension">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.Query.SortOptionDirectionExtension.Value(Universe.Options.Query.Sorting.Direction)">
-            <summary></summary>
-        </member>
-        <member name="T:Universe.Options.Query.Cluster">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Modify(System.Collections.Generic.IList{`0})">
             <summary>
-            Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
+            Bulk modify models in the database
             </summary>
-            <param name="Catalysts">Catalysts under one group / cluster</param>
-            <param name="Where">Where operator (eg AND / OR)</param>
         </member>
-        <member name="M:Universe.Options.Query.Cluster.#ctor(System.Collections.Generic.IList{Universe.Options.Query.Catalyst},Universe.Options.Query.Q.Where)">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Remove(System.String,System.String)">
             <summary>
-            Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
+            Remove one model from the database
             </summary>
-            <param name="Catalysts">Catalysts under one group / cluster</param>
-            <param name="Where">Where operator (eg AND / OR)</param>
-        </member>
-        <member name="P:Universe.Options.Query.Cluster.Catalysts">
-            <summary>Catalysts under one group / cluster</summary>
-        </member>
-        <member name="P:Universe.Options.Query.Cluster.Where">
-            <summary>Where operator (eg AND / OR)</summary>
-        </member>
-        <member name="T:Universe.Options.UniverseSerializer">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.UniverseSerializer.#ctor">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.UniverseSerializer.FromStream``1(System.IO.Stream)">
-            <summary></summary>
-        </member>
-        <member name="M:Universe.Options.UniverseSerializer.ToStream``1(``0)">
-            <summary></summary>
         </member>
         <member name="T:Universe.Response.Gravity">
             <summary>Query execution response</summary>

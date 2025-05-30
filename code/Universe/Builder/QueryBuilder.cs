@@ -1,6 +1,6 @@
 using Universe.Response;
 
-namespace Universe.Query;
+namespace Universe.Builder;
 
 internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEntity
 {
@@ -13,7 +13,7 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
             if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
                 columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c.{c}").ToList());
 
-            if ((columnOptions.Value.Top) > 0)
+            if (columnOptions.Value.Top > 0)
                 columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
 
             if (columnOptions.Value.IsDistinct)

@@ -2,8 +2,7 @@
 using Microsoft.Azure.Cosmos;
 using Universe;
 using Universe.Interfaces;
-using Universe.Options;
-using Universe.Options.Query;
+using Universe.Builder.Options;
 using Universe.Response;
 
 string CosmosDbUri = "<FROM AZURE>";

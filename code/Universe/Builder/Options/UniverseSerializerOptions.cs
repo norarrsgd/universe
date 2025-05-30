@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using Azure.Core.Serialization;
 
-namespace Universe.Options;
+namespace Universe.Builder.Options;
 
 /// <summary></summary>
 public class UniverseSerializer : CosmosSerializer
