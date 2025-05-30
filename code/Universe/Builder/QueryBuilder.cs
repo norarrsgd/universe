@@ -23,6 +23,7 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
             if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Count != 0)
             {
                 groups ??= [];
+                groups = [.. groups.Concat(columnOptions.Value.Names ?? []).Distinct()];
 
                 if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Key)))
                     throw new UniverseException("Aggregate keys must not be null or empty.");
