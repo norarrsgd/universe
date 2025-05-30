@@ -14,7 +14,7 @@ public struct Q
     }
 
     /// <summary>Page definition for paginated queries</summary>
-    public record Page(int Size, string ContinuationToken = null);
+    public record struct Page(int Size, string ContinuationToken = null);
 
     /// <summary>AND / OR where clause operators</summary>
     public enum Where
@@ -65,6 +65,25 @@ public struct Q
         /// <summary>NOT IS_DEFINED</summary>
         NotDefined
     }
+
+    /// <summary>Aggregation functions</summary>
+    public enum Aggregate
+    {
+        /// <summary>Count</summary>
+        Count,
+
+        /// <summary>Sum</summary>
+        Sum,
+
+        /// <summary>Min</summary>
+        Min,
+
+        /// <summary>Max</summary>
+        Max,
+
+        /// <summary>Avg</summary>
+        Avg
+    }
 }
 
 /// <summary></summary>
@@ -98,5 +117,20 @@ public static class OperatorExtension
         Q.Operator.Defined => "IS_DEFINED",
         Q.Operator.NotDefined => "NOT IS_DEFINED",
         _ => throw new UniverseException("Unrecognized OPERATOR keyword")
+    };
+}
+
+/// <summary></summary>
+public static class AggregateExtension
+{
+    /// <summary></summary>
+    public static string Value(this Q.Aggregate aggregate) => aggregate switch
+    {
+        Q.Aggregate.Count => "COUNT(1)",
+        Q.Aggregate.Sum => "SUM({0}) AS {0}_Sum",
+        Q.Aggregate.Min => "MIN({0}) AS {0}_Min",
+        Q.Aggregate.Max => "MAX({0}) AS {0}_Max",
+        Q.Aggregate.Avg => "AVG({0}) AS {0}_Avg",
+        _ => throw new UniverseException("Unrecognized AGGREGATE keyword")
     };
 }

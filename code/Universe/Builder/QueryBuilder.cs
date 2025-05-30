@@ -1,4 +1,5 @@
 using Universe.Response;
+using Universe.Builder.Options;
 
 namespace Universe.Builder;
 
@@ -16,14 +17,38 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
             if (columnOptions.Value.Top > 0)
                 columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
 
-            if (columnOptions.Value.IsDistinct)
+            if (columnOptions.Value.IsDistinct && columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
                 columnsInQuery = $"DISTINCT {columnsInQuery}";
 
-            if (columnOptions.Value.Count)
+            if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Count != 0)
             {
                 groups ??= [];
                 groups = [.. groups.Concat(columnOptions.Value.Names ?? []).Distinct()];
-                columnsInQuery = $"{columnsInQuery}, COUNT(1) Count";
+
+                if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Key)))
+                    throw new UniverseException("Aggregate keys must not be null or empty.");
+
+                foreach (KeyValuePair<string, Q.Aggregate> aggregate in columnOptions.Value.Aggregates)
+                {
+                    string toAppend = aggregate.Value switch
+                    {
+                        Q.Aggregate.Count => Q.Aggregate.Count.Value(),
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), aggregate.Key),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), aggregate.Key),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), aggregate.Key),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), aggregate.Key),
+                        _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Value}")
+                    };
+
+                    columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery)
+                        ? toAppend
+                        : $"{columnsInQuery}, {toAppend}";
+
+                    if (!groups.Contains(aggregate.Key) && aggregate.Value is not Q.Aggregate.Count)
+                        groups.Add(aggregate.Key);
+                }
+
+                groups = [.. groups.Distinct()];
             }
         }
 
