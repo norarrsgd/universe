@@ -225,12 +225,10 @@
             <summary>Custom exception</summary>
         </member>
         <member name="T:Universe.Galaxy`1">
-            <summary>Inherit repositories to implement Universe</summary>
-            <remarks></remarks>
+            <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
         <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
-            <summary>Inherit repositories to implement Universe</summary>
-            <remarks></remarks>
+            <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
         <member name="T:Universe.GalaxyBasic`1">
             <summary>Inherit repositories to implement the very basic Universe</summary>
@@ -238,14 +236,28 @@
         <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
             <summary></summary>
         </member>
-        <member name="M:Universe.GalaxyBasic`1.Dispose(System.Boolean)">
+        <member name="T:Universe.GalaxyCore">
+            <summary>
+            Base class for Universe implementations.
+            </summary>
+        </member>
+        <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
             <summary></summary>
         </member>
-        <member name="M:Universe.GalaxyBasic`1.Finalize">
+        <member name="M:Universe.GalaxyCore.Dispose(System.Boolean)">
             <summary></summary>
         </member>
-        <member name="M:Universe.GalaxyBasic`1.Dispose">
+        <member name="M:Universe.GalaxyCore.Finalize">
             <summary></summary>
+        </member>
+        <member name="M:Universe.GalaxyCore.Dispose">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.GalaxyProcedure">
+            <summary>Inherit repositories to implement stored procedures</summary>
+        </member>
+        <member name="M:Universe.GalaxyProcedure.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
+            <summary>Inherit repositories to implement stored procedures</summary>
         </member>
         <member name="T:Universe.Interfaces.ICosmicEntity">
             <summary>Base interface for Cosmos Entities</summary>
@@ -311,6 +323,39 @@
         <member name="M:Universe.Interfaces.IGalaxyBasic`1.Remove(System.String,System.String)">
             <summary>
             Remove one model from the database
+            </summary>
+        </member>
+        <member name="T:Universe.Interfaces.IGalaxyProcedure">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyProcedure.ExecSProc``1(System.String,System.String,System.Object[])">
+            <summary>
+            Execute a stored procedure
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyProcedure.CreateSProc(System.String,System.String)">
+            <summary>
+            Create a stored procedure
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyProcedure.ReadSProc(System.String)">
+            <summary>
+            Read a stored procedure
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyProcedure.ReplaceSProc(System.String,System.String)">
+            <summary>
+            Replace a stored procedure
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyProcedure.DeleteSProc(System.String)">
+            <summary>
+            Delete a stored procedure
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyProcedure.ListSProcs">
+            <summary>
+            List stored procedures (returns list of names)
             </summary>
         </member>
         <member name="T:Universe.Response.Gravity">

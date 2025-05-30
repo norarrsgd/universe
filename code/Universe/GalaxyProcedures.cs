@@ -45,4 +45,97 @@ public abstract class GalaxyProcedure(
             throw;
         }
     }
+
+    async Task<Gravity> IGalaxyProcedure.CreateSProc(string procedureName, string body)
+    {
+        try
+        {
+            StoredProcedureProperties props = new()
+            {
+                Id = procedureName,
+                Body = body
+            };
+            StoredProcedureResponse response = await _container.Scripts.CreateStoredProcedureAsync(props);
+            return new(response.RequestCharge, null, ($"CreateStoredProcedure: {procedureName}", null));
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new UniverseException($"Stored procedure '{procedureName}' already exists.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.Conflict)
+        {
+            throw;
+        }
+    }
+
+    async Task<(Gravity g, string body)> IGalaxyProcedure.ReadSProc(string procedureName)
+    {
+        try
+        {
+            StoredProcedureResponse response = await _container.Scripts.ReadStoredProcedureAsync(procedureName);
+            return (new(response.RequestCharge, null, ($"ReadStoredProcedure: {procedureName}", null)), response.Resource.Body);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UniverseException($"Stored procedure '{procedureName}' does not exist.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw;
+        }
+    }
+
+    async Task<Gravity> IGalaxyProcedure.ReplaceSProc(string procedureName, string newBody)
+    {
+        try
+        {
+            StoredProcedureProperties props = new()
+            {
+                Id = procedureName,
+                Body = newBody
+            };
+            StoredProcedureResponse response = await _container.Scripts.ReplaceStoredProcedureAsync(props);
+            return new(response.RequestCharge, null, ($"ReplaceStoredProcedure: {procedureName}", null));
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UniverseException($"Stored procedure '{procedureName}' does not exist.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw;
+        }
+    }
+
+    async Task<Gravity> IGalaxyProcedure.DeleteSProc(string procedureName)
+    {
+        try
+        {
+            StoredProcedureResponse response = await _container.Scripts.DeleteStoredProcedureAsync(procedureName);
+            return new(response.RequestCharge, null, ($"DeleteStoredProcedure: {procedureName}", null));
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UniverseException($"Stored procedure '{procedureName}' does not exist.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw;
+        }
+    }
+
+    async Task<(Gravity g, IList<string> names)> IGalaxyProcedure.ListSProcs()
+    {
+        FeedIterator<StoredProcedureProperties> iterator = _container.Scripts.GetStoredProcedureQueryIterator<StoredProcedureProperties>();
+        List<string> names = [];
+        double totalRU = 0;
+        while (iterator.HasMoreResults)
+        {
+            FeedResponse<StoredProcedureProperties> response = await iterator.ReadNextAsync();
+            totalRU += response.RequestCharge;
+            foreach (StoredProcedureProperties sProc in response)
+                names.Add(sProc.Id);
+        }
+        return (new(totalRU, null, ("ListStoredProcedures", null)), names);
+    }
 }

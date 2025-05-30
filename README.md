@@ -129,6 +129,14 @@ Gravity gravity = await galaxy.Modify(models);
 ```csharp
 // Delete a document
 Gravity gravity = await galaxy.Remove("document-id", "partition-key-value");
+
+// Bulk delete multiple documents
+List<(string id, string partitionKey)> itemsToDelete = new List<(string, string)>
+{
+    ("id1", "partitionKey1"),
+    ("id2", "partitionKey2")
+};
+Gravity gravity = await galaxy.Remove(itemsToDelete);
 ```
 
 ## Advanced Query Examples
