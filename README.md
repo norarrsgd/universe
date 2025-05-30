@@ -299,7 +299,7 @@ string continuationToken = gravity.ContinuationToken;
 );
 ```
 
-### Group By Queries
+### Aggregation and Group By Queries
 
 ```csharp
 // Group by a property
@@ -308,15 +308,41 @@ string continuationToken = gravity.ContinuationToken;
     group: new List<string> { nameof(MyModel.Category) }
 );
 
-// Group by with COUNT
+// Using aggregation functions with ColumnOptions.Aggregates
 (Gravity gravity, IList<MyModel> results) = await galaxy.List(
     clusters: new List<Cluster>() { /* query conditions */ },
     columnOptions: new ColumnOptions(
         Names: new List<string> { nameof(MyModel.Category) },
-        Count: true
+        Aggregates: new Dictionary<string, Q.Aggregate> {
+            { nameof(MyModel.Price), Q.Aggregate.Sum },
+            { nameof(MyModel.Quantity), Q.Aggregate.Count }
+        }
+    )
+);
+
+// Multiple aggregation functions in one query
+(Gravity gravity, IList<MyModel> results) = await galaxy.List(
+    clusters: new List<Cluster>() { /* query conditions */ },
+    columnOptions: new ColumnOptions(
+        Names: new List<string> { nameof(MyModel.Category) },
+        Aggregates: new Dictionary<string, Q.Aggregate> {
+            { nameof(MyModel.Price), Q.Aggregate.Sum },
+            { nameof(MyModel.Price), Q.Aggregate.Avg },
+            { nameof(MyModel.Quantity), Q.Aggregate.Max }
+        }
     )
 );
 ```
+
+The `Aggregates` parameter in `ColumnOptions` supports the following aggregate functions:
+
+- `Q.Aggregate.Count`: Counts the number of items
+- `Q.Aggregate.Sum`: Calculates the sum of the specified column
+- `Q.Aggregate.Min`: Finds the minimum value of the specified column
+- `Q.Aggregate.Max`: Finds the maximum value of the specified column
+- `Q.Aggregate.Avg`: Calculates the average of the specified column
+
+When using aggregates, the query will automatically be grouped by the columns specified in the `Names` parameter. The output column names will be suffixed with the aggregate function name (e.g., `Price_Sum`, `Price_Avg`, `Quantity_Max`).
 
 ## Stored Procedures
 
