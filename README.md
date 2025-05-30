@@ -349,7 +349,3 @@ catch (Exception ex)
 - **Column Selection**: Select only the columns you need to reduce data transfer.
 - **Debug Mode**: The debug mode (enabled by passing `true` to the Galaxy constructor) provides query details but adds overhead.
 - **Partition Key**: Always consider your partition strategy for best performance.
-
-## Additional Information
-
-For more detailed information about Universe, please check the [API Documentation](http://example.com) or the [GitHub repository](http://github.com/yourusername/universe).
