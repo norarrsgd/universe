@@ -31,32 +31,32 @@ IGalaxy<MyObject> galaxy = new MyRepo(
 // actual use of UniverseQuery
 (Gravity g, IList<MyObject> T) = await galaxy.Paged(
     page: new Q.Page(50),
-    clusters: new List<Cluster>()
-    {
-        new(Catalysts: new List<Catalyst>
-        {
+    clusters:
+    [
+        new(Catalysts:
+        [
             new(nameof(MyObject.Links), "<VALUE TO QUERY>", Operator: Q.Operator.In),
             new(nameof(MyObject.Code), "<VALUE TO QUERY>", Where: Q.Where.Or)
-        }, Where: Q.Where.And),
-        new(Catalysts: new List<Catalyst>
-        {
+        ], Where: Q.Where.And),
+        new(Catalysts:
+        [
             new(nameof(MyObject.Name), Operator: Q.Operator.Defined),
             new(nameof(MyObject.Description), Operator: Q.Operator.Defined)
-        }, Where: Q.Where.And)
-    },
+        ], Where: Q.Where.And)
+    ],
     columnOptions: new(
-        Names: new List<string>
-        {
+        Names:
+        [
             nameof(MyObject.id),
             nameof(MyObject.Code),
             nameof(MyObject.Name),
             nameof(MyObject.Description)
-        }
+        ]
     ),
-    sorting: new List<Sorting.Option>
-    {
+    sorting:
+    [
         new(nameof(MyObject.Name), Sorting.Direction.DESC)
-    }
+    ]
 );
 
 Console.WriteLine($"RU Spent: {g.RU}");
