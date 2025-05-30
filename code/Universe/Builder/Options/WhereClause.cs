@@ -1,4 +1,4 @@
-namespace Universe.Options.Query;
+namespace Universe.Builder.Options;
 
 /// <summary>
 /// Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
