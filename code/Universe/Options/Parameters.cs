@@ -18,7 +18,7 @@ public readonly record struct Catalyst(
     /// <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
     public IEnumerable<string> RuleViolations()
     {
-        List<string> violations = new();
+        List<string> violations = [];
 
         // Column name cannot be null or empty
         if (string.IsNullOrWhiteSpace(Column))

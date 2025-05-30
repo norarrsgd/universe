@@ -41,8 +41,8 @@ public abstract class Galaxy<T> : IDisposable, IGalaxy<T> where T : class, ICosm
 
             if (columnOptions.Value.Count)
             {
-                groups ??= new List<string>();
-                groups = groups.Concat(columnOptions.Value.Names ?? new List<string>()).Distinct().ToList();
+                groups ??= [];
+                groups = [.. groups.Concat(columnOptions.Value.Names ?? []).Distinct()];
                 columnsInQuery = $"{columnsInQuery}, COUNT(1) Count";
             }
         }
@@ -69,8 +69,8 @@ public abstract class Galaxy<T> : IDisposable, IGalaxy<T> where T : class, ICosm
                 // Validate Catalysts
                 if (cluster.Catalysts.Any(c => c.RuleViolations().Any()))
                 {
-                    List<IEnumerable<string>> violationsPerCatalyst = cluster.Catalysts.Select(c => c.RuleViolations()).ToList();
-                    List<string> violations = violationsPerCatalyst.SelectMany(v => v).ToList().Distinct().ToList();
+                    List<IEnumerable<string>> violationsPerCatalyst = [.. cluster.Catalysts.Select(c => c.RuleViolations())];
+                    List<string> violations = [.. violationsPerCatalyst.SelectMany(v => v).ToList().Distinct()];
                     throw new UniverseException(string.Join(Environment.NewLine, violations));
                 }
 
@@ -282,7 +282,7 @@ public abstract class Galaxy<T> : IDisposable, IGalaxy<T> where T : class, ICosm
     async Task<(Gravity, IList<T>)> GetListFromQuery(QueryDefinition query)
     {
         double requestCharge = 0;
-        List<T> collection = new();
+        List<T> collection = [];
         using FeedIterator<T> queryResponse = _container.GetItemQueryIterator<T>(query);
         while (queryResponse.HasMoreResults)
         {
@@ -315,7 +315,7 @@ public abstract class Galaxy<T> : IDisposable, IGalaxy<T> where T : class, ICosm
 
             double requestUnit = 0;
             string continuationToken = string.Empty;
-            List<T> collection = new();
+            List<T> collection = [];
             using FeedIterator<T> queryResponse = _container.GetItemQueryIterator<T>(query,
                 requestOptions: new() { MaxItemCount = page.Size },
                 continuationToken: string.IsNullOrWhiteSpace(page.ContinuationToken) ? null : page.ContinuationToken
