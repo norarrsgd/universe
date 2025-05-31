@@ -11,8 +11,12 @@ public class UniverseSerializer : CosmosSerializer
     /// <summary></summary>
     public UniverseSerializer() => SystemTextJsonSerializer = new(new()
     {
+        PropertyNamingPolicy = null,
         PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
+        IgnoreReadOnlyFields = true,
+        IgnoreReadOnlyProperties = true
     });
 
     /// <summary></summary>
