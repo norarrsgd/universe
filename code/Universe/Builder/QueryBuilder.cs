@@ -1,9 +1,8 @@
 using Universe.Response;
-using Universe.Builder.Options;
 
 namespace Universe.Builder;
 
-internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEntity
+internal class UniverseBuilder(bool recordQueries)
 {
     internal QueryDefinition CreateQuery(IList<Cluster> clusters, ColumnOptions? columnOptions = null, IList<Sorting.Option> sorting = null, IList<string> groups = null)
     {
@@ -20,25 +19,31 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
             if (columnOptions.Value.IsDistinct && columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
                 columnsInQuery = $"DISTINCT {columnsInQuery}";
 
-            if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Count != 0)
+            if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Count() > 0)
             {
+                if (columnOptions.Value.Names is null || !columnOptions.Value.Names.Any())
+                    throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
+
                 groups ??= [];
                 groups = [.. groups.Concat(columnOptions.Value.Names ?? []).Distinct()];
 
-                if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Key)))
-                    throw new UniverseException("Aggregate keys must not be null or empty.");
+                if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
+                    throw new UniverseException("Aggregate columns must not be null or empty.");
 
-                foreach (KeyValuePair<string, Q.Aggregate> aggregate in columnOptions.Value.Aggregates)
+                foreach (AggregationOption aggregate in columnOptions.Value.Aggregates)
                 {
-                    string toAppend = aggregate.Value switch
+                    string toAppend = aggregate.Aggregate switch
                     {
                         Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), aggregate.Key),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), aggregate.Key),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), aggregate.Key),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), aggregate.Key),
-                        _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Value}")
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), aggregate.Column),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), aggregate.Column),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), aggregate.Column),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), aggregate.Column),
+                        _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
+
+                    if (columnsInQuery.Contains(toAppend))
+                        continue;
 
                     columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery)
                         ? toAppend
@@ -131,7 +136,7 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
         _ => $"c.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
     };
 
-    async internal Task<(Gravity, T)> GetOneFromQuery(Container container, QueryDefinition query)
+    async internal Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query)
     {
         using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: new() { MaxItemCount = Q.Limits.MaxItems });
         if (queryResponse.HasMoreResults)
@@ -149,7 +154,7 @@ internal class UniverseBuilder<T>(bool recordQueries) where T : class, ICosmicEn
         else return new(new(0, null), default);
     }
 
-    async internal Task<(Gravity, IList<T>)> GetListFromQuery(Container container, QueryDefinition query)
+    async internal Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query)
     {
         double requestCharge = 0;
         List<T> collection = [];

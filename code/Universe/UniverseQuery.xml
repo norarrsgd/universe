@@ -4,24 +4,44 @@
         <name>UniverseQuery</name>
     </assembly>
     <members>
+        <member name="T:Universe.Builder.Options.AggregationOption">
+            <summary>
+            Represents a column aggregation.
+            </summary>
+            <param name="Column">The name of the column to aggregate.</param>
+            <param name="Aggregate">The aggregate function to apply to the column.</param>
+        </member>
+        <member name="M:Universe.Builder.Options.AggregationOption.#ctor(System.String,Universe.Builder.Options.Q.Aggregate)">
+            <summary>
+            Represents a column aggregation.
+            </summary>
+            <param name="Column">The name of the column to aggregate.</param>
+            <param name="Aggregate">The aggregate function to apply to the column.</param>
+        </member>
+        <member name="P:Universe.Builder.Options.AggregationOption.Column">
+            <summary>The name of the column to aggregate.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.AggregationOption.Aggregate">
+            <summary>The aggregate function to apply to the column.</summary>
+        </member>
         <member name="T:Universe.Builder.Options.ColumnOptions">
             <summary></summary>
             <param name="Names">List of column names to be part of the query</param>
             <param name="IsDistinct">Adds DISTINCT in the generated query</param>
             <param name="Top">Only select the specified number of top rows</param>
-            <param name="Count">
-                Count the number of rows. Please note that the column <paramref name="Names"/>
-                will be added as part of the GROUP BY clause
+            <param name="Aggregates">
+                    List of aggregates to be applied to the query.
+                    If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </param>
         </member>
-        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Boolean)">
+        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
             <summary></summary>
             <param name="Names">List of column names to be part of the query</param>
             <param name="IsDistinct">Adds DISTINCT in the generated query</param>
             <param name="Top">Only select the specified number of top rows</param>
-            <param name="Count">
-                Count the number of rows. Please note that the column <paramref name="Names"/>
-                will be added as part of the GROUP BY clause
+            <param name="Aggregates">
+                    List of aggregates to be applied to the query.
+                    If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </param>
         </member>
         <member name="P:Universe.Builder.Options.ColumnOptions.Names">
@@ -33,10 +53,10 @@
         <member name="P:Universe.Builder.Options.ColumnOptions.Top">
             <summary>Only select the specified number of top rows</summary>
         </member>
-        <member name="P:Universe.Builder.Options.ColumnOptions.Count">
+        <member name="P:Universe.Builder.Options.ColumnOptions.Aggregates">
             <summary>
-                Count the number of rows. Please note that the column <paramref name="Names"/>
-                will be added as part of the GROUP BY clause
+                    List of aggregates to be applied to the query.
+                    If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </summary>
         </member>
         <member name="T:Universe.Builder.Options.Catalyst">
@@ -144,6 +164,24 @@
         <member name="F:Universe.Builder.Options.Q.Operator.NotDefined">
             <summary>NOT IS_DEFINED</summary>
         </member>
+        <member name="T:Universe.Builder.Options.Q.Aggregate">
+            <summary>Aggregation functions</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Aggregate.Count">
+            <summary>Count</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Aggregate.Sum">
+            <summary>Sum</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Aggregate.Min">
+            <summary>Min</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Aggregate.Max">
+            <summary>Max</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Aggregate.Avg">
+            <summary>Avg</summary>
+        </member>
         <member name="T:Universe.Builder.Options.WhereExtension">
             <summary></summary>
         </member>
@@ -154,6 +192,12 @@
             <summary></summary>
         </member>
         <member name="M:Universe.Builder.Options.OperatorExtension.Value(Universe.Builder.Options.Q.Operator)">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.AggregateExtension">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Builder.Options.AggregateExtension.Value(Universe.Builder.Options.Q.Aggregate)">
             <summary></summary>
         </member>
         <member name="T:Universe.Builder.Options.Sorting">
@@ -274,17 +318,47 @@
         <member name="P:Universe.Interfaces.ICosmicEntity.PartitionKey">
             <summary>Set the value for the PartitionKey field</summary>
         </member>
-        <member name="T:Universe.Interfaces.IGalaxy`1">
+        <member name="P:Universe.Interfaces.ICosmicEntity.CountAggregate">
+            <summary>Represents the count of items in a query result.</summary>
+        </member>
+        <member name="T:Universe.Interfaces.CosmicEntity">
+            <summary>Base record for Cosmos Entities</summary>
+        </member>
+        <member name="P:Universe.Interfaces.CosmicEntity.id">
+            <inheritdoc />
+        </member>
+        <member name="P:Universe.Interfaces.CosmicEntity.AddedOn">
+            <inheritdoc />
+        </member>
+        <member name="P:Universe.Interfaces.CosmicEntity.ModifiedOn">
+            <inheritdoc />
+        </member>
+        <member name="P:Universe.Interfaces.CosmicEntity.PartitionKey">
+            <inheritdoc />
+        </member>
+        <member name="P:Universe.Interfaces.CosmicEntity.CountAggregate">
+            <inheritdoc />
+        </member>
+        <member name="M:Universe.Interfaces.CosmicEntity.Dispose(System.Boolean)">
             <summary></summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.String,System.String)">
-            <summary>
-            Get one model from the database
-            </summary>
+        <member name="M:Universe.Interfaces.CosmicEntity.Finalize">
+            <summary></summary>
+        </member>
+        <member name="M:Universe.Interfaces.CosmicEntity.Dispose">
+            <summary></summary>
+        </member>
+        <member name="T:Universe.Interfaces.IGalaxy`1">
+            <summary></summary>
         </member>
         <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
             <summary>
             Get one model from the database
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get``1(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
+            <summary>
+            Get one model from the database with a different type
             </summary>
         </member>
         <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
@@ -292,7 +366,17 @@
             Get list from the database
             </summary>
         </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+            <summary>
+            Get list from the database with a different type
+            </summary>
+        </member>
         <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+            <summary>
+            Get a paginated list from the database
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged``1(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
             <summary>
             Get a paginated list from the database
             </summary>
@@ -323,6 +407,11 @@
         <member name="M:Universe.Interfaces.IGalaxyBasic`1.Remove(System.String,System.String)">
             <summary>
             Remove one model from the database
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Get(System.String,System.String)">
+            <summary>
+            Get one model from the database
             </summary>
         </member>
         <member name="T:Universe.Interfaces.IGalaxyProcedure">

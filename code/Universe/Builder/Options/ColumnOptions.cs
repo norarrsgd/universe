@@ -12,4 +12,4 @@ public record struct ColumnOptions(
     IList<string> Names,
     bool IsDistinct = false,
     int Top = 0,
-    Dictionary<string, Q.Aggregate> Aggregates = null);
+    IEnumerable<AggregationOption> Aggregates = null);

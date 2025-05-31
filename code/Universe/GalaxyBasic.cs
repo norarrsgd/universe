@@ -1,5 +1,4 @@
 using System.Net;
-using System.Threading.Tasks.Dataflow;
 using Universe.Builder;
 using Universe.Response;
 
@@ -8,7 +7,7 @@ namespace Universe;
 /// <summary>Inherit repositories to implement the very basic Universe</summary>
 public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosmicEntity
 {
-    internal readonly UniverseBuilder<T> _qBuilder;
+    internal readonly UniverseBuilder _qBuilder;
 
     /// <summary></summary>
     protected GalaxyBasic(
@@ -20,54 +19,81 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
     async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
     {
-        if (string.IsNullOrWhiteSpace(model.id))
-            model.id = Guid.NewGuid().ToString();
-        model.AddedOn = DateTime.UtcNow;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(model.id))
+                model.id = Guid.NewGuid().ToString();
+            model.AddedOn = DateTime.UtcNow;
 
-        ItemResponse<T> response = await _container.CreateItemAsync(model, new PartitionKey(model.PartitionKey));
-        return (new(response.RequestCharge, null), model.id);
+            ItemResponse<T> response = await _container.CreateItemAsync(
+                model,
+                new PartitionKey(model.PartitionKey),
+                requestOptions: new()
+                {
+                    EnableContentResponseOnWrite = false
+                });
+            return (new(response.RequestCharge, null), model.id);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new UniverseException($"{typeof(T).Name} already exists.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.Conflict)
+        {
+            throw;
+        }
     }
 
     async Task<Gravity> IGalaxyBasic<T>.Create(IList<T> models)
     {
-        if (!_allowBulk)
-            throw new UniverseException("Bulk create of documents is not configured properly.");
-
-        List<Task<double>> tasks = new(models.Count);
-
-        IEnumerable<IGrouping<string, T>> partitionGroups = models.GroupBy(m => m.PartitionKey);
-        foreach (IGrouping<string, T> group in partitionGroups)
+        try
         {
-            if (string.IsNullOrWhiteSpace(group.Key))
-                throw new UniverseException("PartitionKey cannot be null or empty.");
+            if (!_allowBulk)
+                throw new UniverseException("Bulk create of documents is not configured properly.");
 
-            TransactionalBatch batch = _container.CreateTransactionalBatch(new PartitionKey(group.Key));
+            List<Task<double>> tasks = new(models.Count);
 
-            foreach (T model in group)
+            IEnumerable<IGrouping<string, T>> partitionGroups = models.GroupBy(m => m.PartitionKey);
+            foreach (IGrouping<string, T> group in partitionGroups)
             {
-                if (string.IsNullOrWhiteSpace(model.id))
-                    model.id = Guid.NewGuid().ToString();
-                model.AddedOn = DateTime.UtcNow;
+                if (string.IsNullOrWhiteSpace(group.Key))
+                    throw new UniverseException("PartitionKey cannot be null or empty.");
 
-                batch.CreateItem(model);
+                TransactionalBatch batch = _container.CreateTransactionalBatch(new PartitionKey(group.Key));
+
+                foreach (T model in group)
+                {
+                    if (string.IsNullOrWhiteSpace(model.id))
+                        model.id = Guid.NewGuid().ToString();
+                    model.AddedOn = DateTime.UtcNow;
+
+                    batch.CreateItem(model, requestOptions: new()
+                    {
+                        EnableContentResponseOnWrite = false
+                    });
+                }
+
+                tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
+                {
+                    if (!t.IsCompletedSuccessfully)
+                        throw new UniverseException(t.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+
+                    if (t.Result.IsSuccessStatusCode)
+                        return t.Result.RequestCharge;
+                    else
+                        throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}. Message: {t.Result.ErrorMessage}");
+                }));
             }
 
-            tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
-            {
-                if (!t.IsCompletedSuccessfully)
-                    throw new UniverseException(t.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+            await Task.WhenAll(tasks);
+            double totalRu = tasks.Sum(t => t.Result);
 
-                if (t.Result.IsSuccessStatusCode)
-                    return t.Result.RequestCharge;
-                else
-                    throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}. Message: {t.Result.ErrorMessage}");
-            }));
+            return new(totalRu, string.Empty);
         }
-
-        await Task.WhenAll(tasks);
-        double totalRu = tasks.Sum(t => t.Result);
-
-        return new(totalRu, string.Empty);
+        catch
+        {
+            throw;
+        }
     }
 
     async Task<(Gravity, T)> IGalaxyBasic<T>.Modify(T model)
@@ -110,7 +136,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 {
                     model.ModifiedOn = DateTime.UtcNow;
 
-                    batch.ReplaceItem(model.id, model);
+                    batch.ReplaceItem(model.id, model, requestOptions: new()
+                    {
+                        EnableContentResponseOnWrite = false
+                    });
                 }
 
                 tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
@@ -144,7 +173,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         try
         {
-            ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, new PartitionKey(partitionKey));
+            ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, new PartitionKey(partitionKey), requestOptions: new()
+            {
+                EnableContentResponseOnWrite = false
+            });
             return new(response.RequestCharge, null);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
