@@ -10,19 +10,14 @@ dotnet add package Universe
 ## How-to:
 1. Your models / cosmos entities should inherit from the interface
 ```csharp
-public class MyCosmosEntity : ICosmicEntity
+public class MyCosmosEntity : CosmicEntity
 {
   public string FirstName { get; set; }
   
   public string LastName { get; set; }
-  
-  // The properties below are implementations from ICosmicEntity
-  public string id { get; set; }
-  public DateTime AddedOn { get; set; }
-  public DateTime ModifiedOn { get; set; }
 
   [JsonIgnore]
-  public string PartitionKey => FirstName;
+  public override string PartitionKey => FirstName;
 }
 ```
 
@@ -51,10 +46,23 @@ _ = services.AddScoped(_ => new CosmosClient(
     System.Environment.GetEnvironmentVariable("CosmosDbPrimaryKey"),
     clientOptions: new CosmosClientOptions()
     {
-        Serializer = new UniverseSerializer(), // This is from Universe.Options
+        Serializer = new UniverseSerializer(), // This is from Universe.Builder.Options
         AllowBulkExecution = true // This will tell the underlying code to allow async bulk operations
     }
 ));
+```
+
+Below are the default options for the `UniverseSerializer`:
+```csharp
+new JsonSerializerOptions()
+{
+    PropertyNamingPolicy = null, // To leave the property names as they are in the model
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
+    IgnoreReadOnlyFields = true,
+    IgnoreReadOnlyProperties = true
+}
 ```
 
 4. In your Startup.cs / Main method / Program.cs, configure your CosmosDb repository like so:
@@ -95,6 +103,10 @@ if (gravity.Query.HasValue)
     }
 }
 ```
+
+## Examples
+This section provides examples of how to use the `Galaxy` repository for basic and advanced operations with Cosmos DB.
+_[Here](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples)._
 
 ## Basic Operations
 
@@ -280,6 +292,8 @@ Gravity gravity = await galaxy.Remove("document-id", "partition-key-value");
 );
 ```
 
+_See [example 1](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs), [example 3](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example3_TopAndDistinct.cs)._
+
 ### Pagination
 
 ```csharp
@@ -299,6 +313,8 @@ string continuationToken = gravity.ContinuationToken;
 );
 ```
 
+_See [example 1](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs)._
+
 ### Aggregation and Group By Queries
 
 ```csharp
@@ -313,10 +329,10 @@ string continuationToken = gravity.ContinuationToken;
     clusters: new List<Cluster>() { /* query conditions */ },
     columnOptions: new ColumnOptions(
         Names: new List<string> { nameof(MyModel.Category) },
-        Aggregates: new Dictionary<string, Q.Aggregate> {
-            { nameof(MyModel.Price), Q.Aggregate.Sum },
-            { nameof(MyModel.Quantity), Q.Aggregate.Count }
-        }
+        Aggregates: [
+            new AggregationOption(nameof(MyModel.Price), Q.Aggregate.Sum),
+            new AggregationOption(nameof(MyModel.Quantity), Q.Aggregate.Count)
+        ]
     )
 );
 
@@ -325,16 +341,16 @@ string continuationToken = gravity.ContinuationToken;
     clusters: new List<Cluster>() { /* query conditions */ },
     columnOptions: new ColumnOptions(
         Names: new List<string> { nameof(MyModel.Category) },
-        Aggregates: new Dictionary<string, Q.Aggregate> {
-            { nameof(MyModel.Price), Q.Aggregate.Sum },
-            { nameof(MyModel.Price), Q.Aggregate.Avg },
-            { nameof(MyModel.Quantity), Q.Aggregate.Max }
-        }
+        Aggregates: [
+            new AggregationOption(nameof(MyModel.Price), Q.Aggregate.Sum),
+            new AggregationOption(nameof(MyModel.Price), Q.Aggregate.Avg),
+            new AggregationOption(nameof(MyModel.Quantity), Q.Aggregate.Max)
+        ]
     )
 );
 ```
 
-The `Aggregates` parameter in `ColumnOptions` supports the following aggregate functions:
+The `Aggregates` parameter in `ColumnOptions` takes an array of `AggregationOption` structs, each specifying a column name and an aggregate function to apply. It supports the following aggregate functions:
 
 - `Q.Aggregate.Count`: Counts the number of items
 - `Q.Aggregate.Sum`: Calculates the sum of the specified column
@@ -343,6 +359,8 @@ The `Aggregates` parameter in `ColumnOptions` supports the following aggregate f
 - `Q.Aggregate.Avg`: Calculates the average of the specified column
 
 When using aggregates, the query will automatically be grouped by the columns specified in the `Names` parameter. The output column names will be suffixed with the aggregate function name (e.g., `Price_Sum`, `Price_Avg`, `Quantity_Max`).
+
+_See [example 2](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example2_AggregatesWithGroupBy.cs), [example 7](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example7_AdvancedAggregation.cs), [example 8](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example8_SalesAnalysis.cs)._
 
 ## Stored Procedures
 

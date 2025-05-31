@@ -16,6 +16,11 @@ public abstract class GalaxyCore : IDisposable
         if (string.IsNullOrWhiteSpace(container) || string.IsNullOrWhiteSpace(partitionKey))
             throw new UniverseException("Container name and PartitionKey are required");
 
+        if (string.IsNullOrWhiteSpace(database))
+            throw new UniverseException("Database name is required");
+
+        client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
+
         _recordQuery = recordQueries;
         if (client.ClientOptions is not null)
             _allowBulk = client.ClientOptions.AllowBulkExecution;
