@@ -11,6 +11,7 @@ public class UniverseSerializer : CosmosSerializer
     /// <summary></summary>
     public UniverseSerializer() => SystemTextJsonSerializer = new(new()
     {
+        PropertyNamingPolicy = null,
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
