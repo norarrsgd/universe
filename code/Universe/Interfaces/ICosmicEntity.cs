@@ -6,6 +6,7 @@ public interface ICosmicEntity
     /// <summary>Unique GUID</summary>
 #pragma warning disable IDE1006 // Naming Styles
     public string id { get; set; }
+#pragma warning restore IDE1006 // Naming Styles
 
     /// <summary>UTC Date document was added</summary>
     public DateTime AddedOn { get; set; }
@@ -14,8 +15,9 @@ public interface ICosmicEntity
     public DateTime? ModifiedOn { get; set; }
 
     /// <summary>Set the value for the PartitionKey field</summary>
-    [JsonIgnore] public abstract string PartitionKey { get; }
-#pragma warning restore IDE1006 // Naming Styles
+    [Obsolete("Use 'PartitionKeyAttribute' instead. This is no longer used. Will be removed in future versions.")]
+    [JsonIgnore]
+    public abstract string PartitionKey { get; }
 
     /// <summary>Represents the count of items in a query result.</summary>
     public long CountAggregate { get; set; }
@@ -31,10 +33,12 @@ public abstract record CosmicEntity : IDisposable, ICosmicEntity
     public DateTime AddedOn { get; set; } = DateTime.UtcNow;
 
     /// <inheritdoc />
-    public DateTime? ModifiedOn { get; set; }
+    public DateTime? ModifiedOn { get; set; } = DateTime.UtcNow;
 
     /// <inheritdoc />
-    [JsonIgnore] public abstract string PartitionKey { get; }
+    [Obsolete("Use 'PartitionKeyAttribute' instead. This is no longer used. Will be removed in future versions.")]
+    [JsonIgnore]
+    public abstract string PartitionKey { get; }
 
     /// <inheritdoc />
     public long CountAggregate { get; set; }

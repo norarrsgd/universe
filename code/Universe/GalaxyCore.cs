@@ -11,20 +11,22 @@ public abstract class GalaxyCore : IDisposable
     internal readonly bool _allowBulk;
 
     /// <summary></summary>
-    protected GalaxyCore(CosmosClient client, string database, string container, string partitionKey, bool recordQueries = false)
+    protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
     {
-        if (string.IsNullOrWhiteSpace(container) || string.IsNullOrWhiteSpace(partitionKey))
-            throw new UniverseException("Container name and PartitionKey are required");
+        if (string.IsNullOrWhiteSpace(container))
+            throw new UniverseException("Container name is required");
 
         if (string.IsNullOrWhiteSpace(database))
             throw new UniverseException("Database name is required");
 
         client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
 
+        ContainerProperties containerProps = new(container, partitionKey);
+
         _recordQuery = recordQueries;
         if (client.ClientOptions is not null)
             _allowBulk = client.ClientOptions.AllowBulkExecution;
-        _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(container, partitionKey).GetAwaiter().GetResult();
+        _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(containerProps).GetAwaiter().GetResult();
     }
 
     #region Dispose Pattern

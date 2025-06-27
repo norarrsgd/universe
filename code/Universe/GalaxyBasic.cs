@@ -14,7 +14,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         CosmosClient client,
         string database,
         string container,
-        string partitionKey,
+        IReadOnlyList<string> partitionKey,
         bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => _qBuilder = new(_recordQuery);
 
     async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
@@ -27,7 +27,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             ItemResponse<T> response = await _container.CreateItemAsync(
                 model,
-                new PartitionKey(model.PartitionKey),
+                model.BuildPartitionKey(),
                 requestOptions: new()
                 {
                     EnableContentResponseOnWrite = false
@@ -53,13 +53,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             List<Task<double>> tasks = new(models.Count);
 
-            IEnumerable<IGrouping<string, T>> partitionGroups = models.GroupBy(m => m.PartitionKey);
-            foreach (IGrouping<string, T> group in partitionGroups)
+            IEnumerable<IGrouping<PartitionKey, T>> partitionGroups = models.GroupBy(m => m.BuildPartitionKey());
+            foreach (IGrouping<PartitionKey, T> group in partitionGroups)
             {
-                if (string.IsNullOrWhiteSpace(group.Key))
-                    throw new UniverseException("PartitionKey cannot be null or empty.");
-
-                TransactionalBatch batch = _container.CreateTransactionalBatch(new PartitionKey(group.Key));
+                TransactionalBatch batch = _container.CreateTransactionalBatch(group.Key);
 
                 foreach (T model in group)
                 {
@@ -102,7 +99,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             model.ModifiedOn = DateTime.UtcNow;
 
-            ItemResponse<T> response = await _container.ReplaceItemAsync(model, model.id, new PartitionKey(model.PartitionKey));
+            ItemResponse<T> response = await _container.ReplaceItemAsync(model, model.id, model.BuildPartitionKey());
             return (new(response.RequestCharge, null), response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -124,13 +121,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             List<Task<double>> tasks = new(models.Count);
 
-            IEnumerable<IGrouping<string, T>> partitionGroups = models.GroupBy(m => m.PartitionKey);
-            foreach (IGrouping<string, T> group in partitionGroups)
+            IEnumerable<IGrouping<PartitionKey, T>> partitionGroups = models.GroupBy(m => m.BuildPartitionKey());
+            foreach (IGrouping<PartitionKey, T> group in partitionGroups)
             {
-                if (string.IsNullOrWhiteSpace(group.Key))
-                    throw new UniverseException("PartitionKey cannot be null or empty.");
-
-                TransactionalBatch batch = _container.CreateTransactionalBatch(new PartitionKey(group.Key));
+                TransactionalBatch batch = _container.CreateTransactionalBatch(group.Key);
 
                 foreach (T model in group)
                 {
@@ -169,6 +163,40 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         }
     }
 
+    private static PartitionKey BuildPartitionKey(string[] partitionKey)
+    {
+        PartitionKeyBuilder partitionKeyBuilder = new();
+        foreach (string key in partitionKey)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new UniverseException("Partition key cannot be null or empty.");
+
+            partitionKeyBuilder.Add(key);
+        }
+
+        return partitionKeyBuilder.Build();
+    }
+
+    async Task<Gravity> IGalaxyBasic<T>.Remove(string id, params string[] partitionKey)
+    {
+        try
+        {
+            ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, BuildPartitionKey(partitionKey), requestOptions: new()
+            {
+                EnableContentResponseOnWrite = false
+            });
+            return new(response.RequestCharge, null);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UniverseException($"{typeof(T).Name} does not exist.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw;
+        }
+    }
+
     async Task<Gravity> IGalaxyBasic<T>.Remove(string id, string partitionKey)
     {
         try
@@ -188,6 +216,24 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             throw;
         }
     }
+
+    async Task<(Gravity g, T T)> IGalaxyBasic<T>.Get(string id, params string[] partitionKey)
+    {
+        try
+        {
+            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, BuildPartitionKey(partitionKey));
+            return (new(response.RequestCharge, null), response.Resource);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UniverseException($"{typeof(T).Name} does not exist.");
+        }
+        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw;
+        }
+    }
+
     async Task<(Gravity, T)> IGalaxyBasic<T>.Get(string id, string partitionKey)
     {
         try

@@ -10,7 +10,7 @@ public abstract class GalaxyProcedure(
     CosmosClient client,
     string database,
     string container,
-    string partitionKey,
+    IReadOnlyList<string> partitionKey,
     bool recordQueries = false) : GalaxyCore(client, database, container, partitionKey, recordQueries), IGalaxyProcedure
 {
     async Task<(Gravity g, T T)> IGalaxyProcedure.ExecSProc<T>(string procedureName, string partitionKey, params object[] parameters)

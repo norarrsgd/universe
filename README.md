@@ -8,24 +8,23 @@ dotnet add package Universe
 ```
 
 ## How-to:
-1. Your models / cosmos entities should inherit from the interface
+1. Your models / cosmos entities should inherit from the base class
 ```csharp
 public class MyCosmosEntity : CosmicEntity
 {
+  [PartitionKey]
   public string FirstName { get; set; }
   
   public string LastName { get; set; }
-
-  [JsonIgnore]
-  public override string PartitionKey => FirstName;
 }
 ```
+This will allow you to use the `PartitionKey` attribute to specify the partition key for your Cosmos DB documents. You can also use multiple partition keys by specifying the order in the attribute, e.g., `[PartitionKey(1)]`, `[PartitionKey(2)]`, etc.
 
 2. Create a repository like so:
 ```csharp
 public class MyRepository : Galaxy<MyModel>
 {
-    public MyRepository(CosmosClient client, string database, string container, string partitionKey) : base(client, database, container, partitionKey)
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey)
     {
     }
 }
@@ -33,7 +32,7 @@ public class MyRepository : Galaxy<MyModel>
 // If you want to see debug information such as the full Query text executed, use the format below:
 public class MyRepository : Galaxy<MyModel>
 {
-    public MyRepository(CosmosClient client, string database, string container, string partitionKey) : base(client, database, container, partitionKey, true)
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey, true)
     {
     }
 }
@@ -71,7 +70,7 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
     client: service.GetRequiredService<CosmosClient>(),
     database: "database-name",
     container: "container-name",
-    partitionKey: "/partitionKey"
+    partitionKey: typeof(MyModel).BuildPartitionKey()
 ));
 ```
 
@@ -128,6 +127,11 @@ _[Here](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples
 );
 ```
 
+```csharp
+// Get a single document by id and multiple partition keys
+(Gravity gravity, MyModel model) = await galaxy.Get("document-id", "partition-key-value1", "partition-key-value2");
+```
+
 ### Creating Documents
 
 ```csharp
@@ -168,6 +172,11 @@ Gravity gravity = await galaxy.Modify(models);
 ```csharp
 // Delete a document
 Gravity gravity = await galaxy.Remove("document-id", "partition-key-value");
+```
+
+```csharp
+// Delete a document by id and multiple partition keys
+Gravity gravity = await galaxy.Remove("document-id", "partition-key-value1", "partition-key-value2");
 ```
 
 ## Advanced Query Examples
