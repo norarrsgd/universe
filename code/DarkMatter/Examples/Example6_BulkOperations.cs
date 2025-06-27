@@ -1,4 +1,5 @@
 using DarkMatter.Models;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -32,7 +33,7 @@ public class Example6_BulkOperations(IGalaxy<MyObject> galaxy) : ExampleBase(gal
         // Clean up bulk items (in a real application, you might not want to do this immediately)
         foreach (MyObject item in bulkItems)
         {
-            await galaxy.Remove(item.id, item.PartitionKey);
+            await galaxy.Remove(item.id, [.. item.PartitionKeys()]);
         }
 
         ruUsed = g6.RU;

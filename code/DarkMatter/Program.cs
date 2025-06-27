@@ -1,8 +1,10 @@
 ﻿// filepath: d:\github\universe\code\DarkMatter\Program.cs
 using Microsoft.Azure.Cosmos;
-using Universe.Builder.Options;
 using DarkMatter.Repository;
 using DarkMatter.Examples;
+using DarkMatter.Models;
+using Universe.Builder.Options;
+using Universe.Extensions;
 
 namespace DarkMatter;
 
@@ -30,7 +32,7 @@ class Program
             client: cosmosClient,
             database: "test-database",
             container: "my-container",
-            partitionKey: "/Code"
+            partitionKey: typeof(MyObject).BuildPartitionKey()
         );
 
         // Track the total request units spent

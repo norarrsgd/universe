@@ -1,5 +1,6 @@
 using DarkMatter.Models;
 using Universe.Builder.Options;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -68,7 +69,7 @@ public class Example7_AdvancedAggregation(IGalaxy<MyObject> galaxy) : ExampleBas
         // Clean up category items
         foreach (MyObject item in categoryItems)
         {
-            await galaxy.Remove(item.id, item.PartitionKey);
+            await galaxy.Remove(item.id, [.. item.PartitionKeys()]);
         }
 
         ruUsed = g7a.RU + g7b.RU;

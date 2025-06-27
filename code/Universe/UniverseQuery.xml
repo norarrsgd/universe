@@ -4,6 +4,27 @@
         <name>UniverseQuery</name>
     </assembly>
     <members>
+        <member name="T:Universe.Attributes.PartitionKeyAttribute">
+            <summary>
+            Attribute to specify the partition key for a Cosmos DB entity.
+            </summary>
+        </member>
+        <member name="P:Universe.Attributes.PartitionKeyAttribute.Sequence">
+            <summary>
+            Gets the partition key sequence number.
+            </summary>
+        </member>
+        <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Universe.Attributes.PartitionKeyAttribute"/> class with the specified partition key.
+            </summary>
+        </member>
+        <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor(System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Universe.Attributes.PartitionKeyAttribute"/> class with the specified partition key.
+            </summary>
+            <param name="sequence">The partition key sequence number (1-3).</param>
+        </member>
         <member name="T:Universe.Builder.Options.AggregationOption">
             <summary>
             Represents a column aggregation.
@@ -268,16 +289,31 @@
         <member name="M:Universe.Exception.UniverseException.#ctor(System.String,System.Exception)">
             <summary>Custom exception</summary>
         </member>
+        <member name="T:Universe.Extensions.CosmicEntityExtensions">
+            <summary> Extensions for ICosmicEntity </summary>
+        </member>
+        <member name="F:Universe.Extensions.CosmicEntityExtensions.MaxPartitionKeyLevels">
+            <summary>Maximum allowed partition key levels in Cosmos DB</summary>
+        </member>
+        <member name="M:Universe.Extensions.CosmicEntityExtensions.BuildPartitionKey(System.Type)">
+            <summary>Builds the partition key for the entity.</summary>
+        </member>
+        <member name="M:Universe.Extensions.CosmicEntityExtensions.BuildPartitionKey(Universe.Interfaces.ICosmicEntity)">
+            <summary>Builds the partition key for the entity.</summary>
+        </member>
+        <member name="M:Universe.Extensions.CosmicEntityExtensions.PartitionKeys(Universe.Interfaces.ICosmicEntity)">
+            <summary>Builds the partition key for the entity.</summary>
+        </member>
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
-        <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
+        <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,Microsoft.Azure.Cosmos.PartitionKey,System.Boolean)">
             <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
         <member name="T:Universe.GalaxyBasic`1">
             <summary>Inherit repositories to implement the very basic Universe</summary>
         </member>
-        <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
+        <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,Microsoft.Azure.Cosmos.PartitionKey,System.Boolean)">
             <summary></summary>
         </member>
         <member name="T:Universe.GalaxyCore">
@@ -285,7 +321,7 @@
             Base class for Universe implementations.
             </summary>
         </member>
-        <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
+        <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,Microsoft.Azure.Cosmos.PartitionKey,System.Boolean)">
             <summary></summary>
         </member>
         <member name="M:Universe.GalaxyCore.Dispose(System.Boolean)">
@@ -300,7 +336,7 @@
         <member name="T:Universe.GalaxyProcedure">
             <summary>Inherit repositories to implement stored procedures</summary>
         </member>
-        <member name="M:Universe.GalaxyProcedure.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.String,System.Boolean)">
+        <member name="M:Universe.GalaxyProcedure.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,Microsoft.Azure.Cosmos.PartitionKey,System.Boolean)">
             <summary>Inherit repositories to implement stored procedures</summary>
         </member>
         <member name="T:Universe.Interfaces.ICosmicEntity">
@@ -409,10 +445,24 @@
             Remove one model from the database
             </summary>
         </member>
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Remove(System.String,System.String[])">
+            <summary>
+            Remove one model from the database
+            </summary>
+            <param name="id"></param>
+            <param name="partitionKey">Exact order of your defined partition keys</param>
+        </member>
         <member name="M:Universe.Interfaces.IGalaxyBasic`1.Get(System.String,System.String)">
             <summary>
             Get one model from the database
             </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Get(System.String,System.String[])">
+            <summary>
+            Get one model from the database
+            </summary>
+            <param name="id"></param>
+            <param name="partitionKey">Exact order of your defined partition keys</param>
         </member>
         <member name="T:Universe.Interfaces.IGalaxyProcedure">
             <summary></summary>
