@@ -1,5 +1,6 @@
 using DarkMatter.Models;
 using Universe.Builder.Options;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -108,7 +109,7 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
         // Clean up sales data
         foreach (MyObject item in salesData)
         {
-            await galaxy.Remove(item.id, item.PartitionKey);
+            await galaxy.Remove(item.id, [.. item.PartitionKeys()]);
         }
 
         ruUsed = g8a.RU + g8b.RU + g8c.RU + g8d.RU;

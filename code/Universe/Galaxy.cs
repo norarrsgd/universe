@@ -8,7 +8,7 @@ public abstract class Galaxy<T>(
     CosmosClient client,
     string database,
     string container,
-    string partitionKey,
+    IReadOnlyList<string> partitionKey,
     bool recordQueries = false) : GalaxyBasic<T>(client, database, container, partitionKey, recordQueries), IGalaxy<T> where T : class, ICosmicEntity
 {
     async Task<(Gravity, T)> IGalaxy<T>.Get(IList<Cluster> clusters, IList<string> columns)

@@ -21,10 +21,13 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.0.2</Version>
-		<PackageReleaseNotes>View release on https://github.com/kuromukira/universe/releases</PackageReleaseNotes>
-		<AssemblyVersion>3.0.2.0</AssemblyVersion>
-		<FileVersion>3.0.2.0</FileVersion>
+		<Version>3.0.3</Version>
+		<PackageReleaseNotes>
+			(⚠️ Warning: There are breaking changes) View release on
+			https://github.com/kuromukira/universe/releases
+		</PackageReleaseNotes>
+		<AssemblyVersion>3.0.3.0</AssemblyVersion>
+		<FileVersion>3.0.3.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -37,9 +40,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.51.0" />
+		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.52.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="System.Text.Json" Version="9.0.5" />
+		<PackageReference Include="System.Text.Json" Version="9.0.6" />
 	</ItemGroup>
 
 	<ItemGroup>
