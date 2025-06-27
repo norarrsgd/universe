@@ -163,20 +163,25 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         }
     }
 
+    private static PartitionKey BuildPartitionKey(string[] partitionKey)
+    {
+        PartitionKeyBuilder partitionKeyBuilder = new();
+        foreach (string key in partitionKey)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new UniverseException("Partition key cannot be null or empty.");
+
+            partitionKeyBuilder.Add(key);
+        }
+
+        return partitionKeyBuilder.Build();
+    }
+
     async Task<Gravity> IGalaxyBasic<T>.Remove(string id, params string[] partitionKey)
     {
         try
         {
-            PartitionKeyBuilder partitionKeyBuilder = new();
-            foreach (string key in partitionKey)
-            {
-                if (string.IsNullOrWhiteSpace(key))
-                    throw new UniverseException("Partition key cannot be null or empty.");
-
-                partitionKeyBuilder.Add(key);
-            }
-
-            ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, partitionKeyBuilder.Build(), requestOptions: new()
+            ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, BuildPartitionKey(partitionKey), requestOptions: new()
             {
                 EnableContentResponseOnWrite = false
             });
@@ -216,16 +221,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         try
         {
-            PartitionKeyBuilder partitionKeyBuilder = new();
-            foreach (string key in partitionKey)
-            {
-                if (string.IsNullOrWhiteSpace(key))
-                    throw new UniverseException("Partition key cannot be null or empty.");
-
-                partitionKeyBuilder.Add(key);
-            }
-
-            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, partitionKeyBuilder.Build());
+            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, BuildPartitionKey(partitionKey));
             return (new(response.RequestCharge, null), response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
