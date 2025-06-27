@@ -22,7 +22,10 @@
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
 		<Version>3.0.3</Version>
-		<PackageReleaseNotes>View release on https://github.com/kuromukira/universe/releases</PackageReleaseNotes>
+		<PackageReleaseNotes>
+			(⚠️ Warning: There are breaking changes) View release on
+			https://github.com/kuromukira/universe/releases
+		</PackageReleaseNotes>
 		<AssemblyVersion>3.0.3.0</AssemblyVersion>
 		<FileVersion>3.0.3.0</FileVersion>
 	</PropertyGroup>
