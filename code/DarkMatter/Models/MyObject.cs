@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Universe.Attributes;
 using Universe.Interfaces;
 
@@ -23,5 +24,6 @@ public record MyObject : CosmicEntity
     public string Category { get; set; }
 
     [Obsolete("Use 'PartitionKeyAttribute' instead. This is no longer used. Will be removed in future versions.")]
+    [JsonIgnore]
     public override string PartitionKey => Code;
 }
