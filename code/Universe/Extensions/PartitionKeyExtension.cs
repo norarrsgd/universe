@@ -9,12 +9,12 @@ public static class CosmicEntityExtensions
     public const int MaxPartitionKeyLevels = 3;
 
     /// <summary>Builds the partition key for the entity.</summary>
-    public static PartitionKey BuildPartitionKey(this Type entity)
+    public static IReadOnlyList<string> BuildPartitionKey(this Type entity)
     {
-        if (entity != typeof(ICosmicEntity))
-            throw new UniverseException($"Type {entity.Name} does not implement ICosmicEntity. Please ensure the type is a valid ICosmicEntity.");
+        if (!typeof(CosmicEntity).IsAssignableFrom(entity))
+            throw new UniverseException($"Type {entity.Name} does not inherit from CosmicEntity. Please ensure the type is a valid CosmicEntity.");
 
-        PartitionKeyBuilder builder = new();
+        List<string> pks = [];
 
         // Reflect on this type to find the PartitionKey properties
         IEnumerable<PropertyInfo> partitionKeyProperties = entity.GetProperties()
@@ -41,10 +41,10 @@ public static class CosmicEntityExtensions
         IOrderedEnumerable<PropertyInfo> orderedProperties = partitionKeyProperties
             .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1);
 
-        foreach (PropertyInfo property in partitionKeyProperties)
-            builder.Add(property.Name);
+        foreach (PropertyInfo property in orderedProperties)
+            pks.Add($"/{property.Name}");
 
-        return builder.Build();
+        return pks.AsReadOnly();
     }
 
     /// <summary>Builds the partition key for the entity.</summary>
@@ -58,7 +58,19 @@ public static class CosmicEntityExtensions
 
         // Reflect on this type to find the PartitionKey properties
         IEnumerable<PropertyInfo> partitionKeyProperties = entityType.GetProperties()
-            .Where(p => p.GetCustomAttributes(typeof(PartitionKeyAttribute), false).Any());
+            .Where(p => p.GetCustomAttributes(typeof(PartitionKeyAttribute), false).Any())
+            .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1);
+
+        // Validate for duplicate sequences
+        List<int> sequences = [.. partitionKeyProperties.Select(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1)];
+
+        IEnumerable<int> duplicateSequences = sequences
+            .GroupBy(s => s)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key);
+
+        if (duplicateSequences.Any())
+            throw new UniverseException($"Duplicate PartitionKey Sequence values found in {entityType.Name}: {string.Join(", ", duplicateSequences)}. Each PartitionKey property must have a unique Sequence value.");
 
         foreach (PropertyInfo property in partitionKeyProperties)
         {

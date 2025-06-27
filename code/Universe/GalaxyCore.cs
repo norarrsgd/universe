@@ -11,7 +11,7 @@ public abstract class GalaxyCore : IDisposable
     internal readonly bool _allowBulk;
 
     /// <summary></summary>
-    protected GalaxyCore(CosmosClient client, string database, string container, PartitionKey partitionKey, bool recordQueries = false)
+    protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
     {
         if (string.IsNullOrWhiteSpace(container))
             throw new UniverseException("Container name is required");
@@ -19,9 +19,9 @@ public abstract class GalaxyCore : IDisposable
         if (string.IsNullOrWhiteSpace(database))
             throw new UniverseException("Database name is required");
 
-        ContainerProperties containerProps = new(container, partitionKey.ToString());
-
         client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
+
+        ContainerProperties containerProps = new(container, partitionKey);
 
         _recordQuery = recordQueries;
         if (client.ClientOptions is not null)

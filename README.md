@@ -24,7 +24,7 @@ This will allow you to use the `PartitionKey` attribute to specify the partition
 ```csharp
 public class MyRepository : Galaxy<MyModel>
 {
-    public MyRepository(CosmosClient client, string database, string container, PartitionKey partitionKey) : base(client, database, container, partitionKey)
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey)
     {
     }
 }
@@ -32,7 +32,7 @@ public class MyRepository : Galaxy<MyModel>
 // If you want to see debug information such as the full Query text executed, use the format below:
 public class MyRepository : Galaxy<MyModel>
 {
-    public MyRepository(CosmosClient client, string database, string container, PartitionKey partitionKey) : base(client, database, container, partitionKey, true)
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey, true)
     {
     }
 }
