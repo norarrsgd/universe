@@ -88,7 +88,7 @@ float[] queryVector = [0.4f, 0.6f, 0.8f, 0.2f];
 ```sql
 SELECT TOP 5 c.id, c.name, c.price, VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding) AS DescriptionEmbeddingScore
 FROM c 
-WHERE () AND (c.Category = @Category AND c.Price < @Price)
+WHERE (c.Category = @Category AND c.Price < @Price)
 ORDER BY VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding)
 ```
 
