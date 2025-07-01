@@ -88,6 +88,7 @@ internal class UniverseBuilder(bool recordQueries)
         // Construct Where Clause by Clusters
         if (clusters is not null)
         {
+            bool whereClauseStarted = false;
             foreach (Cluster cluster in clusters.Where(cs => cs.Catalysts.Any()))
             {
                 // Validate Catalysts
@@ -106,9 +107,16 @@ internal class UniverseBuilder(bool recordQueries)
                 if (cluster.Catalysts.Any(c => c.Operator is Q.Operator.VectorDistance && columnOptions.GetValueOrDefault().Top <= 0))
                     throw new UniverseException("ColumnOptions that specify a top value must be provided when using VectorDistance operator.");
 
+                // Skip if all catalysts are of VectorDistance operator
+                if (cluster.Catalysts.All(c => c.Operator is Q.Operator.VectorDistance))
+                    continue;
+
                 // Add the where statement if not yet present
-                if (clusters.IndexOf(cluster) == 0)
+                if (!whereClauseStarted)
+                {
                     queryBuilder.Append(" WHERE (");
+                    whereClauseStarted = true;
+                }
                 else queryBuilder.Append($" {cluster.Where.Value()} (");
 
                 // Where Clause Builder
