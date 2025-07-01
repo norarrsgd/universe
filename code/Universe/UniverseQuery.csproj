@@ -21,7 +21,7 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.0.4</Version>
+		<Version>3.0.4-beta</Version>
 		<PackageReleaseNotes>
 			View release on https://github.com/kuromukira/universe/releases
 		</PackageReleaseNotes>

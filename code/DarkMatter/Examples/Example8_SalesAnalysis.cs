@@ -1,3 +1,4 @@
+using DarkMatter.Helpers;
 using DarkMatter.Models;
 using Universe.Builder.Options;
 using Universe.Extensions;
@@ -11,33 +12,10 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
     public override async Task<double> RunAsync()
     {
         Console.WriteLine("\n=== EXAMPLE 8: Sales Analysis Scenario ===\n");
-        Random random = new();
 
-        // Create sample sales data
-        List<MyObject> salesData = [];
-        string[] regions = ["North", "South", "East", "West"];
-        string[] products = ["Laptop", "Phone", "Tablet", "Desktop"];
+        // Create sample sales data using the helper
+        List<MyObject> salesData = TestDataGenerator.CreateSalesTestData();
         DateTime today = DateTime.Today;
-
-        for (int i = 1; i <= 20; i++)
-        {
-            // Create data for the last 30 days
-            int daysAgo = random.Next(0, 30);
-            string region = regions[random.Next(regions.Length)];
-            string product = products[random.Next(products.Length)];
-
-            salesData.Add(new MyObject
-            {
-                Code = $"SALE-{i}",
-                Name = $"{product} Sale",
-                Description = $"Sale in {region} region",
-                Links = [$"sale-{i}"],
-                Price = Math.Round(random.NextDouble() * 1000, 2),
-                Quantity = random.Next(1, 10),
-                Category = region,
-                AddedOn = today.AddDays(-daysAgo)
-            });
-        }
 
         // Bulk create the sales data
         Gravity g8a = await galaxy.Create(salesData);
