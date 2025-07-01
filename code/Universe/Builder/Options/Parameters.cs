@@ -38,6 +38,19 @@ public readonly record struct Catalyst(
                 violations.Add("Value should contain a wildcard (%) for Like and NotLike operators");
         }
 
+        // VectorDistance operator requires a value
+        if (Operator is Q.Operator.VectorDistance && Value is null)
+            violations.Add("Value is required when using the VectorDistance operator");
+
+        // VectorDistance operator requires value to be a valid vector
+        if (Operator is Q.Operator.VectorDistance && Value is not null)
+        {
+            if (Value is not float[] vector || vector.Length == 0)
+                violations.Add("Value must be a non-empty array of floats for VectorDistance operator");
+            else if (vector.Any(v => float.IsNaN(v) || float.IsInfinity(v)))
+                violations.Add("All elements in the vector must be finite numbers for VectorDistance operator");
+        }
+
         // Value is required for all other operators
         if (Value is null && Operator is not Q.Operator.Defined and not Q.Operator.NotDefined)
             violations.Add("Value is required for all operators except Defined and NotDefined");

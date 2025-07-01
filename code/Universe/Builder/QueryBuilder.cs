@@ -54,6 +54,23 @@ internal class UniverseBuilder(bool recordQueries)
             }
         }
 
+        // Append VectorDistance to columnsInQuery if present
+        if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
+        {
+            List<Catalyst> vectorDistanceCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance)];
+
+            if (vectorDistanceCatalysts.Count > 1)
+            {
+                foreach (Catalyst catalyst in vectorDistanceCatalysts)
+                    columnsInQuery += $", {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+            }
+            else if (vectorDistanceCatalysts.Count == 1)
+            {
+                Catalyst catalyst = vectorDistanceCatalysts.First();
+                columnsInQuery += $", {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+            }
+        }
+
         // This error blocks code execution since this is not yet supported by CosmosDb
         if (sorting is not null && sorting.Any() && groups is not null && groups.Any())
             throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
@@ -71,7 +88,8 @@ internal class UniverseBuilder(bool recordQueries)
         // Construct Where Clause by Clusters
         if (clusters is not null)
         {
-            foreach (Cluster cluster in clusters)
+            bool whereClauseStarted = false;
+            foreach (Cluster cluster in clusters.Where(cs => cs.Catalysts.Any()))
             {
                 // Validate Catalysts
                 if (cluster.Catalysts.Any(c => c.RuleViolations().Any()))
@@ -81,13 +99,28 @@ internal class UniverseBuilder(bool recordQueries)
                     throw new UniverseException(string.Join(Environment.NewLine, violations));
                 }
 
+                // There should be unique combination of column names and operator
+                if (cluster.Catalysts.GroupBy(c => (c.Column, c.Operator)).Any(g => g.Count() > 1))
+                    throw new UniverseException("Each Catalyst in a Cluster must have a unique combination of Column and Operator.");
+
+                // ColumnOptions dependency check for VectorDistance
+                if (cluster.Catalysts.Any(c => c.Operator is Q.Operator.VectorDistance && columnOptions.GetValueOrDefault().Top <= 0))
+                    throw new UniverseException("ColumnOptions that specify a top value must be provided when using VectorDistance operator.");
+
+                // Skip if all catalysts are of VectorDistance operator
+                if (cluster.Catalysts.All(c => c.Operator is Q.Operator.VectorDistance))
+                    continue;
+
                 // Add the where statement if not yet present
-                if (clusters.IndexOf(cluster) == 0)
+                if (!whereClauseStarted)
+                {
                     queryBuilder.Append(" WHERE (");
+                    whereClauseStarted = true;
+                }
                 else queryBuilder.Append($" {cluster.Where.Value()} (");
 
                 // Where Clause Builder
-                foreach (Catalyst catalyst in cluster.Catalysts)
+                foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance))
                 {
                     if (cluster.Catalysts.IndexOf(catalyst) == 0)
                         queryBuilder.Append(WhereClauseBuilder(catalyst));
@@ -101,9 +134,29 @@ internal class UniverseBuilder(bool recordQueries)
         // Sorting Builder
         if (sorting is not null && sorting.Any())
         {
+            // Make sure that the clusters does not have VectorDistance operator
+            if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
+                throw new UniverseException("Sorting scalar fields is not supported in the presence of the VectorDistance operator.");
+
             queryBuilder.Append($" ORDER BY c.{sorting[0].Column} {sorting[0].Direction.Value()}");
             foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column).ToList())
                 queryBuilder.Append($", c.{sort.Column} {sort.Direction.Value()}");
+        }
+        else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
+        {
+            List<Catalyst> vectorDistanceCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance)];
+
+            if (vectorDistanceCatalysts.Count > 1)
+            {
+                queryBuilder.Append(" ORDER BY RANK RRF(");
+                queryBuilder.Append(string.Join(", ", vectorDistanceCatalysts.Select(c => $"{c.Operator.Value()}(c.{c.Column}, @{c.ParameterName()})")));
+                queryBuilder.Append(')');
+            }
+            else if (vectorDistanceCatalysts.Count == 1)
+            {
+                Catalyst catalyst = vectorDistanceCatalysts.First();
+                queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+            }
         }
 
         // Group By Builder
@@ -129,10 +182,10 @@ internal class UniverseBuilder(bool recordQueries)
 
     internal string WhereClauseBuilder(Catalyst catalyst) => catalyst.Operator switch
     {
-        Q.Operator.In => $"ARRAY_CONTAINS(c.{catalyst.Column}, @{catalyst.ParameterName()})",
-        Q.Operator.NotIn => $"NOT ARRAY_CONTAINS(c.{catalyst.Column}, @{catalyst.ParameterName()})",
-        Q.Operator.Defined => $"IS_DEFINED(c.{catalyst.Column})",
-        Q.Operator.NotDefined => $"NOT IS_DEFINED(c.{catalyst.Column})",
+        Q.Operator.In or
+        Q.Operator.NotIn => $"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})",
+        Q.Operator.Defined or
+        Q.Operator.NotDefined => $"{catalyst.Operator.Value()}(c.{catalyst.Column})",
         _ => $"c.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
     };
 

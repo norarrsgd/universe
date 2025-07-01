@@ -21,13 +21,12 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.0.3</Version>
+		<Version>3.0.4-beta</Version>
 		<PackageReleaseNotes>
-			(⚠️ Warning: There are breaking changes) View release on
-			https://github.com/kuromukira/universe/releases
+			View release on https://github.com/kuromukira/universe/releases
 		</PackageReleaseNotes>
-		<AssemblyVersion>3.0.3.0</AssemblyVersion>
-		<FileVersion>3.0.3.0</FileVersion>
+		<AssemblyVersion>3.0.4.0</AssemblyVersion>
+		<FileVersion>3.0.4.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">

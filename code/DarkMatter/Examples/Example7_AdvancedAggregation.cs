@@ -1,3 +1,4 @@
+using DarkMatter.Helpers;
 using DarkMatter.Models;
 using Universe.Builder.Options;
 using Universe.Extensions;
@@ -12,25 +13,8 @@ public class Example7_AdvancedAggregation(IGalaxy<MyObject> galaxy) : ExampleBas
     {
         Console.WriteLine("\n=== EXAMPLE 7: Advanced Aggregation by Category ===\n");
 
-        // First create some sample data with categories
-        List<MyObject> categoryItems = [];
-        string[] categories = ["Electronics", "Books", "Clothing", "Toys"];
-        Random random = new();
-
-        for (int i = 1; i <= 10; i++)
-        {
-            string category = categories[random.Next(categories.Length)];
-            categoryItems.Add(new MyObject
-            {
-                Code = $"CAT-ITEM-{i}",
-                Name = $"Category Item {i}",
-                Description = $"Category example item {i}",
-                Links = [$"cat-link-{i}"],
-                Price = Math.Round(random.NextDouble() * 100, 2),
-                Quantity = random.Next(1, 50),
-                Category = category
-            });
-        }
+        // Create some sample data with categories using the helper
+        List<MyObject> categoryItems = TestDataGenerator.CreateCategoryTestItems();
 
         // Bulk create the category items
         Gravity g7a = await galaxy.Create(categoryItems);

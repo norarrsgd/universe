@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'prod'
+      - 'beta'
 
 jobs:
   publish:

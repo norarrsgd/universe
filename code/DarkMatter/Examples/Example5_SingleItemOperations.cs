@@ -1,3 +1,4 @@
+using DarkMatter.Helpers;
 using DarkMatter.Models;
 using Universe.Builder.Options;
 using Universe.Extensions;
@@ -12,17 +13,8 @@ public class Example5_SingleItemOperations(IGalaxy<MyObject> galaxy) : ExampleBa
     {
         Console.WriteLine("\n=== EXAMPLE 5: Single Item Operations ===\n");
 
-        // Create a new item
-        MyObject newObject = new()
-        {
-            Code = "NEW-ITEM-" + DateTime.Now.Ticks,
-            Name = "New Test Item",
-            Description = "Created via Universe API",
-            Links = ["link1", "link2"],
-            Price = 29.99,
-            Quantity = 10,
-            Category = "Electronics",
-        };
+        // Create a new item using the helper
+        MyObject newObject = TestDataGenerator.CreateSingleTestItem();
 
         (Gravity g5a, string newId) = await galaxy.Create(newObject);
         Console.WriteLine($"Created new item with ID: {newId}, RU: {g5a.RU}");
