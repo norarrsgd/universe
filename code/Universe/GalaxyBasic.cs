@@ -15,7 +15,8 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         string database,
         string container,
         IReadOnlyList<string> partitionKey,
-        bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => _qBuilder = new(_recordQuery);
+        IReadOnlyDictionary<string, VectorIndexType> vectorPolicy = null,
+        bool recordQueries = false) : base(client, database, container, partitionKey, vectorPolicy, recordQueries) => _qBuilder = new(_recordQuery);
 
     async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
     {

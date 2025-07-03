@@ -15,6 +15,25 @@ The Universe library supports vector similarity search through the `Q.Operator.V
 
 ## Generated Query Examples
 
+### Setup
+
+Make sure to initialize your Cosmos DB client and create a vector repository:
+
+```csharp
+MyRepoVector vectorGalaxy = new(
+    client: cosmosClient,
+    database: "test-database",
+    container: "vector-container",
+    partitionKey: typeof(MyObjectVector).BuildPartitionKey(),
+    vectorPolicy: new Dictionary<string, VectorIndexType>
+    {
+        { nameof(MyObjectVector.DescriptionEmbedding), VectorIndexType.Flat },
+        { nameof(MyObjectVector.TitleEmbedding), VectorIndexType.Flat },
+        { nameof(MyObjectVector.CombinedEmbedding), VectorIndexType.Flat }
+    }
+);
+```
+
 ### Single Vector Search
 ```csharp
 // Input

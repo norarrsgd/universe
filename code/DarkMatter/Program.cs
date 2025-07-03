@@ -38,7 +38,13 @@ class Program
             client: cosmosClient,
             database: "test-database",
             container: "vector-container",
-            partitionKey: typeof(MyObjectVector).BuildPartitionKey()
+            partitionKey: typeof(MyObjectVector).BuildPartitionKey(),
+            vectorPolicy: new Dictionary<string, VectorIndexType>
+            {
+                { nameof(MyObjectVector.DescriptionEmbedding), VectorIndexType.Flat },
+                { nameof(MyObjectVector.TitleEmbedding), VectorIndexType.QuantizedFlat },
+                { nameof(MyObjectVector.CombinedEmbedding), VectorIndexType.DiskANN }
+            }
         );
 
         // Track the total request units spent

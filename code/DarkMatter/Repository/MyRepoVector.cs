@@ -5,10 +5,10 @@ using DarkMatter.Models;
 namespace DarkMatter.Repository
 {
 #if DEBUG
-    public class MyRepoVector(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : Galaxy<MyObjectVector>(client, database, container, partitionKey, true)
+    public class MyRepoVector(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, IReadOnlyDictionary<string, VectorIndexType> vectorPolicy) : Galaxy<MyObjectVector>(client, database, container, partitionKey, vectorPolicy, true)
     {
 #else
-    public class MyRepoVector(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : Galaxy<MyObjectVector>(client, database, container, partitionKey)
+    public class MyRepoVector(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, IReadOnlyDictionary<string, VectorIndexType> vectorPolicy) : Galaxy<MyObjectVector>(client, database, container, partitionKey, vectorPolicy)
     {
 #endif
     }

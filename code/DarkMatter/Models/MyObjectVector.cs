@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DarkMatter.Models;
 
 namespace DarkMatter.Models;
@@ -16,6 +17,7 @@ public record MyObjectVector : MyObject
     /// <summary>
     /// Vector embedding of the product title (e.g., from text-embedding-ada-002)
     /// </summary>
+    [JsonIgnore]
     public float TitleEmbeddingScore { get; set; } = 0.0f;
 
     /// <summary>
@@ -26,6 +28,7 @@ public record MyObjectVector : MyObject
     /// <summary>
     /// Vector embedding of the product description (e.g., from text-embedding-ada-002)
     /// </summary>
+    [JsonIgnore]
     public float DescriptionEmbeddingScore { get; set; } = 0.0f;
 
     /// <summary>
@@ -36,5 +39,6 @@ public record MyObjectVector : MyObject
     /// <summary>
     /// Combined embedding score of multiple text fields
     /// </summary>
+    [JsonIgnore]
     public float CombinedEmbeddingScore { get; set; } = 0.0f;
 }
