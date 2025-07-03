@@ -14,12 +14,27 @@ public record MyObjectVector : MyObject
     public float[] TitleEmbedding { get; set; } = [];
 
     /// <summary>
+    /// Vector embedding of the product title (e.g., from text-embedding-ada-002)
+    /// </summary>
+    public float TitleEmbeddingScore { get; set; } = 0.0f;
+
+    /// <summary>
     /// Vector embedding of the product description
     /// </summary>
     public float[] DescriptionEmbedding { get; set; } = [];
 
     /// <summary>
+    /// Vector embedding of the product description (e.g., from text-embedding-ada-002)
+    /// </summary>
+    public float DescriptionEmbeddingScore { get; set; } = 0.0f;
+
+    /// <summary>
     /// Optional: Combined embedding of multiple text fields
     /// </summary>
     public float[] CombinedEmbedding { get; set; } = [];
+
+    /// <summary>
+    /// Combined embedding score of multiple text fields
+    /// </summary>
+    public float CombinedEmbeddingScore { get; set; } = 0.0f;
 }

@@ -2,12 +2,14 @@ using Universe.Response;
 using DarkMatter.Models;
 using Universe.Interfaces;
 using Universe.Builder.Options;
+using DarkMatter.Helpers;
 
 namespace DarkMatter.Examples;
 
 /// <summary>
 /// Example demonstrating VectorDistance search functionality in Cosmos DB
-/// Shows single vector search, multi-vector search with RRF, and hybrid search
+/// Shows single vector search, multi-vector search with RRF, hybrid search, and category-specific search
+/// Uses the VectorDataGenerator to create sample data and predefined query vectors for realistic testing
 /// </summary>
 public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
 {
@@ -18,6 +20,9 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
     {
         Console.WriteLine("=== Vector Search Examples ===\n");
 
+        // First, ensure we have sample data
+        await EnsureSampleDataExists();
+
         // Example 1: Single Vector Search - Find similar products by description embedding
         await SingleVectorSearchExample();
 
@@ -27,8 +32,44 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         // Example 3: Hybrid Search - Combine vector search with traditional filtering
         await HybridVectorSearchExample();
 
+        // Example 4: Furniture-specific Vector Search - Demonstrate category-specific search
+        await FurnitureVectorSearchExample();
+
         Console.WriteLine($"\nTotal RU Used: {ruUsed:F2}");
         return ruUsed;
+    }
+
+    /// <summary>
+    /// Ensures sample vector data exists in the database
+    /// </summary>
+    private async Task EnsureSampleDataExists()
+    {
+        Console.WriteLine("Ensuring sample vector data exists...");
+
+        // Check if data already exists
+        (Gravity checkGravity, IList<MyObjectVector> existingData) = await galaxy.List(
+            clusters: [],
+            columnOptions: new(Names: [nameof(MyObjectVector.id)], Top: 1)
+        );
+
+        ruUsed += checkGravity.RU;
+
+        if (existingData.Count == 0)
+        {
+            Console.WriteLine("No data found. Inserting sample vector data...");
+
+            // Generate and insert sample data
+            List<MyObjectVector> sampleData = VectorDataGenerator.GenerateSampleVectorData();
+
+            Gravity insertGravity = await galaxy.Create(sampleData);
+            ruUsed += insertGravity.RU;
+
+            Console.WriteLine($"Inserted {sampleData.Count} sample items.\n");
+        }
+        else
+        {
+            Console.WriteLine("Sample data already exists.\n");
+        }
     }
 
     /// <summary>
@@ -37,10 +78,10 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
     private async Task SingleVectorSearchExample()
     {
         Console.WriteLine("1. Single Vector Search Example");
-        Console.WriteLine("Finding products similar to 'gaming laptop' based on description embeddings...\n");
+        Console.WriteLine("Finding products similar to 'gaming laptop' using predefined query vector...\n");
 
-        // Simulated embedding for "gaming laptop" query
-        float[] queryEmbedding = [0.1f, 0.8f, 0.3f, 0.9f, 0.2f, 0.7f, 0.4f, 0.6f];
+        // Use the predefined gaming laptop query vector from VectorDataGenerator
+        float[] queryEmbedding = VectorDataGenerator.SampleQueryVectors.GamingLaptopQuery;
 
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters: [
@@ -70,11 +111,11 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
     private async Task MultiVectorRRFExample()
     {
         Console.WriteLine("\n2. Multi-Vector RRF Search Example");
-        Console.WriteLine("Finding products using both title and description embeddings with RRF...\n");
+        Console.WriteLine("Finding products using both title and description embeddings with RRF (business laptop query)...\n");
 
-        // Different embeddings for title vs description
-        float[] titleEmbedding = [0.2f, 0.9f, 0.1f, 0.8f, 0.3f, 0.7f, 0.5f, 0.4f];
-        float[] descriptionEmbedding = [0.3f, 0.7f, 0.2f, 0.9f, 0.4f, 0.6f, 0.8f, 0.1f];
+        // Use the predefined business laptop query vector for both title and description
+        float[] titleEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
+        float[] descriptionEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
 
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters: [
@@ -104,9 +145,10 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
     private async Task HybridVectorSearchExample()
     {
         Console.WriteLine("\n3. Hybrid Vector + Filter Search Example");
-        Console.WriteLine("Finding similar electronics under $1000...\n");
+        Console.WriteLine("Finding affordable electronics using vector similarity...\n");
 
-        float[] queryEmbedding = [0.4f, 0.6f, 0.8f, 0.2f, 0.9f, 0.1f, 0.7f, 0.3f];
+        // Use the predefined affordable electronics query vector
+        float[] queryEmbedding = VectorDataGenerator.SampleQueryVectors.AffordableElectronicsQuery;
 
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters: [
@@ -137,6 +179,39 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Hybrid Vector + Filter Search");
+    }
+
+    /// <summary>
+    /// Furniture-specific vector search - demonstrates category-specific vector queries
+    /// </summary>
+    private async Task FurnitureVectorSearchExample()
+    {
+        Console.WriteLine("\n4. Furniture Vector Search Example");
+        Console.WriteLine("Finding furniture items using furniture-specific query vector...\n");
+
+        // Use the predefined furniture query vector
+        float[] queryEmbedding = VectorDataGenerator.SampleQueryVectors.FurnitureQuery;
+
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
+            clusters: [
+                new(Catalysts: [
+                    new(nameof(MyObjectVector.DescriptionEmbedding), queryEmbedding, Operator: Q.Operator.VectorDistance)
+                ])
+            ],
+            columnOptions: new(
+                Names: [
+                    nameof(MyObjectVector.Code),
+                    nameof(MyObjectVector.Name),
+                    nameof(MyObjectVector.Category),
+                    nameof(MyObjectVector.Price),
+                    nameof(MyObjectVector.Description)
+                ],
+                Top: 3 // Get top 3 furniture-related results
+            )
+        );
+
+        ruUsed += gravity.RU;
+        PrintVectorQueryResults(gravity, results, "Furniture Vector Search");
     }
 
     /// <summary>
@@ -173,6 +248,14 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
             Console.WriteLine($"    Category: {item.Category}");
             Console.WriteLine($"    Price: ${item.Price:F2}");
             Console.WriteLine($"    Description: {item.Description?[..Math.Min(item.Description.Length, 60)]}...");
+
+            // show the scores
+            if (item.TitleEmbeddingScore != 0.0f)
+                Console.WriteLine($"    Title Similarity Score: {item.TitleEmbeddingScore:F4}");
+            if (item.DescriptionEmbeddingScore != 0.0f)
+                Console.WriteLine($"    Description Similarity Score: {item.DescriptionEmbeddingScore:F4}");
+            if (item.CombinedEmbeddingScore != 0.0f)
+                Console.WriteLine($"    Combined Similarity Score: {item.CombinedEmbeddingScore:F4}");
 
             // Note: Vector similarity scores would be included in the SELECT if we included them in column names
         }
