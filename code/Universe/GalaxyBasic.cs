@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Universe.Builder;
 using Universe.Response;
 
@@ -51,6 +52,13 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             if (!_allowBulk)
                 throw new UniverseException("Bulk create of documents is not configured properly.");
+
+            string payload = JsonSerializer.Serialize(models);
+            if (Encoding.UTF8.GetByteCount(payload) > 2 * 1024 * 1024)
+                throw new UniverseException("Payload size exceeds the maximum allowed size of 2MB.");
+
+            if (models.Count > 100)
+                throw new UniverseException("Bulk create can only handle up to 100 items at a time.");
 
             List<Task<double>> tasks = new(models.Count);
 
@@ -119,6 +127,13 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             if (!_allowBulk)
                 throw new UniverseException("Bulk modify of documents is not configured properly.");
+
+            string payload = JsonSerializer.Serialize(models);
+            if (Encoding.UTF8.GetByteCount(payload) > 2 * 1024 * 1024)
+                throw new UniverseException("Payload size exceeds the maximum allowed size of 2MB.");
+
+            if (models.Count > 100)
+                throw new UniverseException("Bulk create can only handle up to 100 items at a time.");
 
             List<Task<double>> tasks = new(models.Count);
 

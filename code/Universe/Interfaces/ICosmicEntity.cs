@@ -14,11 +14,6 @@ public interface ICosmicEntity
     /// <summary>UTC Date document was modified.</summary>
     public DateTime? ModifiedOn { get; set; }
 
-    /// <summary>Set the value for the PartitionKey field</summary>
-    [Obsolete("Use 'PartitionKeyAttribute' instead. This is no longer used. Will be removed in future versions.")]
-    [JsonIgnore]
-    public abstract string PartitionKey { get; }
-
     /// <summary>Represents the count of items in a query result.</summary>
     public long CountAggregate { get; set; }
 }
@@ -34,11 +29,6 @@ public abstract record CosmicEntity : IDisposable, ICosmicEntity
 
     /// <inheritdoc />
     public DateTime? ModifiedOn { get; set; } = DateTime.UtcNow;
-
-    /// <inheritdoc />
-    [Obsolete("Use 'PartitionKeyAttribute' instead. This is no longer used. Will be removed in future versions.")]
-    [JsonIgnore]
-    public abstract string PartitionKey { get; }
 
     /// <inheritdoc />
     public long CountAggregate { get; set; }
