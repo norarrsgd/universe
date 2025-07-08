@@ -17,11 +17,11 @@
 		<Description>A simpler way of querying a CosmosDb Namespace</Description>
 		<Copyright>kuromukira 2023</Copyright>
 		<RepositoryUrl>https://github.com/kuromukira/universe</RepositoryUrl>
-		<PackageTags>cosmos cosmosdb wrapper azure simple query</PackageTags>
+		<PackageTags>cosmos cosmosdb wrapper azure simple query vector nosql ai</PackageTags>
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.0.4-beta.2</Version>
+		<Version>3.0.4-beta.3</Version>
 		<PackageReleaseNotes>
 			View release on https://github.com/kuromukira/universe/releases
 		</PackageReleaseNotes>
