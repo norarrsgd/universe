@@ -310,13 +310,13 @@
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
-        <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyDictionary{System.String,Microsoft.Azure.Cosmos.VectorIndexType},System.Boolean)">
+        <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
             <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
         <member name="T:Universe.GalaxyBasic`1">
             <summary>Inherit repositories to implement the very basic Universe</summary>
         </member>
-        <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyDictionary{System.String,Microsoft.Azure.Cosmos.VectorIndexType},System.Boolean)">
+        <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
             <summary></summary>
         </member>
         <member name="T:Universe.GalaxyCore">
@@ -324,7 +324,7 @@
             Base class for Universe implementations.
             </summary>
         </member>
-        <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyDictionary{System.String,Microsoft.Azure.Cosmos.VectorIndexType},System.Boolean)">
+        <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
             <summary></summary>
         </member>
         <member name="M:Universe.GalaxyCore.Dispose(System.Boolean)">
@@ -339,7 +339,7 @@
         <member name="T:Universe.GalaxyProcedure">
             <summary>Inherit repositories to implement stored procedures</summary>
         </member>
-        <member name="M:Universe.GalaxyProcedure.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyDictionary{System.String,Microsoft.Azure.Cosmos.VectorIndexType},System.Boolean)">
+        <member name="M:Universe.GalaxyProcedure.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
             <summary>Inherit repositories to implement stored procedures</summary>
         </member>
         <member name="T:Universe.Interfaces.ICosmicEntity">

@@ -11,7 +11,7 @@ public abstract class GalaxyCore : IDisposable
     internal readonly bool _allowBulk;
 
     /// <summary></summary>
-    protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, IReadOnlyDictionary<string, VectorIndexType> vectorPolicy = null, bool recordQueries = false)
+    protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
     {
         if (string.IsNullOrWhiteSpace(container))
             throw new UniverseException("Container name is required");
@@ -22,19 +22,6 @@ public abstract class GalaxyCore : IDisposable
         client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
 
         ContainerProperties containerProps = new(container, partitionKey);
-
-        if (vectorPolicy is not null && vectorPolicy.Any())
-        {
-            IndexingPolicy policy = new();
-            foreach (var vp in vectorPolicy)
-                policy.VectorIndexes.Add(new VectorIndexPath
-                {
-                    Path = $"/{vp.Key}",
-                    Type = vp.Value
-                });
-
-            containerProps.IndexingPolicy = policy;
-        }
 
         _recordQuery = recordQueries;
         if (client.ClientOptions is not null)

@@ -11,8 +11,7 @@ public abstract class GalaxyProcedure(
     string database,
     string container,
     IReadOnlyList<string> partitionKey,
-    IReadOnlyDictionary<string, VectorIndexType> vectorPolicy = null,
-    bool recordQueries = false) : GalaxyCore(client, database, container, partitionKey, vectorPolicy, recordQueries), IGalaxyProcedure
+    bool recordQueries = false) : GalaxyCore(client, database, container, partitionKey, recordQueries), IGalaxyProcedure
 {
     async Task<(Gravity g, T T)> IGalaxyProcedure.ExecSProc<T>(string procedureName, string partitionKey, params object[] parameters)
     {
