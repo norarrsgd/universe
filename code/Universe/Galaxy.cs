@@ -9,8 +9,7 @@ public abstract class Galaxy<T>(
     string database,
     string container,
     IReadOnlyList<string> partitionKey,
-    IReadOnlyDictionary<string, VectorIndexType> vectorPolicy = null,
-    bool recordQueries = false) : GalaxyBasic<T>(client, database, container, partitionKey, vectorPolicy, recordQueries), IGalaxy<T> where T : class, ICosmicEntity
+    bool recordQueries = false) : GalaxyBasic<T>(client, database, container, partitionKey, recordQueries), IGalaxy<T> where T : class, ICosmicEntity
 {
     async Task<(Gravity, T)> IGalaxy<T>.Get(IList<Cluster> clusters, IList<string> columns)
         => await InternalGet<T>(clusters, columns);

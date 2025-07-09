@@ -12,6 +12,7 @@ The Universe library supports vector similarity search through the `Q.Operator.V
 2. **Vector format** - Values must be `float[]` arrays with finite numbers
 3. **Container setup** - Your Cosmos DB container must have vector indexing configured
 4. **No traditional sorting** - Cannot combine `VectorDistance` with regular `ORDER BY` clauses
+5. Ensure your container has a proper **Vector Index Policy** setup
 
 ## Generated Query Examples
 
@@ -24,13 +25,7 @@ MyRepoVector vectorGalaxy = new(
     client: cosmosClient,
     database: "test-database",
     container: "vector-container",
-    partitionKey: typeof(MyObjectVector).BuildPartitionKey(),
-    vectorPolicy: new Dictionary<string, VectorIndexType>
-    {
-        { nameof(MyObjectVector.DescriptionEmbedding), VectorIndexType.Flat },
-        { nameof(MyObjectVector.TitleEmbedding), VectorIndexType.Flat },
-        { nameof(MyObjectVector.CombinedEmbedding), VectorIndexType.Flat }
-    }
+    partitionKey: typeof(MyObjectVector).BuildPartitionKey()
 );
 ```
 
