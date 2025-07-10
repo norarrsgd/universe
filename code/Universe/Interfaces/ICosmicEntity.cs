@@ -27,7 +27,7 @@ public abstract record CosmicEntity : IDisposable, ICosmicEntity
 {
     /// <inheritdoc />
     [JsonPropertyOrder(0)]
-    public string id { get; set; } = Guid.NewGuid().ToString();
+    public string id { get; set; } = Guid.CreateVersion7().ToString();
 
     /// <inheritdoc />
     [JsonPropertyOrder(1)]
