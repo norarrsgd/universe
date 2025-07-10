@@ -53,6 +53,9 @@ public struct Q
         /// <summary>Not In</summary>
         NotIn,
 
+        /// <summary>Array Length</summary>
+        Len,
+
         /// <summary>Like</summary>
         Like,
 
@@ -114,6 +117,7 @@ public static class OperatorExtension
         Q.Operator.Lt => "<",
         Q.Operator.Lte => "<=",
         Q.Operator.In => "ARRAY_CONTAINS",
+        Q.Operator.Len => "ARRAY_LENGTH",
         Q.Operator.NotIn => "NOT ARRAY_CONTAINS",
         Q.Operator.Like => "LIKE",
         Q.Operator.NotLike => "NOT LIKE",

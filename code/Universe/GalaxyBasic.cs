@@ -23,7 +23,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         try
         {
             if (string.IsNullOrWhiteSpace(model.id))
-                model.id = Guid.NewGuid().ToString();
+                model.id = Guid.CreateVersion7().ToString();
             model.AddedOn = DateTime.UtcNow;
 
             ItemResponse<T> response = await _container.CreateItemAsync(
@@ -69,7 +69,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 foreach (T model in group)
                 {
                     if (string.IsNullOrWhiteSpace(model.id))
-                        model.id = Guid.NewGuid().ToString();
+                        model.id = Guid.CreateVersion7().ToString();
                     model.AddedOn = DateTime.UtcNow;
 
                     batch.CreateItem(model, requestOptions: new()
