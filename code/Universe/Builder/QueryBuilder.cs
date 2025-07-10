@@ -184,6 +184,7 @@ internal class UniverseBuilder(bool recordQueries)
     {
         Q.Operator.In or
         Q.Operator.NotIn => $"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})",
+        Q.Operator.Len => $"{catalyst.Operator.Value()}(c.{catalyst.Column}) = @{catalyst.ParameterName()}",
         Q.Operator.Defined or
         Q.Operator.NotDefined => $"{catalyst.Operator.Value()}(c.{catalyst.Column})",
         _ => $"c.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
