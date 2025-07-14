@@ -10,7 +10,10 @@ public struct Sorting
         ASC,
 
         /// <summary>Descending</summary>
-        DESC
+        DESC,
+
+        /// <summary>Weighted sorting direction</summary>
+        WEIGHTED
     }
 
     /// <summary></summary>
@@ -25,6 +28,7 @@ public static class SortOptionDirectionExtension
     {
         Sorting.Direction.ASC => "ASC",
         Sorting.Direction.DESC => "DESC",
+        Sorting.Direction.WEIGHTED => string.Empty,
         _ => throw new UniverseException("Unrecognized SORT DIRECTION keyword")
     };
 }

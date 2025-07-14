@@ -77,6 +77,35 @@ FROM c
 ORDER BY RANK RRF(VectorDistance(c.TitleEmbedding, @TitleEmbedding), VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding))
 ```
 
+### Multi-Vector Search with Weighted RRF
+```csharp
+// Input
+float[] titleVector = [0.2f, 0.9f, 0.1f, 0.8f];
+float[] descVector = [0.3f, 0.7f, 0.2f, 0.9f];
+
+(Gravity, IList<T>) results = await galaxy.List(
+    clusters: [
+        new(Catalysts: [
+            new(nameof(MyObjectWithVector.TitleEmbedding), titleVector, Operator: Q.Operator.VectorDistance),
+            new(nameof(MyObjectWithVector.DescriptionEmbedding), descVector, Operator: Q.Operator.VectorDistance)
+        ])
+    ],
+    columnOptions: new(Names: ["id", "name"], Top: 3),
+    sorting: [
+        new(Column: "[1, 2]", Direction: Sorting.Direction.WEIGHTED)
+    ]
+);
+```
+
+**Generated SQL:**
+```sql
+SELECT TOP 3 c.id, c.name, 
+       VectorDistance(c.TitleEmbedding, @TitleEmbedding) AS TitleEmbeddingScore,
+       VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding) AS DescriptionEmbeddingScore
+FROM c 
+ORDER BY RANK RRF(VectorDistance(c.TitleEmbedding, @TitleEmbedding), VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding), [1, 2])
+```
+
 ### Hybrid Search (Vector + Filters)
 ```csharp
 // Input  
@@ -108,9 +137,12 @@ ORDER BY VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding)
 
 ### Validation Rules
 - VectorDistance requires `columnOptions.Top > 0`
-- Cannot combine VectorDistance with manual sorting
+- Cannot combine VectorDistance with regular sorting (scalar fields)
 - Vector values must be non-empty `float[]` with finite numbers
 - Each Catalyst must have unique Column+Operator combination
+- Only one `Sorting.Direction.WEIGHTED` option is allowed per query
+- Weight values must be formatted as bracketed arrays (e.g., `"[0.8, 1.2]"`)
+- Weighted sorting only works with multiple VectorDistance operators (RRF scenarios)
 
 ## Sample Data Model
 
@@ -173,6 +205,6 @@ Common errors and solutions:
 
 ## Limitations
 
-- No explicit support for weight vectors in current implementation
-  - Weight vector is default to [1, 1]
-- VectorDistance does not support manual sorting or complex ordering
+- Weight vectors are supported only for RRF scenarios with multiple VectorDistance operators
+- VectorDistance does not support manual sorting or complex ordering with scalar fields
+- Weighted sorting requires bracketed array format in the Column property

@@ -132,7 +132,7 @@ internal class UniverseBuilder(bool recordQueries)
         }
 
         // Sorting Builder
-        if (sorting is not null && sorting.Any())
+        if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
         {
             // Make sure that the clusters does not have VectorDistance operator
             if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
@@ -150,6 +150,21 @@ internal class UniverseBuilder(bool recordQueries)
             {
                 queryBuilder.Append(" ORDER BY RANK RRF(");
                 queryBuilder.Append(string.Join(", ", vectorDistanceCatalysts.Select(c => $"{c.Operator.Value()}(c.{c.Column}, @{c.ParameterName()})")));
+
+                if (sorting is not null && sorting.Any(s => s.Direction is Sorting.Direction.WEIGHTED))
+                    throw new UniverseException("Only one WEIGHT option is allowed.");
+
+                foreach (Sorting.Option sort in sorting.Where(s => s.Direction is Sorting.Direction.WEIGHTED).ToList())
+                {
+                    string weightValue = sort.Column;
+                    if (!weightValue.StartsWith('['))
+                        weightValue = $"[{weightValue}";
+                    if (!weightValue.EndsWith(']'))
+                        weightValue = $"{weightValue}]";
+
+                    queryBuilder.Append($", {weightValue}");
+                }
+
                 queryBuilder.Append(')');
             }
             else if (vectorDistanceCatalysts.Count == 1)
