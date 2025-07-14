@@ -29,6 +29,9 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         // Example 2: Multi-Vector Search with RRF - Search by both title and description embeddings
         await MultiVectorRRFExample();
 
+        // Example 2b: Weighted Multi-Vector Search with RRF - Demonstrate custom weights
+        await WeightedMultiVectorRRFExample();
+
         // Example 3: Hybrid Search - Combine vector search with traditional filtering
         await HybridVectorSearchExample();
 
@@ -110,7 +113,7 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
     /// </summary>
     private async Task MultiVectorRRFExample()
     {
-        Console.WriteLine("\n2. Multi-Vector RRF Search Example");
+        Console.WriteLine("\n2a. Multi-Vector RRF Search Example");
         Console.WriteLine("Finding products using both title and description embeddings with RRF (business laptop query)...\n");
 
         // Use the predefined business laptop query vector for both title and description
@@ -137,6 +140,45 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Multi-Vector RRF Search");
+    }
+
+    /// <summary>
+    /// Multi-vector search using Reciprocal Rank Fusion (RRF) with custom weights
+    /// Demonstrates how to weight different vector fields differently in the ranking
+    /// </summary>
+    private async Task WeightedMultiVectorRRFExample()
+    {
+        Console.WriteLine("\n2b. Weighted Multi-Vector RRF Search Example");
+        Console.WriteLine("Finding products using weighted title and description embeddings (business laptop query)...\n");
+        Console.WriteLine("Title weight: 0.8, Description weight: 1.2 (description has higher importance)\n");
+
+        // Use the predefined business laptop query vector for both title and description
+        float[] titleEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
+        float[] descriptionEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
+
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
+            clusters: [
+                new(Catalysts: [
+                    new(nameof(MyObjectVector.TitleEmbedding), titleEmbedding, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.DescriptionEmbedding), descriptionEmbedding, Operator: Q.Operator.VectorDistance)
+                ])
+            ],
+            columnOptions: new(
+                Names: [
+                    nameof(MyObjectVector.Code),
+                    nameof(MyObjectVector.Name),
+                    nameof(MyObjectVector.Category),
+                    nameof(MyObjectVector.Price)
+                ],
+                Top: 3 // Get top 3 results from weighted RRF ranking
+            ),
+            sorting: [
+                new(Column: "[1, 2]", Direction: Sorting.Direction.WEIGHTED)
+            ]
+        );
+
+        ruUsed += gravity.RU;
+        PrintVectorQueryResults(gravity, results, "Weighted Multi-Vector RRF Search");
     }
 
     /// <summary>

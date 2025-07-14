@@ -21,7 +21,7 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.0.4-beta.5</Version>
+		<Version>3.0.4-beta.6</Version>
 		<PackageReleaseNotes>
 			View release on https://github.com/kuromukira/universe/releases
 		</PackageReleaseNotes>
@@ -41,7 +41,7 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.52.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="System.Text.Json" Version="9.0.6" />
+		<PackageReference Include="System.Text.Json" Version="9.0.7" />
 	</ItemGroup>
 
 	<ItemGroup>
