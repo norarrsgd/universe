@@ -371,6 +371,11 @@ When using aggregates, the query will automatically be grouped by the columns sp
 
 _See [example 2](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example2_AggregatesWithGroupBy.cs), [example 7](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example7_AdvancedAggregation.cs), [example 8](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example8_SalesAnalysis.cs)._
 
+## Vector Distance Search
+The Universe library supports vector similarity search through the `Q.Operator.VectorDistance` operator, which leverages Azure Cosmos DB's built-in vector search capabilities.
+
+See the [VECTORDISTANCE_USAGE.md](https://github.com/kuromukira/universe/blob/dev/VECTORDISTANCE_USAGE.md)
+
 ## Stored Procedures
 
 You can manage and execute Cosmos DB stored procedures using the `IGalaxyProcedure` interface. Inject your repository as `IGalaxyProcedure` and use its methods for full stored procedure lifecycle management and execution.

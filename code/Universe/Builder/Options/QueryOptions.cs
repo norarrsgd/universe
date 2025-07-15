@@ -53,6 +53,9 @@ public struct Q
         /// <summary>Not In</summary>
         NotIn,
 
+        /// <summary>Array Length</summary>
+        Len,
+
         /// <summary>Like</summary>
         Like,
 
@@ -63,7 +66,10 @@ public struct Q
         Defined,
 
         /// <summary>NOT IS_DEFINED</summary>
-        NotDefined
+        NotDefined,
+
+        /// <summary>VectorDistance</summary>
+        VectorDistance
     }
 
     /// <summary>Aggregation functions</summary>
@@ -110,12 +116,14 @@ public static class OperatorExtension
         Q.Operator.Gte => ">=",
         Q.Operator.Lt => "<",
         Q.Operator.Lte => "<=",
-        Q.Operator.In => "IN",
-        Q.Operator.NotIn => "NOT IN",
+        Q.Operator.In => "ARRAY_CONTAINS",
+        Q.Operator.Len => "ARRAY_LENGTH",
+        Q.Operator.NotIn => "NOT ARRAY_CONTAINS",
         Q.Operator.Like => "LIKE",
         Q.Operator.NotLike => "NOT LIKE",
         Q.Operator.Defined => "IS_DEFINED",
         Q.Operator.NotDefined => "NOT IS_DEFINED",
+        Q.Operator.VectorDistance => "VectorDistance",
         _ => throw new UniverseException("Unrecognized OPERATOR keyword")
     };
 }

@@ -22,8 +22,4 @@ public record MyObject : CosmicEntity
 
     [PartitionKey(1)]
     public string Category { get; set; }
-
-    [Obsolete("Use 'PartitionKeyAttribute' instead. This is no longer used. Will be removed in future versions.")]
-    [JsonIgnore]
-    public override string PartitionKey => Code;
 }

@@ -173,6 +173,9 @@
         <member name="F:Universe.Builder.Options.Q.Operator.NotIn">
             <summary>Not In</summary>
         </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Len">
+            <summary>Array Length</summary>
+        </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Like">
             <summary>Like</summary>
         </member>
@@ -184,6 +187,9 @@
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotDefined">
             <summary>NOT IS_DEFINED</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.VectorDistance">
+            <summary>VectorDistance</summary>
         </member>
         <member name="T:Universe.Builder.Options.Q.Aggregate">
             <summary>Aggregation functions</summary>
@@ -232,6 +238,9 @@
         </member>
         <member name="F:Universe.Builder.Options.Sorting.Direction.DESC">
             <summary>Descending</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Sorting.Direction.WEIGHTED">
+            <summary>Weighted sorting direction</summary>
         </member>
         <member name="T:Universe.Builder.Options.Sorting.Option">
             <summary></summary>
@@ -351,9 +360,6 @@
         <member name="P:Universe.Interfaces.ICosmicEntity.ModifiedOn">
             <summary>UTC Date document was modified.</summary>
         </member>
-        <member name="P:Universe.Interfaces.ICosmicEntity.PartitionKey">
-            <summary>Set the value for the PartitionKey field</summary>
-        </member>
         <member name="P:Universe.Interfaces.ICosmicEntity.CountAggregate">
             <summary>Represents the count of items in a query result.</summary>
         </member>
@@ -367,9 +373,6 @@
             <inheritdoc />
         </member>
         <member name="P:Universe.Interfaces.CosmicEntity.ModifiedOn">
-            <inheritdoc />
-        </member>
-        <member name="P:Universe.Interfaces.CosmicEntity.PartitionKey">
             <inheritdoc />
         </member>
         <member name="P:Universe.Interfaces.CosmicEntity.CountAggregate">
