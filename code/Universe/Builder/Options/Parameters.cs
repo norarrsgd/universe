@@ -51,6 +51,28 @@ public readonly record struct Catalyst(
                 violations.Add("All elements in the vector must be finite numbers for VectorDistance operator");
         }
 
+        // FullTextContains operators require a value
+        if (Operator is Q.Operator.FTContains or Q.Operator.NotFTContains)
+        {
+            if (Value is null)
+                violations.Add("Value is required for Full-text search operators");
+            else if (Value is not string)
+                violations.Add("Value must be a string for FullTextContains and NotFullTextContains operators");
+        }
+
+        // Other Full-text search operators require a string array as value
+        if (Operator is Q.Operator.FTContainsAll or Q.Operator.NotFTContainsAll or
+            Q.Operator.FTContainsAny or Q.Operator.NotFTContainsAny or
+            Q.Operator.FTScore)
+        {
+            if (Value is null)
+                violations.Add("Value is required for Full-text search operators");
+            else if (Value is not string[] ftValues || ftValues.Length == 0)
+                violations.Add("Value must be a non-empty array of strings for Full-text search operators");
+            else if (ftValues.Any(string.IsNullOrWhiteSpace))
+                violations.Add("All elements in the Full-text search value array must be non-empty strings");
+        }
+
         // Value is required for all other operators
         if (Value is null && Operator is not Q.Operator.Defined and not Q.Operator.NotDefined)
             violations.Add("Value is required for all operators except Defined and NotDefined");
