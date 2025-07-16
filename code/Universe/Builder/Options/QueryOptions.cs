@@ -69,7 +69,28 @@ public struct Q
         NotDefined,
 
         /// <summary>VectorDistance</summary>
-        VectorDistance
+        VectorDistance,
+
+        /// <summary>FullTextContains</summary>
+        FTContains,
+
+        /// <summary>NOT FullTextContains</summary>
+        NotFTContains,
+
+        /// <summary>FullTextContainsAll</summary>
+        FTContainsAll,
+
+        /// <summary>NOT FullTextContainsAll</summary>
+        NotFTContainsAll,
+
+        /// <summary>FullTextContainsAny</summary>
+        FTContainsAny,
+
+        /// <summary>NOT FullTextContainsAny</summary>
+        NotFTContainsAny,
+
+        /// <summary>FullTextScore</summary>
+        FTScore
     }
 
     /// <summary>Aggregation functions</summary>
@@ -124,6 +145,13 @@ public static class OperatorExtension
         Q.Operator.Defined => "IS_DEFINED",
         Q.Operator.NotDefined => "NOT IS_DEFINED",
         Q.Operator.VectorDistance => "VectorDistance",
+        Q.Operator.FTContains => "FullTextContains",
+        Q.Operator.NotFTContains => "NOT FullTextContains",
+        Q.Operator.FTContainsAll => "FullTextContainsAll",
+        Q.Operator.NotFTContainsAll => "NOT FullTextContainsAll",
+        Q.Operator.FTContainsAny => "FullTextContainsAny",
+        Q.Operator.NotFTContainsAny => "NOT FullTextContainsAny",
+        Q.Operator.FTScore => "FullTextScore",
         _ => throw new UniverseException("Unrecognized OPERATOR keyword")
     };
 }

@@ -191,6 +191,27 @@
         <member name="F:Universe.Builder.Options.Q.Operator.VectorDistance">
             <summary>VectorDistance</summary>
         </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTContains">
+            <summary>FullTextContains</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotFTContains">
+            <summary>NOT FullTextContains</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTContainsAll">
+            <summary>FullTextContainsAll</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotFTContainsAll">
+            <summary>NOT FullTextContainsAll</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTContainsAny">
+            <summary>FullTextContainsAny</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotFTContainsAny">
+            <summary>NOT FullTextContainsAny</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTScore">
+            <summary>FullTextScore</summary>
+        </member>
         <member name="T:Universe.Builder.Options.Q.Aggregate">
             <summary>Aggregation functions</summary>
         </member>

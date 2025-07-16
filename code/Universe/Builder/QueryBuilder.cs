@@ -108,7 +108,7 @@ internal class UniverseBuilder(bool recordQueries)
                     throw new UniverseException("ColumnOptions that specify a top value must be provided when using VectorDistance operator.");
 
                 // Skip if all catalysts are of VectorDistance operator
-                if (cluster.Catalysts.All(c => c.Operator is Q.Operator.VectorDistance))
+                if (cluster.Catalysts.All(c => c.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore))
                     continue;
 
                 // Add the where statement if not yet present
@@ -120,7 +120,7 @@ internal class UniverseBuilder(bool recordQueries)
                 else queryBuilder.Append($" {cluster.Where.Value()} (");
 
                 // Where Clause Builder
-                foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance))
+                foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance or Q.Operator.FTScore))
                 {
                     if (cluster.Catalysts.IndexOf(catalyst) == 0)
                         queryBuilder.Append(WhereClauseBuilder(catalyst));
@@ -142,14 +142,14 @@ internal class UniverseBuilder(bool recordQueries)
             foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column).ToList())
                 queryBuilder.Append($", c.{sort.Column} {sort.Direction.Value()}");
         }
-        else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
+        else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
         {
-            List<Catalyst> vectorDistanceCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance)];
+            List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)];
 
-            if (vectorDistanceCatalysts.Count > 1)
+            if (rankCatalysts.Count > 1)
             {
                 queryBuilder.Append(" ORDER BY RANK RRF(");
-                queryBuilder.Append(string.Join(", ", vectorDistanceCatalysts.Select(c => $"{c.Operator.Value()}(c.{c.Column}, @{c.ParameterName()})")));
+                queryBuilder.Append(string.Join(", ", rankCatalysts.Select(c => $"{c.Operator.Value()}(c.{c.Column}, @{c.ParameterName()})")));
 
                 if (sorting is not null && sorting.Any(s => s.Direction is Sorting.Direction.WEIGHTED))
                     throw new UniverseException("Only one WEIGHT option is allowed.");
@@ -167,10 +167,13 @@ internal class UniverseBuilder(bool recordQueries)
 
                 queryBuilder.Append(')');
             }
-            else if (vectorDistanceCatalysts.Count == 1)
+            else if (rankCatalysts.Count == 1)
             {
-                Catalyst catalyst = vectorDistanceCatalysts.First();
-                queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+                Catalyst catalyst = rankCatalysts.First();
+                if (catalyst.Operator is Q.Operator.FTScore)
+                    queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+                else
+                    queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
             }
         }
 
@@ -202,6 +205,12 @@ internal class UniverseBuilder(bool recordQueries)
         Q.Operator.Len => $"{catalyst.Operator.Value()}(c.{catalyst.Column}) = @{catalyst.ParameterName()}",
         Q.Operator.Defined or
         Q.Operator.NotDefined => $"{catalyst.Operator.Value()}(c.{catalyst.Column})",
+        Q.Operator.FTContains or
+        Q.Operator.NotFTContains or
+        Q.Operator.FTContainsAll or
+        Q.Operator.NotFTContainsAll or
+        Q.Operator.FTContainsAny or
+        Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})",
         _ => $"c.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
     };
 

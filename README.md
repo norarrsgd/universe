@@ -376,6 +376,11 @@ The Universe library supports vector similarity search through the `Q.Operator.V
 
 See the [VECTORDISTANCE_USAGE.md](https://github.com/kuromukira/universe/blob/dev/VECTORDISTANCE_USAGE.md)
 
+## Full-Text Search
+The Universe library provides a simple way to perform full-text search queries using the `Q.Operator.FT*` operators. This allows you to search for documents containing specific text in designated fields.
+
+See the [FULLTEXT_USAGE.md](https://github.com/kuromukira/universe/blob/dev/FULLTEXT_USAGE.md)
+
 ## Stored Procedures
 
 You can manage and execute Cosmos DB stored procedures using the `IGalaxyProcedure` interface. Inject your repository as `IGalaxyProcedure` and use its methods for full stored procedure lifecycle management and execution.
