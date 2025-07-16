@@ -171,7 +171,7 @@ internal class UniverseBuilder(bool recordQueries)
             {
                 Catalyst catalyst = rankCatalysts.First();
                 if (catalyst.Operator is Q.Operator.FTScore)
-                    queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column})");
+                    queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
                 else
                     queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
             }
