@@ -363,6 +363,7 @@ public record ArticleDocument : MyObject
 
 For complete working examples, refer to:
 - `Examples/Example10_FullTextSearch.cs` - Comprehensive full-text search examples
+- `Examples/Example11_HybridVectorFullText.cs` - Hybrid vector + full-text search examples
 - `Helpers/TestDataGenerator.cs` - Sample data generation with text content
 
 ## Cosmos DB Setup Requirements

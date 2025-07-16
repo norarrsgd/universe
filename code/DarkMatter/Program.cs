@@ -54,6 +54,8 @@ class Program
         totalRu += await new Example7_AdvancedAggregation(galaxy).RunAsync();
         totalRu += await new Example8_SalesAnalysis(galaxy).RunAsync();
         totalRu += await new Example9_VectorSearch(vectorGalaxy).RunAsync();
+        totalRu += await new Example10_FullTextSearch(galaxy).RunAsync();
+        totalRu += await new Example11_HybridVectorFullText(vectorGalaxy).RunAsync();
 
         // Display summary information
         Console.WriteLine($"\nTotal RU spent across all examples: {totalRu}");
