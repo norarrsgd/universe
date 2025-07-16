@@ -23,7 +23,8 @@
 		<Product>Universe</Product>
 		<Version>3.0.5-beta.1</Version>
 		<PackageReleaseNotes>
-			View release on https://github.com/kuromukira/universe/releases/tag/universe-3.0.4
+			View release on
+			https://github.com/kuromukira/universe/releases/tag/untagged-cdcf4202c2656450c07b
 		</PackageReleaseNotes>
 		<AssemblyVersion>3.0.5.0</AssemblyVersion>
 		<FileVersion>3.0.5.0</FileVersion>
