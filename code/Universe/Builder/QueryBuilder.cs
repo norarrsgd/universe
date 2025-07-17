@@ -11,7 +11,7 @@ internal class UniverseBuilder(bool recordQueries)
         if (columnOptions is not null)
         {
             if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
-                columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c.{c}").ToList());
+                columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c.{c}"));
 
             if (columnOptions.Value.Top > 0)
                 columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
@@ -77,7 +77,7 @@ internal class UniverseBuilder(bool recordQueries)
 
         // Update Columns Builder with Group By
         if (columnsInQuery.Contains('*') && groups is not null && groups.Any())
-            _ = columnsInQuery.Replace("*", string.Join(", ", groups.Select(c => $"c.{c}").ToList()));
+            columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", groups.Select(c => $"c.{c}")));
 
         StringBuilder queryBuilder = new($"SELECT {columnsInQuery} FROM c");
 
@@ -95,7 +95,7 @@ internal class UniverseBuilder(bool recordQueries)
                 if (cluster.Catalysts.Any(c => c.RuleViolations().Any()))
                 {
                     List<IEnumerable<string>> violationsPerCatalyst = [.. cluster.Catalysts.Select(c => c.RuleViolations())];
-                    List<string> violations = [.. violationsPerCatalyst.SelectMany(v => v).ToList().Distinct()];
+                    List<string> violations = [.. violationsPerCatalyst.SelectMany(v => v).Distinct()];
                     throw new UniverseException(string.Join(Environment.NewLine, violations));
                 }
 
@@ -104,7 +104,7 @@ internal class UniverseBuilder(bool recordQueries)
                     throw new UniverseException("Each Catalyst in a Cluster must have a unique combination of Column and Operator.");
 
                 // ColumnOptions dependency check for VectorDistance
-                if (cluster.Catalysts.Any(c => c.Operator is Q.Operator.VectorDistance && columnOptions.GetValueOrDefault().Top <= 0))
+                if (cluster.Catalysts.Any(c => c.Operator is Q.Operator.VectorDistance) && (columnOptions == null || columnOptions.GetValueOrDefault().Top <= 0))
                     throw new UniverseException("ColumnOptions that specify a top value must be provided when using VectorDistance operator.");
 
                 // Skip if all catalysts are of VectorDistance operator
@@ -139,7 +139,7 @@ internal class UniverseBuilder(bool recordQueries)
                 throw new UniverseException("Sorting scalar fields is not supported in the presence of the VectorDistance operator.");
 
             queryBuilder.Append($" ORDER BY c.{sorting[0].Column} {sorting[0].Direction.Value()}");
-            foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column).ToList())
+            foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column))
                 queryBuilder.Append($", c.{sort.Column} {sort.Direction.Value()}");
         }
         else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
@@ -151,18 +151,21 @@ internal class UniverseBuilder(bool recordQueries)
                 queryBuilder.Append(" ORDER BY RANK RRF(");
                 queryBuilder.Append(string.Join(", ", rankCatalysts.Select(c => $"{c.Operator.Value()}(c.{c.Column}, @{c.ParameterName()})")));
 
-                if (sorting is not null && sorting.Any(s => s.Direction is Sorting.Direction.WEIGHTED))
+                if (sorting is not null && sorting.Count(s => s.Direction is Sorting.Direction.WEIGHTED) > 1)
                     throw new UniverseException("Only one WEIGHT option is allowed.");
 
-                foreach (Sorting.Option sort in sorting.Where(s => s.Direction is Sorting.Direction.WEIGHTED).ToList())
+                if (sorting is not null)
                 {
-                    string weightValue = sort.Column;
-                    if (!weightValue.StartsWith('['))
-                        weightValue = $"[{weightValue}";
-                    if (!weightValue.EndsWith(']'))
-                        weightValue = $"{weightValue}]";
+                    foreach (Sorting.Option sort in sorting.Where(s => s.Direction is Sorting.Direction.WEIGHTED))
+                    {
+                        string weightValue = sort.Column;
+                        if (!weightValue.StartsWith('['))
+                            weightValue = $"[{weightValue}";
+                        if (!weightValue.EndsWith(']'))
+                            weightValue = $"{weightValue}]";
 
-                    queryBuilder.Append($", {weightValue}");
+                        queryBuilder.Append($", {weightValue}");
+                    }
                 }
 
                 queryBuilder.Append(')');
@@ -181,7 +184,7 @@ internal class UniverseBuilder(bool recordQueries)
         if (groups is not null && groups.Any())
         {
             queryBuilder.Append($" GROUP BY c.{groups[0]}");
-            foreach (string group in groups.Where(g => g != groups[0]).ToList())
+            foreach (string group in groups.Where(g => g != groups[0]))
                 queryBuilder.Append($", c.{group}");
         }
 
@@ -198,7 +201,7 @@ internal class UniverseBuilder(bool recordQueries)
         return query;
     }
 
-    internal string WhereClauseBuilder(Catalyst catalyst) => catalyst.Operator switch
+    internal static string WhereClauseBuilder(Catalyst catalyst) => catalyst.Operator switch
     {
         Q.Operator.In or
         Q.Operator.NotIn => $"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})",
