@@ -29,7 +29,7 @@ public class Example5_SingleItemOperations(IGalaxy<MyObject> galaxy) : ExampleBa
             [
                 new Cluster(Catalysts:
                 [
-                    new Catalyst(nameof(MyObject.Name), newObject.Name)
+                    new Catalyst(nameof(MyObject.Name).ToLowerCamelCase(), newObject.Name)
                 ])
             ]
         );

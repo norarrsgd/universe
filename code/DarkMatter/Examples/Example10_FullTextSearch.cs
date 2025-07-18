@@ -3,6 +3,7 @@ using DarkMatter.Models;
 using Universe.Interfaces;
 using Universe.Builder.Options;
 using DarkMatter.Helpers;
+using Universe.Extensions;
 
 namespace DarkMatter.Examples;
 
@@ -71,7 +72,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         // Check if data already exists
         (Gravity checkGravity, IList<MyObject> existingData) = await galaxy.List(
             clusters: [],
-            columnOptions: new(Names: [nameof(MyObject.id)], Top: 1)
+            columnOptions: new(Names: [nameof(MyObject.id).ToLowerCamelCase()], Top: 1)
         );
 
         ruUsed += checkGravity.RU;
@@ -106,10 +107,10 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Name), "machine learning", Operator: Q.Operator.FTContains)
+                    new(nameof(MyObject.Name).ToLowerCamelCase(), "machine learning", Operator: Q.Operator.FTContains)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -129,10 +130,10 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Description), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 5)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 5)
         );
 
         ruUsed += gravity.RU;
@@ -152,11 +153,11 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Name), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-                    new(nameof(MyObject.Description), new[] { "neural", "networks" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "neural", "networks" }, Operator: Q.Operator.FTScore)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -176,11 +177,11 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Name), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-                    new(nameof(MyObject.Description), new[] { "deep", "learning" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "deep", "learning" }, Operator: Q.Operator.FTScore)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 10),
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10),
             sorting: [
                 new(Column: "[0.8, 0.2]", Direction: Sorting.Direction.WEIGHTED)
             ]
@@ -203,10 +204,10 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Description), new[] { "machine", "learning", "algorithms" }, Operator: Q.Operator.FTContainsAll)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "machine", "learning", "algorithms" }, Operator: Q.Operator.FTContainsAll)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -226,11 +227,11 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Category), "Electronics", Operator: Q.Operator.Eq),
-                    new(nameof(MyObject.Description), new[] { "AI", "ML", "DL", "NLP" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
+                    new(nameof(MyObject.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "AI", "ML", "DL", "NLP" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Category)], Top: 15)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase()], Top: 15)
         );
 
         ruUsed += gravity.RU;
@@ -250,11 +251,11 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Description), "deprecated", Operator: Q.Operator.NotFTContains),
-                    new(nameof(MyObject.Name), new[] { "obsolete", "legacy" }, Operator: Q.Operator.NotFTContainsAny, Where: Q.Where.And)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), "deprecated", Operator: Q.Operator.NotFTContains),
+                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "obsolete", "legacy" }, Operator: Q.Operator.NotFTContainsAny, Where: Q.Where.And)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -277,15 +278,15 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
             clusters: [
                 // Full-text search cluster
                 new(Catalysts: [
-                    new(nameof(MyObject.Description), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
                 ]),
                 // Traditional filter cluster
                 new(Where: Q.Where.And, Catalysts: [
-                    new(nameof(MyObject.Category), "Electronics", Operator: Q.Operator.Eq),
-                    new(nameof(MyObject.Price), 1000.0, Operator: Q.Operator.Lt)
+                    new(nameof(MyObject.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), 1000.0, Operator: Q.Operator.Lt)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Category), nameof(MyObject.Price)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase(), nameof(MyObject.Price).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -306,15 +307,15 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
             clusters: [
                 // Primary content search
                 new(Catalysts: [
-                    new(nameof(MyObject.Name), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
                 ]),
                 // Secondary content search
                 new(Where: Q.Where.And, Catalysts: [
-                    new(nameof(MyObject.Description), new[] { "machine", "learning" }, Operator: Q.Operator.FTContainsAny),
-                    new(nameof(MyObject.Category), new[] { "AI", "ML" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.Or)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTContainsAny),
+                    new(nameof(MyObject.Category).ToLowerCamelCase(), new[] { "AI", "ML" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.Or)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description), nameof(MyObject.Category)], Top: 20)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase()], Top: 20)
         );
 
         ruUsed += gravity.RU;
@@ -334,13 +335,13 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Description), new[] { "technology", "innovation" }, Operator: Q.Operator.FTContainsAny)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "technology", "innovation" }, Operator: Q.Operator.FTContainsAny)
                 ])
             ],
             columnOptions: new(
-                Names: [nameof(MyObject.Category)],
+                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
                 Aggregates: [
-                    new(nameof(MyObject.id), Aggregate: Q.Aggregate.Count)
+                    new(nameof(MyObject.id).ToLowerCamelCase(), Aggregate: Q.Aggregate.Count)
                 ]
             )
         );
@@ -383,11 +384,11 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.Description), "machine learning", Operator: Q.Operator.FTContains),
-                    new(nameof(MyObject.Description), new[] { "AI", "artificial intelligence", "neural" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), "machine learning", Operator: Q.Operator.FTContains),
+                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "AI", "artificial intelligence", "neural" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObject.Code), nameof(MyObject.Name), nameof(MyObject.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;

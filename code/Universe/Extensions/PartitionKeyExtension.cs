@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Universe.Extensions;
 
@@ -42,12 +43,33 @@ public static class CosmicEntityExtensions
             .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1);
 
         foreach (PropertyInfo property in orderedProperties)
-            pks.Add($"/{property.Name}");
+        {
+            string keyName = property.GetCustomAttribute<PartitionKeyAttribute>()?.KeyName ?? ToCamelCase(property.Name);
+            pks.Add($"/{keyName}");
+
+        }
 
         return pks.AsReadOnly();
     }
 
-    /// <summary>Builds the partition key for the entity.</summary>
+    // Converts a string to lower camel case using regex (handles acronyms and underscores).
+    private static string ToCamelCase(string str)
+    {
+        if (string.IsNullOrWhiteSpace(str))
+            return str;
+
+        // Remove underscores and capitalize following letter
+        str = Regex.Replace(str, @"_([a-zA-Z])", m => m.Groups[1].Value.ToUpper());
+
+        // If all uppercase (acronym), make only first letter lowercase
+        if (Regex.IsMatch(str, @"^[A-Z0-9]+$"))
+            return str.ToLowerInvariant();
+
+        // Lowercase first character
+        return char.ToLowerInvariant(str[0]) + str[1..];
+    }
+
+    /// <summary>Builds the partition key values for the entity.</summary>
     public static PartitionKey BuildPartitionKey(this ICosmicEntity entity)
     {
         if (entity is null)
@@ -81,7 +103,7 @@ public static class CosmicEntityExtensions
         return builder.Build();
     }
 
-    /// <summary>Builds the partition key for the entity.</summary>
+    /// <summary>Builds the partition key values for the entity.</summary>
     public static IEnumerable<string> PartitionKeys(this ICosmicEntity entity)
     {
         if (entity is null)

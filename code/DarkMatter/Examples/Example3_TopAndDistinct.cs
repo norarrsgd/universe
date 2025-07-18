@@ -1,4 +1,5 @@
 using DarkMatter.Models;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -12,7 +13,10 @@ public class Example3_TopAndDistinct(IGalaxy<MyObject> galaxy) : ExampleBase(gal
         (Gravity g3, IList<MyObject> results3) = await galaxy.List(
             clusters: null, // No filtering, return all records
             columnOptions: new(
-                Names: [nameof(MyObject.Code), nameof(MyObject.Name)],
+                Names: [
+                    nameof(MyObject.Code).ToLowerCamelCase(),
+                    nameof(MyObject.Name).ToLowerCamelCase()
+                ],
                 IsDistinct: true,
                 Top: 10
             )

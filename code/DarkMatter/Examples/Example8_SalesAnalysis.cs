@@ -29,9 +29,9 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
                 Names: [nameof(MyObject.Category) /* represents Region in this example */],
                 Aggregates:
                 [
-                    new(nameof(MyObject.Price), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id), Q.Aggregate.Count)
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
                 ]
             )
         );
@@ -45,16 +45,16 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
         (Gravity g8c, IList<MyObjectAggregation> recentSales) = await galaxy.List<MyObjectAggregation>(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.AddedOn), today.AddDays(-7), Operator: Q.Operator.Gte)
+                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-7), Operator: Q.Operator.Gte)
                 ])
             ],
             columnOptions: new(
-                Names: [nameof(MyObject.Category)],
+                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
                 Aggregates:
                 [
-                    new(nameof(MyObject.Price), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id), Q.Aggregate.Count)
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
                 ]
             )
         );
@@ -66,17 +66,17 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
         (Gravity g8d, IList<MyObject> olderSales) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObject.AddedOn), today.AddDays(-7), Operator: Q.Operator.Lt),
-                    new(nameof(MyObject.AddedOn), today.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And)
+                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-7), Operator: Q.Operator.Lt),
+                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And)
                 ])
             ],
             columnOptions: new(
-                Names: [nameof(MyObject.Category)],
+                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
                 Aggregates:
                 [
-                    new(nameof(MyObject.Price), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id), Q.Aggregate.Count)
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
                 ]
             )
         );

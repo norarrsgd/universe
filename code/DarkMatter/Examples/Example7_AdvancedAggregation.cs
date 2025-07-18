@@ -24,13 +24,13 @@ public class Example7_AdvancedAggregation(IGalaxy<MyObject> galaxy) : ExampleBas
         (Gravity g7b, IList<MyObjectAggregation> results7) = await galaxy.List<MyObjectAggregation>(
             clusters: null,
             columnOptions: new(
-                Names: [nameof(MyObject.Category)],
+                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
                 Aggregates:
                 [
-                    new(nameof(MyObject.Price), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Price), Q.Aggregate.Avg),
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id), Q.Aggregate.Count)
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Avg),
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
                 ]
             )
         );

@@ -1,5 +1,6 @@
 using DarkMatter.Models;
 using Universe.Builder.Options;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -22,11 +23,11 @@ public class Example2_AggregatesWithGroupBy(IGalaxy<MyObject> galaxy) : ExampleB
                 Names: [nameof(MyObject.Category)],
                 Aggregates:
                 [
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Count),
-                    new(nameof(MyObject.Price), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Price), Q.Aggregate.Avg),
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Max),
-                    new(nameof(MyObject.Quantity), Q.Aggregate.Min)
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Count),
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Avg),
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Max),
+                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Min)
                 ]
             )
         );
