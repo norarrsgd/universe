@@ -3,6 +3,7 @@ using DarkMatter.Models;
 using Universe.Interfaces;
 using Universe.Builder.Options;
 using DarkMatter.Helpers;
+using Universe.Extensions;
 
 namespace DarkMatter.Examples;
 
@@ -53,7 +54,7 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
         // Check if data already exists
         (Gravity checkGravity, IList<MyObjectVector> existingData) = await galaxy.List(
             clusters: [],
-            columnOptions: new(Names: [nameof(MyObjectVector.id)], Top: 1)
+            columnOptions: new(Names: [nameof(MyObjectVector.id).ToLowerCamelCase()], Top: 1)
         );
 
         ruUsed += checkGravity.RU;
@@ -92,12 +93,12 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
             clusters: [
                 new(Catalysts: [
                     // Semantic similarity via vector
-                    new(nameof(MyObjectVector.DescriptionEmbedding), queryVector, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
                     // Lexical matching via full-text
-                    new(nameof(MyObjectVector.Name), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code), nameof(MyObjectVector.Name), nameof(MyObjectVector.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -120,13 +121,13 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
             clusters: [
                 new(Catalysts: [
                     // Semantic similarity
-                    new(nameof(MyObjectVector.TitleEmbedding), queryVector, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
                     // Lexical matching on multiple fields
-                    new(nameof(MyObjectVector.Name), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore),
-                    new(nameof(MyObjectVector.Description), new[] { "neural", "networks", "deep", "learning" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore),
+                    new(nameof(MyObjectVector.Description).ToLowerCamelCase(), new[] { "neural", "networks", "deep", "learning" }, Operator: Q.Operator.FTScore)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code), nameof(MyObjectVector.Name), nameof(MyObjectVector.Description)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Description).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -148,11 +149,11 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObjectVector.DescriptionEmbedding), queryVector, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.Name), new[] { "gaming", "performance" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "gaming", "performance" }, Operator: Q.Operator.FTScore)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code), nameof(MyObjectVector.Name), nameof(MyObjectVector.Price)], Top: 10),
+            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 10),
             sorting: [
                 new(Column: "[0.6, 0.4]", Direction: Sorting.Direction.WEIGHTED) // 60% vector, 40% text
             ]
@@ -178,16 +179,16 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
             clusters: [
                 // Hybrid ranking cluster (Vector + Full-Text)
                 new(Catalysts: [
-                    new(nameof(MyObjectVector.DescriptionEmbedding), queryVector, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.Description), new[] { "technology", "innovation" }, Operator: Q.Operator.FTScore)
+                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.Description).ToLowerCamelCase(), new[] { "technology", "innovation" }, Operator: Q.Operator.FTScore)
                 ]),
                 // Traditional filter cluster
                 new(Where: Q.Where.And, Catalysts: [
-                    new(nameof(MyObjectVector.Category), "Electronics", Operator: Q.Operator.Eq),
-                    new(nameof(MyObjectVector.Price), 2000.0, Operator: Q.Operator.Lt)
+                    new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
+                    new(nameof(MyObjectVector.Price).ToLowerCamelCase(), 2000.0, Operator: Q.Operator.Lt)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code), nameof(MyObjectVector.Name), nameof(MyObjectVector.Category), nameof(MyObjectVector.Price)], Top: 10)
+            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Category).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 10)
         );
 
         ruUsed += gravity.RU;
@@ -210,13 +211,13 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
             clusters: [
                 new(Catalysts: [
                     // Category filter first
-                    new(nameof(MyObjectVector.Category), "Electronics", Operator: Q.Operator.Eq),
+                    new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
                     // Then hybrid search
-                    new(nameof(MyObjectVector.TitleEmbedding), queryVector, Operator: Q.Operator.VectorDistance, Where: Q.Where.And),
-                    new(nameof(MyObjectVector.Name), new[] { "laptop", "computer", "gaming" }, Operator: Q.Operator.FTScore, Where: Q.Where.And)
+                    new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance, Where: Q.Where.And),
+                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "laptop", "computer", "gaming" }, Operator: Q.Operator.FTScore, Where: Q.Where.And)
                 ])
             ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code), nameof(MyObjectVector.Name), nameof(MyObjectVector.Category), nameof(MyObjectVector.Price)], Top: 8)
+            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Category).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 8)
         );
 
         ruUsed += gravity.RU;

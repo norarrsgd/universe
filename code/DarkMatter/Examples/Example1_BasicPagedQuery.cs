@@ -1,5 +1,6 @@
 using DarkMatter.Models;
 using Universe.Builder.Options;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -29,14 +30,14 @@ public class Example1_BasicPagedQuery(IGalaxy<MyObject> galaxy) : ExampleBase(ga
                 Names:
                 [
                     nameof(MyObject.id),
-                    nameof(MyObject.Code),
-                    nameof(MyObject.Name),
-                    nameof(MyObject.Description)
+                    nameof(MyObject.Code).ToLowerCamelCase(),
+                    nameof(MyObject.Name).ToLowerCamelCase(),
+                    nameof(MyObject.Description).ToLowerCamelCase()
                 ]
             ),
             sorting:
             [
-                new(nameof(MyObject.Name), Sorting.Direction.DESC)
+                new(nameof(MyObject.Name).ToLowerCamelCase(), Sorting.Direction.DESC)
             ]
         );
 

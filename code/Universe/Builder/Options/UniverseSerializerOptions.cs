@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Text.Json;
 using Azure.Core.Serialization;
 
 namespace Universe.Builder.Options;
@@ -9,9 +10,9 @@ public class UniverseSerializer : CosmosSerializer
     private readonly JsonObjectSerializer SystemTextJsonSerializer;
 
     /// <summary></summary>
-    public UniverseSerializer() => SystemTextJsonSerializer = new(new()
+    public UniverseSerializer(JsonNamingPolicy policy = null) => SystemTextJsonSerializer = new(new()
     {
-        PropertyNamingPolicy = null,
+        PropertyNamingPolicy = policy,
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,

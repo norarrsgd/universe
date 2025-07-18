@@ -1,5 +1,6 @@
 using DarkMatter.Models;
 using Universe.Builder.Options;
+using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
 
@@ -15,21 +16,26 @@ public class Example4_ComplexFiltering(IGalaxy<MyObject> galaxy) : ExampleBase(g
             [
                 new(Catalysts:
                 [
-                    new(nameof(MyObject.Name), "%Test%", Operator: Q.Operator.Like),
-                    new(nameof(MyObject.AddedOn), DateTime.Now.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And),
-                    new(nameof(MyObject.Price), 50.0, Operator: Q.Operator.Lte, Where: Q.Where.And)
+                    new(nameof(MyObject.Name).ToLowerCamelCase(), "%Test%", Operator: Q.Operator.Like),
+                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), DateTime.Now.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And),
+                    new(nameof(MyObject.Price).ToLowerCamelCase(), 50.0, Operator: Q.Operator.Lte, Where: Q.Where.And)
                 ], Where: Q.Where.And),
                 new(Catalysts:
                 [
-                    new(nameof(MyObject.Code), "SPECIAL", Where: Q.Where.Or),
-                    new(nameof(MyObject.Category), "Premium", Where: Q.Where.And)
+                    new(nameof(MyObject.Code).ToLowerCamelCase(), "SPECIAL", Where: Q.Where.Or),
+                    new(nameof(MyObject.Category).ToLowerCamelCase(), "Premium", Where: Q.Where.And)
                 ])
             ],
             columnOptions: new(
-                Names: [nameof(MyObject.id), nameof(MyObject.Name), nameof(MyObject.Price), nameof(MyObject.Category)],
+                Names: [
+                    nameof(MyObject.id).ToLowerCamelCase(),
+                    nameof(MyObject.Name).ToLowerCamelCase(),
+                    nameof(MyObject.Price).ToLowerCamelCase(),
+                    nameof(MyObject.Category).ToLowerCamelCase()
+                ],
                 Top: 20
             ),
-            sorting: [new(nameof(MyObject.Price), Sorting.Direction.DESC)]
+            sorting: [new(nameof(MyObject.Price).ToLowerCamelCase(), Sorting.Direction.DESC)]
         );
 
         ruUsed = g4.RU;

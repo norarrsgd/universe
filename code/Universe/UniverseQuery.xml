@@ -14,16 +14,22 @@
             Gets the partition key sequence number.
             </summary>
         </member>
+        <member name="P:Universe.Attributes.PartitionKeyAttribute.KeyName">
+            <summary>
+            Gets the name of the partition key.
+            </summary>
+        </member>
         <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor">
             <summary>
             Initializes a new instance of the <see cref="T:Universe.Attributes.PartitionKeyAttribute"/> class with the specified partition key.
             </summary>
         </member>
-        <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor(System.Int32)">
+        <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor(System.Int32,System.String)">
             <summary>
             Initializes a new instance of the <see cref="T:Universe.Attributes.PartitionKeyAttribute"/> class with the specified partition key.
             </summary>
             <param name="sequence">The partition key sequence number (1-3).</param>
+            <param name="keyName">The name of the partition key.</param>
         </member>
         <member name="T:Universe.Builder.Options.AggregationOption">
             <summary>
@@ -278,7 +284,7 @@
         <member name="T:Universe.Builder.Options.UniverseSerializer">
             <summary></summary>
         </member>
-        <member name="M:Universe.Builder.Options.UniverseSerializer.#ctor">
+        <member name="M:Universe.Builder.Options.UniverseSerializer.#ctor(System.Text.Json.JsonNamingPolicy)">
             <summary></summary>
         </member>
         <member name="M:Universe.Builder.Options.UniverseSerializer.FromStream``1(System.IO.Stream)">
@@ -329,10 +335,22 @@
             <summary>Builds the partition key for the entity.</summary>
         </member>
         <member name="M:Universe.Extensions.CosmicEntityExtensions.BuildPartitionKey(Universe.Interfaces.ICosmicEntity)">
-            <summary>Builds the partition key for the entity.</summary>
+            <summary>Builds the partition key values for the entity.</summary>
         </member>
         <member name="M:Universe.Extensions.CosmicEntityExtensions.PartitionKeys(Universe.Interfaces.ICosmicEntity)">
-            <summary>Builds the partition key for the entity.</summary>
+            <summary>Builds the partition key values for the entity.</summary>
+        </member>
+        <member name="T:Universe.Extensions.StringExtensions">
+            <summary>
+            Extension methods for string manipulation.
+            </summary>
+        </member>
+        <member name="M:Universe.Extensions.StringExtensions.ToLowerCamelCase(System.String)">
+            <summary>
+            Converts a string to lower camel case.
+            </summary>
+            <param name="str"></param>
+            <returns></returns>
         </member>
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement a more advanced Universe</summary>

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Universe.Extensions;
 
@@ -42,12 +43,16 @@ public static class CosmicEntityExtensions
             .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1);
 
         foreach (PropertyInfo property in orderedProperties)
-            pks.Add($"/{property.Name}");
+        {
+            string keyName = property.GetCustomAttribute<PartitionKeyAttribute>()?.KeyName ?? property.Name.ToLowerCamelCase();
+            pks.Add($"/{keyName}");
+
+        }
 
         return pks.AsReadOnly();
     }
 
-    /// <summary>Builds the partition key for the entity.</summary>
+    /// <summary>Builds the partition key values for the entity.</summary>
     public static PartitionKey BuildPartitionKey(this ICosmicEntity entity)
     {
         if (entity is null)
@@ -81,7 +86,7 @@ public static class CosmicEntityExtensions
         return builder.Build();
     }
 
-    /// <summary>Builds the partition key for the entity.</summary>
+    /// <summary>Builds the partition key values for the entity.</summary>
     public static IEnumerable<string> PartitionKeys(this ICosmicEntity entity)
     {
         if (entity is null)

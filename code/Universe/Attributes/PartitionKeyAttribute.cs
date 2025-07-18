@@ -12,6 +12,11 @@ public class PartitionKeyAttribute : Attribute
     public int Sequence { get; }
 
     /// <summary>
+    /// Gets the name of the partition key.
+    /// </summary>
+    public string KeyName { get; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="PartitionKeyAttribute"/> class with the specified partition key.
     /// </summary>
     public PartitionKeyAttribute() => Sequence = 1;
@@ -20,7 +25,8 @@ public class PartitionKeyAttribute : Attribute
     /// Initializes a new instance of the <see cref="PartitionKeyAttribute"/> class with the specified partition key.
     /// </summary>
     /// <param name="sequence">The partition key sequence number (1-3).</param>
-    public PartitionKeyAttribute(int sequence)
+    /// <param name="keyName">The name of the partition key.</param>
+    public PartitionKeyAttribute(int sequence, string keyName = null)
     {
         if (sequence < 1 || sequence > 3)
             throw new ArgumentOutOfRangeException(nameof(sequence), "Partition key sequence must be between 1 and 3.");

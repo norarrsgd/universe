@@ -5,6 +5,7 @@ using DarkMatter.Examples;
 using DarkMatter.Models;
 using Universe.Builder.Options;
 using Universe.Extensions;
+using System.Text.Json;
 
 namespace DarkMatter;
 
@@ -22,7 +23,7 @@ class Program
             CosmosDbPrimaryKey,
             clientOptions: new()
             {
-                Serializer = new UniverseSerializer(),
+                Serializer = new UniverseSerializer(JsonNamingPolicy.CamelCase),
                 AllowBulkExecution = true
             }
         );

@@ -3,6 +3,7 @@ using DarkMatter.Models;
 using Universe.Interfaces;
 using Universe.Builder.Options;
 using DarkMatter.Helpers;
+using Universe.Extensions;
 
 namespace DarkMatter.Examples;
 
@@ -159,16 +160,16 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObjectVector.TitleEmbedding), titleEmbedding, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.DescriptionEmbedding), descriptionEmbedding, Operator: Q.Operator.VectorDistance)
+                    new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), titleEmbedding, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), descriptionEmbedding, Operator: Q.Operator.VectorDistance)
                 ])
             ],
             columnOptions: new(
                 Names: [
-                    nameof(MyObjectVector.Code),
-                    nameof(MyObjectVector.Name),
-                    nameof(MyObjectVector.Category),
-                    nameof(MyObjectVector.Price)
+                    nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Price).ToLowerCamelCase()
                 ],
                 Top: 3 // Get top 3 results from weighted RRF ranking
             ),
@@ -196,24 +197,24 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
             clusters: [
                 // First cluster: Vector similarity
                 new(Catalysts: [
-                    new(nameof(MyObjectVector.DescriptionEmbedding), queryEmbedding, Operator: Q.Operator.VectorDistance)
+                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryEmbedding, Operator: Q.Operator.VectorDistance)
                 ]),
                 // Second cluster: Traditional filters (AND logic)
                 new(
                     Where: Q.Where.And,
                     Catalysts: [
-                        new(nameof(MyObjectVector.Category), "Electronics", Operator: Q.Operator.Eq),
-                        new(nameof(MyObjectVector.Price), 1000.0, Operator: Q.Operator.Lt)
+                        new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
+                        new(nameof(MyObjectVector.Price).ToLowerCamelCase(), 1000.0, Operator: Q.Operator.Lt)
                     ]
                 )
             ],
             columnOptions: new(
                 Names: [
-                    nameof(MyObjectVector.Code),
-                    nameof(MyObjectVector.Name),
-                    nameof(MyObjectVector.Category),
-                    nameof(MyObjectVector.Price),
-                    nameof(MyObjectVector.Description)
+                    nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Price).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Description).ToLowerCamelCase()
                 ],
                 Top: 4 // Get top 4 filtered and ranked results
             )
@@ -237,16 +238,16 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters: [
                 new(Catalysts: [
-                    new(nameof(MyObjectVector.DescriptionEmbedding), queryEmbedding, Operator: Q.Operator.VectorDistance)
+                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryEmbedding, Operator: Q.Operator.VectorDistance)
                 ])
             ],
             columnOptions: new(
                 Names: [
-                    nameof(MyObjectVector.Code),
-                    nameof(MyObjectVector.Name),
-                    nameof(MyObjectVector.Category),
-                    nameof(MyObjectVector.Price),
-                    nameof(MyObjectVector.Description)
+                    nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Price).ToLowerCamelCase(),
+                    nameof(MyObjectVector.Description).ToLowerCamelCase()
                 ],
                 Top: 3 // Get top 3 furniture-related results
             )
