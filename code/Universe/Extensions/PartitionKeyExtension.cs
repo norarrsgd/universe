@@ -44,29 +44,12 @@ public static class CosmicEntityExtensions
 
         foreach (PropertyInfo property in orderedProperties)
         {
-            string keyName = property.GetCustomAttribute<PartitionKeyAttribute>()?.KeyName ?? ToCamelCase(property.Name);
+            string keyName = property.GetCustomAttribute<PartitionKeyAttribute>()?.KeyName ?? property.Name.ToLowerCamelCase();
             pks.Add($"/{keyName}");
 
         }
 
         return pks.AsReadOnly();
-    }
-
-    // Converts a string to lower camel case using regex (handles acronyms and underscores).
-    private static string ToCamelCase(string str)
-    {
-        if (string.IsNullOrWhiteSpace(str))
-            return str;
-
-        // Remove underscores and capitalize following letter
-        str = Regex.Replace(str, @"_([a-zA-Z])", m => m.Groups[1].Value.ToUpper());
-
-        // If all uppercase (acronym), make only first letter lowercase
-        if (Regex.IsMatch(str, @"^[A-Z0-9]+$"))
-            return str.ToLowerInvariant();
-
-        // Lowercase first character
-        return char.ToLowerInvariant(str[0]) + str[1..];
     }
 
     /// <summary>Builds the partition key values for the entity.</summary>
