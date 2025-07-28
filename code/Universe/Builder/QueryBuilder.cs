@@ -120,7 +120,7 @@ internal class UniverseBuilder(bool recordQueries)
                 else queryBuilder.Append($" {cluster.Where.Value()} (");
 
                 // Where Clause Builder
-                foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance or Q.Operator.FTScore))
+                foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance && c.Operator is not Q.Operator.FTScore))
                 {
                     if (cluster.Catalysts.IndexOf(catalyst) == 0)
                         queryBuilder.Append(WhereClauseBuilder(catalyst));
@@ -149,10 +149,30 @@ internal class UniverseBuilder(bool recordQueries)
             if (rankCatalysts.Count > 1)
             {
                 queryBuilder.Append(" ORDER BY RANK RRF(");
-                queryBuilder.Append(string.Join(", ", rankCatalysts.Select(c => $"{c.Operator.Value()}(c.{c.Column}, @{c.ParameterName()})")));
+
+                foreach (Catalyst catalyst in rankCatalysts)
+                {
+                    if (rankCatalysts.IndexOf(catalyst) > 0)
+                        queryBuilder.Append(", ");
+
+                    if (catalyst.Operator is Q.Operator.VectorDistance)
+                        queryBuilder.Append($"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+                    else if (catalyst.Operator is Q.Operator.FTScore)
+                    {
+                        queryBuilder.Append($"{catalyst.Operator.Value()}(c.{catalyst.Column}, ");
+                        if (catalyst.Value is IEnumerable<string> stringVals)
+                            queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
+                        else
+                            throw new UniverseException("FullTextScore operator requires a string[] string value.");
+                        queryBuilder.Append(')');
+                    }
+                }
 
                 if (sorting is not null && sorting.Count(s => s.Direction is Sorting.Direction.WEIGHTED) > 1)
                     throw new UniverseException("Only one WEIGHT option is allowed.");
+
+                if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
+                    throw new UniverseException("Sorting fields is not supported in the presence of multiple rank catalysts.");
 
                 if (sorting is not null)
                 {
