@@ -134,17 +134,17 @@ internal class UniverseBuilder(bool recordQueries)
         // Sorting Builder
         if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
         {
-            // Make sure that the clusters does not have VectorDistance operator
-            if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
-                throw new UniverseException("Sorting scalar fields is not supported in the presence of the VectorDistance operator.");
+            // Make sure that the clusters does not have VectorDistance or FTScore operator
+            if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
+                throw new UniverseException("Sorting scalar fields is not supported in the presence of rank catalysts.");
 
             queryBuilder.Append($" ORDER BY c.{sorting[0].Column} {sorting[0].Direction.Value()}");
             foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column))
                 queryBuilder.Append($", c.{sort.Column} {sort.Direction.Value()}");
         }
-        else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
+        else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
         {
-            List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)];
+            List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance || catalyst.Operator is Q.Operator.FTScore)];
 
             if (rankCatalysts.Count > 1)
             {
@@ -194,7 +194,13 @@ internal class UniverseBuilder(bool recordQueries)
             {
                 Catalyst catalyst = rankCatalysts.First();
                 if (catalyst.Operator is Q.Operator.FTScore)
-                    queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+                {
+                    queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column}, ");
+                    if (catalyst.Value is IEnumerable<string> stringVals)
+                        queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
+
+                    queryBuilder.Append(')');
+                }
                 else
                     queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
             }
