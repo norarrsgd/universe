@@ -163,10 +163,10 @@ public static class AggregateExtension
     public static string Value(this Q.Aggregate aggregate) => aggregate switch
     {
         Q.Aggregate.Count => $"COUNT(1) AS {nameof(ICosmicEntity.CountAggregate)}",
-        Q.Aggregate.Sum => "SUM(c.{0}) AS {0}_Sum",
-        Q.Aggregate.Min => "MIN(c.{0}) AS {0}_Min",
-        Q.Aggregate.Max => "MAX(c.{0}) AS {0}_Max",
-        Q.Aggregate.Avg => "AVG(c.{0}) AS {0}_Avg",
+        Q.Aggregate.Sum => "SUM({0}.{1}) AS {1}_Sum",
+        Q.Aggregate.Min => "MIN({0}.{1}) AS {1}_Min",
+        Q.Aggregate.Max => "MAX({0}.{1}) AS {1}_Max",
+        Q.Aggregate.Avg => "AVG({0}.{1}) AS {1}_Avg",
         _ => throw new UniverseException("Unrecognized AGGREGATE keyword")
     };
 }

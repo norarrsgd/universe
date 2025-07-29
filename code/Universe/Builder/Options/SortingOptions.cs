@@ -17,7 +17,7 @@ public struct Sorting
     }
 
     /// <summary></summary>
-    public readonly record struct Option(string Column, Direction Direction = Direction.ASC);
+    public readonly record struct Option(string Column, Direction Direction = Direction.ASC, string Alias = "c");
 }
 
 /// <summary></summary>

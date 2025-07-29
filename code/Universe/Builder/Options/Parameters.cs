@@ -9,12 +9,19 @@ namespace Universe.Builder.Options;
 /// <param name="Value">Value for the where clause associated with the Column</param>
 /// <param name="Where">Where operator (eg AND / OR)</param>
 /// <param name="Operator">Boolean expression operator</param>
+/// <param name="Alias">Alias for the collection containing the column. Default is 'c'</param>
 public readonly record struct Catalyst(
     string Column,
     object Value = null,
     Q.Where Where = Q.Where.And,
-    Q.Operator Operator = Q.Operator.Eq)
+    Q.Operator Operator = Q.Operator.Eq,
+    string Alias = "c")
 {
+    /// <summary>
+    /// Unique identifier for the catalyst, used to differentiate between multiple catalysts in a query.
+    /// </summary>
+    public string CatalystId { get; init; } = Guid.CreateVersion7().ToString().Replace("-", string.Empty);
+    
     /// <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
     public IEnumerable<string> RuleViolations()
     {
@@ -85,5 +92,5 @@ public readonly record struct Catalyst(
 public static class CatalystExtension
 {
     /// <summary></summary>
-    public static string ParameterName(this Catalyst catalyst) => Regex.Replace(catalyst.Column, "[^\\w\\d]", string.Empty);
+    public static string ParameterName(this Catalyst catalyst) => $"{Regex.Replace(catalyst.Column, "[^\\w\\d]", string.Empty)}{catalyst.CatalystId}";
 }
