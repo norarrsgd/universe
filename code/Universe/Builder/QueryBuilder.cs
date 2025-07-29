@@ -16,16 +16,16 @@ internal class UniverseBuilder(bool recordQueries)
             if (columnOptions.Value.Top > 0)
                 columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
 
-            if (columnOptions.Value.IsDistinct && columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
+            if (columnOptions.Value is { IsDistinct: true, Names.Count: > 0 })
                 columnsInQuery = $"DISTINCT {columnsInQuery}";
 
-            if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Count() > 0)
+            if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Any())
             {
                 if (columnOptions.Value.Names is null || !columnOptions.Value.Names.Any())
                     throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
 
                 groups ??= [];
-                groups = [.. groups.Concat(columnOptions.Value.Names ?? []).Distinct()];
+                groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c.{n}") ?? []).Distinct()];
 
                 if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
                     throw new UniverseException("Aggregate columns must not be null or empty.");
@@ -35,10 +35,10 @@ internal class UniverseBuilder(bool recordQueries)
                     string toAppend = aggregate.Aggregate switch
                     {
                         Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), aggregate.Column),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), aggregate.Column),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), aggregate.Column),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), aggregate.Column),
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), "c", aggregate.Column),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), "c", aggregate.Column),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), "c", aggregate.Column),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), "c", aggregate.Column),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -59,27 +59,69 @@ internal class UniverseBuilder(bool recordQueries)
         {
             List<Catalyst> vectorDistanceCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance)];
 
-            if (vectorDistanceCatalysts.Count > 1)
+            switch (vectorDistanceCatalysts.Count)
             {
-                foreach (Catalyst catalyst in vectorDistanceCatalysts)
-                    columnsInQuery += $", {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
-            }
-            else if (vectorDistanceCatalysts.Count == 1)
-            {
-                Catalyst catalyst = vectorDistanceCatalysts.First();
-                columnsInQuery += $", {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+                case > 1:
+                    columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
+                        => $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score");
+                    break;
+                case 1:
+                {
+                    Catalyst catalyst = vectorDistanceCatalysts.First();
+                    columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+                    break;
+                }
             }
         }
 
-        // This error blocks code execution since this is not yet supported by CosmosDb
-        if (sorting is not null && sorting.Any() && groups is not null && groups.Any())
-            throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
-
         // Update Columns Builder with Group By
         if (columnsInQuery.Contains('*') && groups is not null && groups.Any())
-            columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", groups.Select(c => $"c.{c}")));
+            columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", groups));
 
         StringBuilder queryBuilder = new($"SELECT {columnsInQuery} FROM c");
+        
+        if (columnOptions?.Join is not null)
+        {
+            JoinOptions join = columnOptions.Value.Join;
+            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+
+            // Add join columns to the select if specified
+            if (join.Columns?.Any() == true)
+            {
+                string joinColumns = string.Join(", ", join.Columns.Select(col => $"{join.Alias}.{col}"));
+                columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+            }
+
+            // Handle join aggregates
+            if (join.Aggregates?.Any() == true)
+            {
+                groups ??= [];
+
+                foreach (AggregationOption aggregate in join.Aggregates)
+                {
+                    string toAppend = aggregate.Aggregate switch
+                    {
+                        Q.Aggregate.Count => Q.Aggregate.Count.Value(),
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), join.Alias, aggregate.Column),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), join.Alias, aggregate.Column),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), join.Alias, aggregate.Column),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), join.Alias, aggregate.Column),
+                        _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
+                    };
+                    
+                    // Only add if not already present
+                    if (!columnsInQuery.Contains(toAppend))
+                        columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery) ? toAppend : $"{columnsInQuery}, {toAppend}";
+                }
+
+                // Add join columns to GROUP BY
+                if (join.Columns?.Any() == true)
+                    groups = [.. groups.Concat(join.Columns.Select(col => $"{join.Alias}.{col}"))];
+
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+            }
+        }
 
         // Validate Clusters
         if (clusters is not null && clusters.Any(c => c.Catalysts is null || !c.Catalysts.Any()))
@@ -209,10 +251,14 @@ internal class UniverseBuilder(bool recordQueries)
         // Group By Builder
         if (groups is not null && groups.Any())
         {
-            queryBuilder.Append($" GROUP BY c.{groups[0]}");
+            queryBuilder.Append($" GROUP BY {groups[0]}");
             foreach (string group in groups.Where(g => g != groups[0]))
-                queryBuilder.Append($", c.{group}");
+                queryBuilder.Append($", {group}");
         }
+
+        // This error blocks code execution since this is not yet supported by CosmosDb
+        if (queryBuilder.ToString().Contains("ORDER BY") && groups is not null && groups.Any())
+            throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
 
         // Parameters Builder
         QueryDefinition query = new(queryBuilder.ToString());
@@ -227,23 +273,27 @@ internal class UniverseBuilder(bool recordQueries)
         return query;
     }
 
-    internal static string WhereClauseBuilder(Catalyst catalyst) => catalyst.Operator switch
+    private static string WhereClauseBuilder(Catalyst catalyst)
     {
-        Q.Operator.In or
-        Q.Operator.NotIn => $"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})",
-        Q.Operator.Len => $"{catalyst.Operator.Value()}(c.{catalyst.Column}) = @{catalyst.ParameterName()}",
-        Q.Operator.Defined or
-        Q.Operator.NotDefined => $"{catalyst.Operator.Value()}(c.{catalyst.Column})",
-        Q.Operator.FTContains or
-        Q.Operator.NotFTContains or
-        Q.Operator.FTContainsAll or
-        Q.Operator.NotFTContainsAll or
-        Q.Operator.FTContainsAny or
-        Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})",
-        _ => $"c.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
-    };
+        string alias = catalyst.Alias ?? "c";
+        return catalyst.Operator switch
+        {
+            Q.Operator.In or
+                Q.Operator.NotIn => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}, @{catalyst.ParameterName()})",
+            Q.Operator.Len => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}) = @{catalyst.ParameterName()}",
+            Q.Operator.Defined or
+                Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column})",
+            Q.Operator.FTContains or
+                Q.Operator.NotFTContains or
+                Q.Operator.FTContainsAll or
+                Q.Operator.NotFTContainsAll or
+                Q.Operator.FTContainsAny or
+                Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}, @{catalyst.ParameterName()})",
+            _ => $"{alias}.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
+        };
+    }
 
-    async internal Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query)
+    internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query)
     {
         using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: new() { MaxItemCount = Q.Limits.MaxItems });
         if (queryResponse.HasMoreResults)
@@ -261,7 +311,7 @@ internal class UniverseBuilder(bool recordQueries)
         else return new(new(0, null), default);
     }
 
-    async internal Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query)
+    internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query)
     {
         double requestCharge = 0;
         List<T> collection = [];
