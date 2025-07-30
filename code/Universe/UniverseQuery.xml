@@ -60,8 +60,9 @@
                     List of aggregates to be applied to the query.
                     If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </param>
+            <param name="Join">Options for joining a sub-collection.</param>
         </member>
-        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
+        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption},Universe.Builder.Options.JoinOptions)">
             <summary></summary>
             <param name="Names">List of column names to be part of the query</param>
             <param name="IsDistinct">Adds DISTINCT in the generated query</param>
@@ -70,6 +71,7 @@
                     List of aggregates to be applied to the query.
                     If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </param>
+            <param name="Join">Options for joining a sub-collection.</param>
         </member>
         <member name="P:Universe.Builder.Options.ColumnOptions.Names">
             <summary>List of column names to be part of the query</summary>
@@ -86,6 +88,39 @@
                     If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </summary>
         </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.Join">
+            <summary>Options for joining a sub-collection.</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.JoinOptions">
+            <summary>
+            Options for joining tables.
+            </summary>
+            <param name="Alias">The alias for the sub-collection.</param>
+            <param name="ArrayPath">The path to the array sub-collection.</param>
+            <param name="Columns">The columns to include in the join.</param>
+            <param name="Aggregates">The aggregation options for the join.</param>
+        </member>
+        <member name="M:Universe.Builder.Options.JoinOptions.#ctor(System.String,System.String,System.Collections.Generic.IList{System.String},System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
+            <summary>
+            Options for joining tables.
+            </summary>
+            <param name="Alias">The alias for the sub-collection.</param>
+            <param name="ArrayPath">The path to the array sub-collection.</param>
+            <param name="Columns">The columns to include in the join.</param>
+            <param name="Aggregates">The aggregation options for the join.</param>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.Alias">
+            <summary>The alias for the sub-collection.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.ArrayPath">
+            <summary>The path to the array sub-collection.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.Columns">
+            <summary>The columns to include in the join.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.Aggregates">
+            <summary>The aggregation options for the join.</summary>
+        </member>
         <member name="T:Universe.Builder.Options.Catalyst">
             <summary>
             Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
@@ -94,8 +129,9 @@
             <param name="Value">Value for the where clause associated with the Column</param>
             <param name="Where">Where operator (eg AND / OR)</param>
             <param name="Operator">Boolean expression operator</param>
+            <param name="Alias">Alias for the collection containing the column. Default is 'c'</param>
         </member>
-        <member name="M:Universe.Builder.Options.Catalyst.#ctor(System.String,System.Object,Universe.Builder.Options.Q.Where,Universe.Builder.Options.Q.Operator)">
+        <member name="M:Universe.Builder.Options.Catalyst.#ctor(System.String,System.Object,Universe.Builder.Options.Q.Where,Universe.Builder.Options.Q.Operator,System.String)">
             <summary>
             Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
             </summary>
@@ -103,6 +139,7 @@
             <param name="Value">Value for the where clause associated with the Column</param>
             <param name="Where">Where operator (eg AND / OR)</param>
             <param name="Operator">Boolean expression operator</param>
+            <param name="Alias">Alias for the collection containing the column. Default is 'c'</param>
         </member>
         <member name="P:Universe.Builder.Options.Catalyst.Column">
             <summary>Column name</summary>
@@ -115,6 +152,14 @@
         </member>
         <member name="P:Universe.Builder.Options.Catalyst.Operator">
             <summary>Boolean expression operator</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.Alias">
+            <summary>Alias for the collection containing the column. Default is 'c'</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.CatalystId">
+            <summary>
+            Unique identifier for the catalyst, used to differentiate between multiple catalysts in a query.
+            </summary>
         </member>
         <member name="M:Universe.Builder.Options.Catalyst.RuleViolations">
             <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
@@ -272,7 +317,7 @@
         <member name="T:Universe.Builder.Options.Sorting.Option">
             <summary></summary>
         </member>
-        <member name="M:Universe.Builder.Options.Sorting.Option.#ctor(System.String,Universe.Builder.Options.Sorting.Direction)">
+        <member name="M:Universe.Builder.Options.Sorting.Option.#ctor(System.String,Universe.Builder.Options.Sorting.Direction,System.String)">
             <summary></summary>
         </member>
         <member name="T:Universe.Builder.Options.SortOptionDirectionExtension">

@@ -10,8 +10,8 @@
 /// </param>
 /// <param name="Join">Options for joining a sub-collection.</param>
 public record struct ColumnOptions(
-    IList<string> Names,
-    bool IsDistinct = false,
-    int Top = 0,
-    IEnumerable<AggregationOption> Aggregates = null,
-    JoinOptions Join = null);
+	IList<string> Names,
+	bool IsDistinct = false,
+	int Top = 0,
+	IEnumerable<AggregationOption> Aggregates = null,
+	JoinOptions Join = null);
