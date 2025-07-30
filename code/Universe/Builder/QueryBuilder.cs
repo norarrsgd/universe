@@ -63,7 +63,7 @@ internal class UniverseBuilder(bool recordQueries)
 			{
 				case > 1:
 					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
-						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score");
+						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8] : string.Empty)}");
 					break;
 				case 1:
 				{
@@ -117,7 +117,7 @@ internal class UniverseBuilder(bool recordQueries)
 
 				// Add join columns to GROUP BY
 				if (join.Columns?.Any() == true)
-					groups = [.. groups.Concat(join.Columns.Select(col => $"{join.Alias}.{col}"))];
+					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => $"{join.Alias}.{col}"))];
 
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -203,7 +203,7 @@ internal class UniverseBuilder(bool recordQueries)
 						if (catalyst.Value is IEnumerable<string> stringVals)
 							queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 						else
-							throw new UniverseException("FullTextScore operator requires a string[] string value.");
+							throw new UniverseException("FullTextScore operator requires a string[] value.");
 						queryBuilder.Append(')');
 					}
 				}
