@@ -63,14 +63,14 @@ internal class UniverseBuilder(bool recordQueries)
 			{
 				case > 1:
 					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
-						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8] : string.Empty)}");
+						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
 					break;
 				case 1:
-				{
-					Catalyst catalyst = vectorDistanceCatalysts.First();
-					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
-					break;
-				}
+					{
+						Catalyst catalyst = vectorDistanceCatalysts.First();
+						columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+						break;
+					}
 			}
 		}
 
