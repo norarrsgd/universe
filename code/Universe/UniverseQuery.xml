@@ -14,16 +14,22 @@
             Gets the partition key sequence number.
             </summary>
         </member>
+        <member name="P:Universe.Attributes.PartitionKeyAttribute.KeyName">
+            <summary>
+            Gets the name of the partition key.
+            </summary>
+        </member>
         <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor">
             <summary>
             Initializes a new instance of the <see cref="T:Universe.Attributes.PartitionKeyAttribute"/> class with the specified partition key.
             </summary>
         </member>
-        <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor(System.Int32)">
+        <member name="M:Universe.Attributes.PartitionKeyAttribute.#ctor(System.Int32,System.String)">
             <summary>
             Initializes a new instance of the <see cref="T:Universe.Attributes.PartitionKeyAttribute"/> class with the specified partition key.
             </summary>
             <param name="sequence">The partition key sequence number (1-3).</param>
+            <param name="keyName">The name of the partition key.</param>
         </member>
         <member name="T:Universe.Builder.Options.AggregationOption">
             <summary>
@@ -54,8 +60,9 @@
                     List of aggregates to be applied to the query.
                     If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </param>
+            <param name="Join">Options for joining a sub-collection.</param>
         </member>
-        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
+        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption},Universe.Builder.Options.JoinOptions)">
             <summary></summary>
             <param name="Names">List of column names to be part of the query</param>
             <param name="IsDistinct">Adds DISTINCT in the generated query</param>
@@ -64,6 +71,7 @@
                     List of aggregates to be applied to the query.
                     If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </param>
+            <param name="Join">Options for joining a sub-collection.</param>
         </member>
         <member name="P:Universe.Builder.Options.ColumnOptions.Names">
             <summary>List of column names to be part of the query</summary>
@@ -80,6 +88,39 @@
                     If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
             </summary>
         </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.Join">
+            <summary>Options for joining a sub-collection.</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.JoinOptions">
+            <summary>
+            Options for joining tables.
+            </summary>
+            <param name="Alias">The alias for the sub-collection.</param>
+            <param name="ArrayPath">The path to the array sub-collection.</param>
+            <param name="Columns">The columns to include in the join.</param>
+            <param name="Aggregates">The aggregation options for the join.</param>
+        </member>
+        <member name="M:Universe.Builder.Options.JoinOptions.#ctor(System.String,System.String,System.Collections.Generic.IList{System.String},System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
+            <summary>
+            Options for joining tables.
+            </summary>
+            <param name="Alias">The alias for the sub-collection.</param>
+            <param name="ArrayPath">The path to the array sub-collection.</param>
+            <param name="Columns">The columns to include in the join.</param>
+            <param name="Aggregates">The aggregation options for the join.</param>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.Alias">
+            <summary>The alias for the sub-collection.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.ArrayPath">
+            <summary>The path to the array sub-collection.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.Columns">
+            <summary>The columns to include in the join.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.JoinOptions.Aggregates">
+            <summary>The aggregation options for the join.</summary>
+        </member>
         <member name="T:Universe.Builder.Options.Catalyst">
             <summary>
             Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
@@ -88,8 +129,9 @@
             <param name="Value">Value for the where clause associated with the Column</param>
             <param name="Where">Where operator (eg AND / OR)</param>
             <param name="Operator">Boolean expression operator</param>
+            <param name="Alias">Alias for the collection containing the column. Default is 'c'</param>
         </member>
-        <member name="M:Universe.Builder.Options.Catalyst.#ctor(System.String,System.Object,Universe.Builder.Options.Q.Where,Universe.Builder.Options.Q.Operator)">
+        <member name="M:Universe.Builder.Options.Catalyst.#ctor(System.String,System.Object,Universe.Builder.Options.Q.Where,Universe.Builder.Options.Q.Operator,System.String)">
             <summary>
             Create a generic query string from a list of parameters. The first parameter created will be the first parameter in the where clause of the query string.
             </summary>
@@ -97,6 +139,7 @@
             <param name="Value">Value for the where clause associated with the Column</param>
             <param name="Where">Where operator (eg AND / OR)</param>
             <param name="Operator">Boolean expression operator</param>
+            <param name="Alias">Alias for the collection containing the column. Default is 'c'</param>
         </member>
         <member name="P:Universe.Builder.Options.Catalyst.Column">
             <summary>Column name</summary>
@@ -109,6 +152,14 @@
         </member>
         <member name="P:Universe.Builder.Options.Catalyst.Operator">
             <summary>Boolean expression operator</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.Alias">
+            <summary>Alias for the collection containing the column. Default is 'c'</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.CatalystId">
+            <summary>
+            Unique identifier for the catalyst, used to differentiate between multiple catalysts in a query.
+            </summary>
         </member>
         <member name="M:Universe.Builder.Options.Catalyst.RuleViolations">
             <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
@@ -191,6 +242,27 @@
         <member name="F:Universe.Builder.Options.Q.Operator.VectorDistance">
             <summary>VectorDistance</summary>
         </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTContains">
+            <summary>FullTextContains</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotFTContains">
+            <summary>NOT FullTextContains</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTContainsAll">
+            <summary>FullTextContainsAll</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotFTContainsAll">
+            <summary>NOT FullTextContainsAll</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTContainsAny">
+            <summary>FullTextContainsAny</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotFTContainsAny">
+            <summary>NOT FullTextContainsAny</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.FTScore">
+            <summary>FullTextScore</summary>
+        </member>
         <member name="T:Universe.Builder.Options.Q.Aggregate">
             <summary>Aggregation functions</summary>
         </member>
@@ -245,7 +317,7 @@
         <member name="T:Universe.Builder.Options.Sorting.Option">
             <summary></summary>
         </member>
-        <member name="M:Universe.Builder.Options.Sorting.Option.#ctor(System.String,Universe.Builder.Options.Sorting.Direction)">
+        <member name="M:Universe.Builder.Options.Sorting.Option.#ctor(System.String,Universe.Builder.Options.Sorting.Direction,System.String)">
             <summary></summary>
         </member>
         <member name="T:Universe.Builder.Options.SortOptionDirectionExtension">
@@ -257,7 +329,7 @@
         <member name="T:Universe.Builder.Options.UniverseSerializer">
             <summary></summary>
         </member>
-        <member name="M:Universe.Builder.Options.UniverseSerializer.#ctor">
+        <member name="M:Universe.Builder.Options.UniverseSerializer.#ctor(System.Text.Json.JsonNamingPolicy)">
             <summary></summary>
         </member>
         <member name="M:Universe.Builder.Options.UniverseSerializer.FromStream``1(System.IO.Stream)">
@@ -308,10 +380,22 @@
             <summary>Builds the partition key for the entity.</summary>
         </member>
         <member name="M:Universe.Extensions.CosmicEntityExtensions.BuildPartitionKey(Universe.Interfaces.ICosmicEntity)">
-            <summary>Builds the partition key for the entity.</summary>
+            <summary>Builds the partition key values for the entity.</summary>
         </member>
         <member name="M:Universe.Extensions.CosmicEntityExtensions.PartitionKeys(Universe.Interfaces.ICosmicEntity)">
-            <summary>Builds the partition key for the entity.</summary>
+            <summary>Builds the partition key values for the entity.</summary>
+        </member>
+        <member name="T:Universe.Extensions.StringExtensions">
+            <summary>
+            Extension methods for string manipulation.
+            </summary>
+        </member>
+        <member name="M:Universe.Extensions.StringExtensions.ToLowerCamelCase(System.String)">
+            <summary>
+            Converts a string to lower camel case.
+            </summary>
+            <param name="str"></param>
+            <returns></returns>
         </member>
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement a more advanced Universe</summary>

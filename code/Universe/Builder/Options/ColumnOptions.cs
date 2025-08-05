@@ -8,8 +8,10 @@
 ///         List of aggregates to be applied to the query.
 ///         If aggregates are specified, the query will be grouped by the <paramref name="Names"/> columns.
 /// </param>
+/// <param name="Join">Options for joining a sub-collection.</param>
 public record struct ColumnOptions(
-    IList<string> Names,
-    bool IsDistinct = false,
-    int Top = 0,
-    IEnumerable<AggregationOption> Aggregates = null);
+	IList<string> Names,
+	bool IsDistinct = false,
+	int Top = 0,
+	IEnumerable<AggregationOption> Aggregates = null,
+	JoinOptions Join = null);

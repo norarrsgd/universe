@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Text.Json;
 using Azure.Core.Serialization;
 
 namespace Universe.Builder.Options;
@@ -6,40 +7,40 @@ namespace Universe.Builder.Options;
 /// <summary></summary>
 public class UniverseSerializer : CosmosSerializer
 {
-    private readonly JsonObjectSerializer SystemTextJsonSerializer;
+	private readonly JsonObjectSerializer SystemTextJsonSerializer;
 
-    /// <summary></summary>
-    public UniverseSerializer() => SystemTextJsonSerializer = new(new()
-    {
-        PropertyNamingPolicy = null,
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
-        IgnoreReadOnlyFields = true,
-        IgnoreReadOnlyProperties = true
-    });
+	/// <summary></summary>
+	public UniverseSerializer(JsonNamingPolicy policy = null) => SystemTextJsonSerializer = new(new()
+	{
+		PropertyNamingPolicy = policy,
+		PropertyNameCaseInsensitive = true,
+		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+		UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
+		IgnoreReadOnlyFields = true,
+		IgnoreReadOnlyProperties = true
+	});
 
-    /// <summary></summary>
-    public override T FromStream<T>(Stream stream)
-    {
-        using (stream)
-        {
-            if (stream.CanSeek && stream.Length == 0)
-                return default;
+	/// <summary></summary>
+	public override T FromStream<T>(Stream stream)
+	{
+		using (stream)
+		{
+			if (stream.CanSeek && stream.Length == 0)
+				return default;
 
-            if (typeof(Stream).IsAssignableFrom(typeof(T)))
-                return (T)(object)stream;
+			if (typeof(Stream).IsAssignableFrom(typeof(T)))
+				return (T)(object)stream;
 
-            return (T)SystemTextJsonSerializer.Deserialize(stream, typeof(T), default);
-        }
-    }
+			return (T)SystemTextJsonSerializer.Deserialize(stream, typeof(T), default);
+		}
+	}
 
-    /// <summary></summary>
-    public override Stream ToStream<T>(T input)
-    {
-        MemoryStream streamPayload = new();
-        SystemTextJsonSerializer.Serialize(streamPayload, input, typeof(T), default);
-        streamPayload.Position = 0;
-        return streamPayload;
-    }
+	/// <summary></summary>
+	public override Stream ToStream<T>(T input)
+	{
+		MemoryStream streamPayload = new();
+		SystemTextJsonSerializer.Serialize(streamPayload, input, typeof(T), default);
+		streamPayload.Position = 0;
+		return streamPayload;
+	}
 }
