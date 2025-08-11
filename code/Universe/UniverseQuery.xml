@@ -62,7 +62,7 @@
             </param>
             <param name="Join">Options for joining a sub-collection.</param>
         </member>
-        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption},Universe.Builder.Options.JoinOptions)">
+        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.AggregationOption},Universe.Builder.Options.JoinOptions)">
             <summary></summary>
             <param name="Names">List of column names to be part of the query</param>
             <param name="IsDistinct">Adds DISTINCT in the generated query</param>
@@ -100,7 +100,7 @@
             <param name="Columns">The columns to include in the join.</param>
             <param name="Aggregates">The aggregation options for the join.</param>
         </member>
-        <member name="M:Universe.Builder.Options.JoinOptions.#ctor(System.String,System.String,System.Collections.Generic.IList{System.String},System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
+        <member name="M:Universe.Builder.Options.JoinOptions.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.AggregationOption})">
             <summary>
             Options for joining tables.
             </summary>
@@ -345,7 +345,7 @@
             <param name="Catalysts">Catalysts under one group / cluster</param>
             <param name="Where">Where operator (eg AND / OR)</param>
         </member>
-        <member name="M:Universe.Builder.Options.Cluster.#ctor(System.Collections.Generic.IList{Universe.Builder.Options.Catalyst},Universe.Builder.Options.Q.Where)">
+        <member name="M:Universe.Builder.Options.Cluster.#ctor(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Catalyst},Universe.Builder.Options.Q.Where)">
             <summary>
             Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
             </summary>
@@ -474,34 +474,39 @@
         <member name="T:Universe.Interfaces.IGalaxy`1">
             <summary></summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get one model from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Get``1(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get one model from the database with a different type
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get list from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get list from the database with a different type
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get a paginated list from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Paged``1(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged``1(Universe.Builder.Options.Q.Page,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get a paginated list from the database
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.GenerateQuery(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Generate SQL query without executing it
             </summary>
         </member>
         <member name="T:Universe.Interfaces.IGalaxyBasic`1">
@@ -512,7 +517,7 @@
             Create a new model in the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Create(System.Collections.Generic.IList{`0})">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Create(System.Collections.Generic.IReadOnlyList{`0})">
             <summary>
             Bulk create new models in the database
             </summary>
@@ -522,7 +527,7 @@
             Modify a model in the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Modify(System.Collections.Generic.IList{`0})">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Modify(System.Collections.Generic.IReadOnlyList{`0})">
             <summary>
             Bulk modify models in the database
             </summary>

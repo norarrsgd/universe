@@ -35,4 +35,9 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
 	/// Get a paginated list from the database
 	/// </summary>
 	Task<(Gravity g, IList<S> T)> Paged<S>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null) where S : ICosmicEntity;
+
+	/// <summary>
+	/// Generate SQL query without executing it
+	/// </summary>
+	Gravity GenerateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null);
 }
