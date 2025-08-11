@@ -8,7 +8,7 @@ namespace Universe;
 /// <summary>Inherit repositories to implement the very basic Universe</summary>
 public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosmicEntity
 {
-	internal readonly UniverseBuilder _qBuilder;
+	internal readonly UniverseBuilder QBuilder;
 
 	/// <summary></summary>
 	protected GalaxyBasic(
@@ -16,7 +16,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		string database,
 		string container,
 		IReadOnlyList<string> partitionKey,
-		bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => _qBuilder = new(_recordQuery);
+		bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => QBuilder = new(_recordQuery);
 
 	async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
 	{
@@ -45,7 +45,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 	}
 
-	async Task<Gravity> IGalaxyBasic<T>.Create(IList<T> models)
+	async Task<Gravity> IGalaxyBasic<T>.Create(IReadOnlyList<T> models)
 	{
 		try
 		{
@@ -95,7 +95,11 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
 			return new(totalRu, string.Empty);
 		}
-		catch
+		catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+		{
+			throw new UniverseException($"{typeof(T).Name} already exists.");
+		}
+		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.Conflict)
 		{
 			throw;
 		}
@@ -120,7 +124,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 	}
 
-	async Task<Gravity> IGalaxyBasic<T>.Modify(IList<T> models)
+	async Task<Gravity> IGalaxyBasic<T>.Modify(IReadOnlyList<T> models)
 	{
 		try
 		{

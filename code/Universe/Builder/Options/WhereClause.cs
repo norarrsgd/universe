@@ -5,4 +5,4 @@ namespace Universe.Builder.Options;
 /// </summary>
 /// <param name="Catalysts">Catalysts under one group / cluster</param>
 /// <param name="Where">Where operator (eg AND / OR)</param>
-public readonly record struct Cluster(IList<Catalyst> Catalysts, Q.Where Where = Q.Where.And);
+public readonly record struct Cluster(IReadOnlyList<Catalyst> Catalysts, Q.Where Where = Q.Where.And);

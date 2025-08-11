@@ -4,7 +4,7 @@ namespace Universe.Builder;
 
 internal class UniverseBuilder(bool recordQueries)
 {
-	internal QueryDefinition CreateQuery(IList<Cluster> clusters, ColumnOptions? columnOptions = null, IList<Sorting.Option> sorting = null, IList<string> groups = null)
+	internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
 	{
 		// Column Options Builder
 		string columnsInQuery = "*";
@@ -161,7 +161,7 @@ internal class UniverseBuilder(bool recordQueries)
 				// Where Clause Builder
 				foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance && c.Operator is not Q.Operator.FTScore))
 				{
-					if (cluster.Catalysts.IndexOf(catalyst) == 0)
+					if (cluster.Catalysts.ToList().IndexOf(catalyst) == 0)
 						queryBuilder.Append(WhereClauseBuilder(catalyst));
 					else
 						queryBuilder.Append($" {catalyst.Where.Value()} {WhereClauseBuilder(catalyst)}");

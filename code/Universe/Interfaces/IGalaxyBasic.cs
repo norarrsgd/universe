@@ -13,7 +13,7 @@ public interface IGalaxyBasic<T> where T : ICosmicEntity
 	/// <summary>
 	/// Bulk create new models in the database
 	/// </summary>
-	Task<Gravity> Create(IList<T> models);
+	Task<Gravity> Create(IReadOnlyList<T> models);
 
 	/// <summary>
 	/// Modify a model in the database
@@ -23,7 +23,7 @@ public interface IGalaxyBasic<T> where T : ICosmicEntity
 	/// <summary>
 	/// Bulk modify models in the database
 	/// </summary>
-	Task<Gravity> Modify(IList<T> models);
+	Task<Gravity> Modify(IReadOnlyList<T> models);
 
 	/// <summary>
 	/// Remove one model from the database
