@@ -91,4 +91,10 @@ public abstract class Galaxy<T>(
 			throw;
 		}
 	}
+
+	Gravity IGalaxy<T>.GenerateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
+	{
+		QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+		return new(0, string.Empty, (query.QueryText, query.GetQueryParameters()));
+	}
 }
