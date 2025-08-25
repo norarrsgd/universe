@@ -1,9 +1,24 @@
 using Universe.Response;
+using Universe.Builder.Strategies;
+using System.Diagnostics;
 
 namespace Universe.Builder;
 
 internal class UniverseBuilder(bool recordQueries)
 {
+	private readonly QueryTuner _queryTuner = new();
+	private readonly QueryStrategySelector _strategySelector = new(new());
+
+	public UniverseBuilder() : this(false)
+	{
+	}
+
+	public UniverseBuilder(bool recordQueries, QueryTuner queryTuner) : this(recordQueries)
+	{
+		_queryTuner = queryTuner;
+		_strategySelector = new(_queryTuner);
+	}
+
 	internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
 	{
 		// Column Options Builder
@@ -25,6 +40,17 @@ internal class UniverseBuilder(bool recordQueries)
 					throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
 
 				groups ??= [];
+				List<string> formattedGroup = [];
+				foreach (string group in groups)
+				{
+					if (!group.StartsWith("c."))
+						formattedGroup.Add($"c.{group}");
+					else
+						formattedGroup.Add(group);
+				}
+
+				groups = [.. formattedGroup.Distinct()];
+
 				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c.{n}")).Distinct()];
 
 				if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
@@ -66,11 +92,11 @@ internal class UniverseBuilder(bool recordQueries)
 						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
 					break;
 				case 1:
-					{
-						Catalyst catalyst = vectorDistanceCatalysts.First();
-						columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
-						break;
-					}
+				{
+					Catalyst catalyst = vectorDistanceCatalysts.First();
+					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+					break;
+				}
 			}
 		}
 
@@ -255,8 +281,8 @@ internal class UniverseBuilder(bool recordQueries)
 		}
 
 		// This error blocks code execution since this is not yet supported by CosmosDb
-		if (queryBuilder.ToString().Contains("ORDER BY") && groups is not null && groups.Any())
-			throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
+		// if (queryBuilder.ToString().Contains("ORDER BY") && groups is not null && groups.Any())
+		// 	throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
 
 		// Parameters Builder
 		QueryDefinition query = new(queryBuilder.ToString());
@@ -291,43 +317,126 @@ internal class UniverseBuilder(bool recordQueries)
 		};
 	}
 
-	internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query)
+	internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
 	{
-		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: new() { MaxItemCount = Q.Limits.MaxItems });
-		if (queryResponse.HasMoreResults)
+		context ??= InferQueryContext(query);
+		QueryContext singleContext = context.Value with { MaxItemCount = 1 };
+
+		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, singleContext);
+		Stopwatch stopwatch = Stopwatch.StartNew();
+
+		try
 		{
-			FeedResponse<T> next = await queryResponse.ReadNextAsync();
-			return (
-				new
-				(
-					RU: next.RequestCharge,
-					ContinuationToken: null,
-					Query: recordQueries ? (query.QueryText, query.GetQueryParameters()) : default
-				),
-				next.Count != 0 ? next.Resource.FirstOrDefault() : default);
+			(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries);
+			stopwatch.Stop();
+
+			// Record successful execution
+			_queryTuner.RecordExecution(new(
+				QueryHash: ComputeQueryHash(query.QueryText),
+				Strategy: strategy.Name,
+				RequestUnits: gravity.RU,
+				ExecutionTime: stopwatch.Elapsed,
+				ResultCount: results.Count,
+				ExecutedAt: DateTime.UtcNow,
+				QueryType: singleContext.Type,
+				WasSuccessful: true));
+
+			T result = results.Count != 0 ? results.First() : default(T);
+			return (gravity, result);
 		}
-		else
-			return new(new(0, null), default);
+		catch (SystemException ex)
+		{
+			stopwatch.Stop();
+
+			// Record failed execution
+			_queryTuner.RecordExecution(new(
+				QueryHash: ComputeQueryHash(query.QueryText),
+				Strategy: strategy.Name,
+				RequestUnits: 0,
+				ExecutionTime: stopwatch.Elapsed,
+				ResultCount: 0,
+				ExecutedAt: DateTime.UtcNow,
+				QueryType: singleContext.Type,
+				WasSuccessful: false,
+				ErrorMessage: ex.Message));
+
+			throw;
+		}
 	}
 
-	internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query)
+	internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
 	{
-		double requestCharge = 0;
-		List<T> collection = [];
-		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: new() { MaxItemCount = Q.Limits.MaxItems });
-		while (queryResponse.HasMoreResults)
-		{
-			FeedResponse<T> next = await queryResponse.ReadNextAsync();
-			collection.AddRange(next);
-			requestCharge += next.RequestCharge;
-		}
+		context ??= InferQueryContext(query);
 
-		return (
-			new
-			(
-				RU: requestCharge,
-				ContinuationToken: null,
-				Query: recordQueries ? (query.QueryText, query.GetQueryParameters()) : default
-			), collection);
+		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context.Value);
+		Stopwatch stopwatch = Stopwatch.StartNew();
+
+		try
+		{
+			(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries);
+			stopwatch.Stop();
+
+			// Record successful execution
+			_queryTuner.RecordExecution(new(
+				QueryHash: ComputeQueryHash(query.QueryText),
+				Strategy: strategy.Name,
+				RequestUnits: gravity.RU,
+				ExecutionTime: stopwatch.Elapsed,
+				ResultCount: results.Count,
+				ExecutedAt: DateTime.UtcNow,
+				QueryType: context.Value.Type,
+				WasSuccessful: true));
+
+			return (gravity, results);
+		}
+		catch (SystemException ex)
+		{
+			stopwatch.Stop();
+
+			// Record failed execution
+			_queryTuner.RecordExecution(new(
+				QueryHash: ComputeQueryHash(query.QueryText),
+				Strategy: strategy.Name,
+				RequestUnits: 0,
+				ExecutionTime: stopwatch.Elapsed,
+				ResultCount: 0,
+				ExecutedAt: DateTime.UtcNow,
+				QueryType: context.Value.Type,
+				WasSuccessful: false,
+				ErrorMessage: ex.Message));
+
+			throw;
+		}
+	}
+
+	internal QueryTuningRecommendations GetQueryRecommendations(string queryPattern, QueryType queryType) => _queryTuner.GetRecommendations(queryPattern, queryType);
+
+	private static QueryContext InferQueryContext(QueryDefinition query)
+	{
+		string queryText = query.QueryText.ToUpperInvariant();
+
+		QueryType type = QueryType.Simple;
+
+		if (queryText.Contains("VECTORDISTANCE") && queryText.Contains("FULLTEXTSCORE"))
+			type = QueryType.HybridSearch;
+		else if (queryText.Contains("VECTORDISTANCE"))
+			type = QueryType.VectorSearch;
+		else if (queryText.Contains("FULLTEXTSCORE"))
+			type = QueryType.FullTextSearch;
+		else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
+			type = QueryType.Aggregation;
+		else if (queryText.Contains("JOIN"))
+			type = QueryType.Join;
+		else if (queryText.Contains("RRF") || queryText.Split(' ').Length > 20)
+			type = QueryType.Complex;
+
+		return new(type);
+	}
+
+	private static string ComputeQueryHash(string queryText)
+	{
+		using System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create();
+		byte[] hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(queryText));
+		return Convert.ToHexString(hashBytes)[..16];
 	}
 }

@@ -15,8 +15,8 @@ class Program
 	static async Task Main(string[] args)
 	{
 		// Database connection details
-		string CosmosDbUri = "<FROM AZURE COSMOS DB ACCOUNT>";
-		string CosmosDbPrimaryKey = "<FROM AZURE COSMOS DB ACCOUNT KEY>";
+		string CosmosDbUri = "<FROM AZURE PORTAL>";
+		string CosmosDbPrimaryKey = "<FROM AZURE PORTAL>";
 
 		// Initialize CosmosClient with appropriate options
 		CosmosClient cosmosClient = new(
@@ -59,6 +59,7 @@ class Program
 		totalRu += await new Example10_FullTextSearch(galaxy).RunAsync();
 		totalRu += await new Example11_HybridVectorFullText(vectorGalaxy).RunAsync();
 		totalRu += await new Example12_QueryGeneration(galaxy).RunAsync();
+		totalRu += await new Example13_QueryOptimization(vectorGalaxy).RunAsync();
 
 		// Display summary information
 		Console.WriteLine($"\nTotal RU spent across all examples: {totalRu}");

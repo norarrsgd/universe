@@ -2,7 +2,6 @@ using Universe.Response;
 using DarkMatter.Models;
 using Universe.Interfaces;
 using Universe.Builder.Options;
-using DarkMatter.Helpers;
 using Universe.Extensions;
 
 namespace DarkMatter.Examples;
@@ -452,7 +451,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 		for (int i = 0; i < displayCount; i++)
 		{
 			Console.WriteLine($"  Item {i + 1}: {results[i].Code} - {results[i].Name}");
-			if (!string.IsNullOrEmpty(results[i].Description))
+			if (!string.IsNullOrWhiteSpace(results[i].Description))
 			{
 				string desc = results[i].Description.Length > 100
 					? $"{results[i].Description[..100]}..."

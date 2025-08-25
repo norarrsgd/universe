@@ -10,3 +10,4 @@ global using Universe.Builder.Options;
 global using Universe.Exception;
 global using Universe.Extensions;
 global using Universe.Interfaces;
+global using SystemException = System.Exception;

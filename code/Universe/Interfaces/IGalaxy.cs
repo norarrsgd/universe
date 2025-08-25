@@ -1,4 +1,5 @@
 ﻿using Universe.Response;
+using Universe.Builder.Strategies;
 
 namespace Universe.Interfaces;
 
@@ -16,10 +17,9 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
 	Task<(Gravity g, S S)> Get<S>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns = null) where S : ICosmicEntity;
 
 	/// <summary>
-	/// Get list from the database
+	/// Get list from the database with optional query optimization hints
 	/// </summary>
-	Task<(Gravity g, IList<T> T)> List(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null);
-
+	Task<(Gravity g, IList<T> T)> List(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null, QueryHints? hints = null);
 
 	/// <summary>
 	/// Get list from the database with a different type
@@ -40,4 +40,9 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
 	/// Generate SQL query without executing it
 	/// </summary>
 	Gravity GenerateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null);
+
+	/// <summary>
+	/// Get query execution recommendations for optimization
+	/// </summary>
+	QueryTuningRecommendations GetQueryRecommendations(string queryPattern, QueryType queryType);
 }

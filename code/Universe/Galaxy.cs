@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Universe.Response;
+using Universe.Builder.Strategies;
 
 namespace Universe;
 
@@ -34,8 +35,8 @@ public abstract class Galaxy<T>(
 		}
 	}
 
-	async Task<(Gravity, IList<T>)> IGalaxy<T>.List(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
-		=> await InternalList<T>(clusters, columnOptions, sorting, group);
+	async Task<(Gravity, IList<T>)> IGalaxy<T>.List(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints)
+		=> hints is null ? await InternalList<T>(clusters, columnOptions, sorting, group) : await InternalListWithHints<T>(clusters, columnOptions, sorting, group, hints);
 
 	async Task<(Gravity g, IList<S> T)> IGalaxy<T>.List<S>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
 		=> await InternalList<S>(clusters, columnOptions, sorting, group);
@@ -96,5 +97,49 @@ public abstract class Galaxy<T>(
 	{
 		QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
 		return new(0, string.Empty, (query.QueryText, query.GetQueryParameters()));
+	}
+
+	QueryTuningRecommendations IGalaxy<T>.GetQueryRecommendations(string queryPattern, QueryType queryType)
+	{
+		return QBuilder.GetQueryRecommendations(queryPattern, queryType);
+	}
+
+	private async Task<(Gravity g, IList<ArgType> T)> InternalListWithHints<ArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints) where ArgType : ICosmicEntity
+	{
+		try
+		{
+			QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+
+			QueryContext context = new(
+				Type: InferQueryType(query),
+				Hints: hints?.ToContextHints()
+			);
+
+			return await QBuilder.GetListFromQuery<ArgType>(_container, query, context);
+		}
+		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+		{
+			throw;
+		}
+	}
+
+	private static QueryType InferQueryType(QueryDefinition query)
+	{
+		string queryText = query.QueryText.ToUpperInvariant();
+
+		if (queryText.Contains("VECTORDISTANCE") && queryText.Contains("FULLTEXTSCORE"))
+			return QueryType.HybridSearch;
+		else if (queryText.Contains("VECTORDISTANCE"))
+			return QueryType.VectorSearch;
+		else if (queryText.Contains("FULLTEXTSCORE"))
+			return QueryType.FullTextSearch;
+		else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
+			return QueryType.Aggregation;
+		else if (queryText.Contains("JOIN"))
+			return QueryType.Join;
+		else if (queryText.Contains("RRF") || queryText.Split(' ').Length > 20)
+			return QueryType.Complex;
+
+		return QueryType.Simple;
 	}
 }
