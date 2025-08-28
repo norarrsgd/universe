@@ -31,7 +31,7 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 
 		QueryRequestOptions requestOptions = new()
 		{
-			EnableOptimisticDirectExecution = true,
+			EnableOptimisticDirectExecution = false,
 			MaxConcurrency = Environment.ProcessorCount // CPU-bound operations
 		};
 
@@ -46,8 +46,11 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 
 			if (context.Hints.TryGetValue(nameof(QueryHints.MaxConcurrency), out object concurrency))
 				requestOptions.MaxConcurrency = (int)concurrency;
-		}
 
+			if (context.Hints.TryGetValue(nameof(QueryHints.EnableOptimisticDirectExecution), out object optimistic))
+				requestOptions.EnableOptimisticDirectExecution = (bool)optimistic;
+		}
+		
 		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);
 
 		while (queryResponse.HasMoreResults)

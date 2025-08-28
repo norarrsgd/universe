@@ -199,7 +199,7 @@
             Query hints for optimization
             </summary>
         </member>
-        <member name="M:Universe.Builder.Options.QueryHints.#ctor(System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{Universe.Builder.Options.QueryExecutionStrategy},System.Nullable{System.Boolean},System.Nullable{System.Int32})">
+        <member name="M:Universe.Builder.Options.QueryHints.#ctor(System.Nullable{Universe.Builder.Options.QueryExecutionStrategy},System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Boolean},System.Nullable{System.Int32})">
             <summary>
             Query hints for optimization
             </summary>
@@ -214,6 +214,9 @@
         </member>
         <member name="T:Universe.Builder.Options.Q.Limits">
             <summary>Query Limits</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Limits.MaxVectorItems">
+            <summary>Maximum number of items return for vector search queries</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Limits.MaxItems">
             <summary>Maximum number of items to return</summary>
@@ -493,6 +496,11 @@
             Selects the best execution strategy for a given query
             </summary>
         </member>
+        <member name="M:Universe.Builder.Strategies.QueryStrategySelector.#ctor(Universe.Builder.Strategies.QueryTuner)">
+            <summary>
+            Selects the best execution strategy for a given query
+            </summary>
+        </member>
         <member name="T:Universe.Builder.Strategies.QueryTuner">
             <summary>
             Analyzes query execution patterns and provides tuning recommendations
@@ -634,7 +642,7 @@
             Get list from the database with optional query optimization hints
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints})">
             <summary>
             Get list from the database with a different type
             </summary>

@@ -57,10 +57,11 @@ internal sealed class QueryTuner
 		// Generate hints based on query patterns
 		switch (queryType)
 		{
-			case QueryType.VectorSearch:
 			case QueryType.HybridSearch:
+			case QueryType.VectorSearch:
 			case QueryType.FullTextSearch:
-				hints[nameof(QueryHints.MaxBufferedItemCount)] = Q.Limits.MaxItems;
+				hints[nameof(QueryHints.MaxItemCount)] = Q.Limits.MaxVectorItems;
+				hints[nameof(QueryHints.MaxBufferedItemCount)] = Q.Limits.MaxVectorItems;
 				break;
 
 			case QueryType.Aggregation:
@@ -77,9 +78,11 @@ internal sealed class QueryTuner
 				hints[nameof(QueryHints.MaxConcurrency)] = 1; // Conservative for complex queries
 				hints[nameof(QueryHints.ResponseContinuationTokenLimitInKb)] = 1;
 				break;
+
 			case QueryType.Simple:
 			case QueryType.Join:
 				break;
+
 			default:
 				throw new ArgumentOutOfRangeException(nameof(queryType), queryType, null);
 		}

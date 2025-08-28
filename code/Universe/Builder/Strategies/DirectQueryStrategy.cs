@@ -45,8 +45,14 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
 			if (context.Hints.TryGetValue(nameof(QueryHints.MaxBufferedItemCount), out object bufferedCount))
 				requestOptions.MaxBufferedItemCount = (int)bufferedCount;
 
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxConcurrency), out object concurrency))
+				requestOptions.MaxConcurrency = (int)concurrency;
+
 			if (context.Hints.TryGetValue(nameof(QueryHints.EnableOptimisticDirectExecution), out object optimistic))
 				requestOptions.EnableOptimisticDirectExecution = (bool)optimistic;
+
+			if (context.Hints.TryGetValue(nameof(QueryHints.ResponseContinuationTokenLimitInKb), out object tokenLimit))
+				requestOptions.ResponseContinuationTokenLimitInKb = (int)tokenLimit;
 		}
 
 		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);

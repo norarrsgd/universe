@@ -417,11 +417,11 @@ internal class UniverseBuilder(bool recordQueries)
 
 		QueryType type = QueryType.Simple;
 
-		if (queryText.Contains("VECTORDISTANCE") && queryText.Contains("FULLTEXTSCORE"))
+		if (queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) && queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()))
 			type = QueryType.HybridSearch;
-		else if (queryText.Contains("VECTORDISTANCE"))
+		else if (queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()))
 			type = QueryType.VectorSearch;
-		else if (queryText.Contains("FULLTEXTSCORE"))
+		else if (queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()))
 			type = QueryType.FullTextSearch;
 		else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
 			type = QueryType.Aggregation;
