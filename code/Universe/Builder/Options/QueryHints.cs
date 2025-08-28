@@ -36,10 +36,10 @@ public static class QueryExecutionStrategyExtensions
 /// Query hints for optimization
 /// </summary>
 public readonly record struct QueryHints(
+	QueryExecutionStrategy? ForceStrategy = null,
 	int? MaxItemCount = null,
 	int? MaxBufferedItemCount = null,
 	int? MaxConcurrency = null,
-	QueryExecutionStrategy? ForceStrategy = null,
 	bool? EnableOptimisticDirectExecution = null,
 	int? ResponseContinuationTokenLimitInKb = null)
 {
@@ -51,17 +51,17 @@ public readonly record struct QueryHints(
 		Dictionary<string, object> hints = [];
 
 		if (MaxItemCount.HasValue)
-			hints["MaxItemCount"] = MaxItemCount.Value;
+			hints[nameof(MaxItemCount)] = MaxItemCount.Value;
 		if (MaxBufferedItemCount.HasValue)
-			hints["MaxBufferedItemCount"] = MaxBufferedItemCount.Value;
+			hints[nameof(MaxBufferedItemCount)] = MaxBufferedItemCount.Value;
 		if (MaxConcurrency.HasValue)
-			hints["MaxConcurrency"] = MaxConcurrency.Value;
+			hints[nameof(MaxConcurrency)] = MaxConcurrency.Value;
 		if (ForceStrategy.HasValue)
-			hints["ForceStrategy"] = ForceStrategy.Value.ToStrategyName();
+			hints[nameof(ForceStrategy)] = ForceStrategy.Value.ToStrategyName();
 		if (EnableOptimisticDirectExecution.HasValue)
-			hints["EnableOptimisticDirectExecution"] = EnableOptimisticDirectExecution.Value;
+			hints[nameof(EnableOptimisticDirectExecution)] = EnableOptimisticDirectExecution.Value;
 		if (ResponseContinuationTokenLimitInKb.HasValue)
-			hints["ResponseContinuationTokenLimitInKb"] = ResponseContinuationTokenLimitInKb.Value;
+			hints[nameof(ResponseContinuationTokenLimitInKb)] = ResponseContinuationTokenLimitInKb.Value;
 
 		return hints;
 	}

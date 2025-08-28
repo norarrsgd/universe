@@ -38,10 +38,13 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 		// Vector search specific optimizations
 		if (context.Hints is not null)
 		{
-			if (context.Hints.TryGetValue("MaxItemCount", out object itemCount))
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxBufferedItemCount), out object bufferedCount))
+				requestOptions.MaxBufferedItemCount = (int)bufferedCount;
+			
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxItemCount), out object itemCount))
 				requestOptions.MaxItemCount = (int)itemCount;
 
-			if (context.Hints.TryGetValue("MaxConcurrency", out object concurrency))
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxConcurrency), out object concurrency))
 				requestOptions.MaxConcurrency = (int)concurrency;
 		}
 

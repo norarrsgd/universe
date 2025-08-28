@@ -27,30 +27,16 @@ internal sealed class QueryStrategySelector(QueryTuner tuner)
 			IQueryExecutionStrategy recommendedStrategy = _strategies
 				.FirstOrDefault(s => s.Name == recommendations.RecommendedStrategy);
 
-			if (recommendedStrategy?.CanHandle(query, context) == true)
-			{
-				// Apply suggested hints and return with enhanced context
-				Dictionary<string, object> mergedHints = new(context.Hints ?? new Dictionary<string, object>());
-				if (recommendations.SuggestedHints is not null)
-				{
-					foreach ((string key, object value) in recommendations.SuggestedHints)
-					{
-						mergedHints[key] = value;
-					}
-				}
-
-				QueryContext enhancedContext = context with { Hints = mergedHints };
-				return new EnhancedContextStrategy(recommendedStrategy, enhancedContext);
-			}
+			return EnhancedStrategy(query, context, recommendedStrategy, recommendations);
 		}
 
 		// Check if strategy is forced via hints
-		if (context.Hints?.TryGetValue("ForceStrategy", out object forcedStrategy) == true)
+		if (context.Hints?.TryGetValue(nameof(QueryHints.ForceStrategy), out object forcedStrategy) == true)
 		{
 			IQueryExecutionStrategy forced = _strategies
 				.FirstOrDefault(s => s.Name == (string)forcedStrategy);
 			if (forced?.CanHandle(query, context) == true)
-				return forced;
+				return EnhancedStrategy(query, context, forced, recommendations);
 		}
 
 		// Fall back to priority-based selection
@@ -58,6 +44,27 @@ internal sealed class QueryStrategySelector(QueryTuner tuner)
 			.Where(strategy => strategy.CanHandle(query, context))
 			.OrderByDescending(strategy => strategy.Priority)
 			.First();
+	}
+
+	private static EnhancedContextStrategy EnhancedStrategy(QueryDefinition query, QueryContext context, IQueryExecutionStrategy recommendedStrategy, QueryTuningRecommendations recommendations)
+	{
+		if (recommendedStrategy?.CanHandle(query, context) == true)
+		{
+			// Apply suggested hints and return with enhanced context
+			Dictionary<string, object> mergedHints = new(context.Hints ?? new Dictionary<string, object>());
+			if (recommendations.SuggestedHints is not null)
+			{
+				foreach ((string key, object value) in recommendations.SuggestedHints)
+				{
+					mergedHints[key] = value;
+				}
+			}
+
+			QueryContext enhancedContext = context with { Hints = mergedHints };
+			return new(recommendedStrategy, enhancedContext);
+		}
+
+		return new(recommendedStrategy, context);
 	}
 
 	private static string ComputeQueryHash(string queryText)

@@ -42,10 +42,10 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
 		// Apply hints if available
 		if (context.Hints is not null)
 		{
-			if (context.Hints.TryGetValue("MaxBufferedItemCount", out object bufferedCount))
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxBufferedItemCount), out object bufferedCount))
 				requestOptions.MaxBufferedItemCount = (int)bufferedCount;
 
-			if (context.Hints.TryGetValue("EnableOptimisticDirectExecution", out object optimistic))
+			if (context.Hints.TryGetValue(nameof(QueryHints.EnableOptimisticDirectExecution), out object optimistic))
 				requestOptions.EnableOptimisticDirectExecution = (bool)optimistic;
 		}
 

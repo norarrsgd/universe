@@ -60,23 +60,22 @@ internal sealed class QueryTuner
 			case QueryType.VectorSearch:
 			case QueryType.HybridSearch:
 			case QueryType.FullTextSearch:
-				hints["MaxItemCount"] = 50; // Smaller batches for vector queries
-				hints["MaxBufferedItemCount"] = 100;
+				hints[nameof(QueryHints.MaxBufferedItemCount)] = Q.Limits.MaxItems;
 				break;
 
 			case QueryType.Aggregation:
 				double avgResultCount = queries.Average(q => q.ResultCount);
-				if (avgResultCount > 1000)
+				if (avgResultCount > Q.Limits.MaxItems)
 				{
-					hints["MaxItemCount"] = 500; // Larger batches for aggregations
-					hints["MaxBufferedItemCount"] = 1000;
+					hints[nameof(QueryHints.MaxItemCount)] = 500; // Larger batches for aggregations
+					hints[nameof(QueryHints.MaxBufferedItemCount)] = Q.Limits.MaxItems;
 				}
 
 				break;
 
 			case QueryType.Complex:
-				hints["MaxConcurrency"] = 1; // Conservative for complex queries
-				hints["ResponseContinuationTokenLimitInKb"] = 1;
+				hints[nameof(QueryHints.MaxConcurrency)] = 1; // Conservative for complex queries
+				hints[nameof(QueryHints.ResponseContinuationTokenLimitInKb)] = 1;
 				break;
 			case QueryType.Simple:
 			case QueryType.Join:

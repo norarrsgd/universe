@@ -34,13 +34,13 @@ internal sealed class GatewayQueryStrategy : IQueryExecutionStrategy
 		// Apply query hints if available
 		if (context.Hints is not null)
 		{
-			if (context.Hints.TryGetValue("MaxBufferedItemCount", out object bufferedCount))
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxBufferedItemCount), out object bufferedCount))
 				requestOptions.MaxBufferedItemCount = (int)bufferedCount;
 
-			if (context.Hints.TryGetValue("MaxConcurrency", out object concurrency))
+			if (context.Hints.TryGetValue(nameof(QueryHints.MaxConcurrency), out object concurrency))
 				requestOptions.MaxConcurrency = (int)concurrency;
 
-			if (context.Hints.TryGetValue("ResponseContinuationTokenLimitInKb", out object tokenLimit))
+			if (context.Hints.TryGetValue(nameof(QueryHints.ResponseContinuationTokenLimitInKb), out object tokenLimit))
 				requestOptions.ResponseContinuationTokenLimitInKb = (int)tokenLimit;
 		}
 
