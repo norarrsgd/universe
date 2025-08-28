@@ -31,7 +31,7 @@ internal sealed class QueryTuner
 		if (similarQueries.Count == 0)
 			return new();
 
-		double avgRU = similarQueries.Average(s => s.RequestUnits);
+		double avgRu = similarQueries.Average(s => s.RequestUnits);
 		TimeSpan avgTime = TimeSpan.FromMilliseconds(similarQueries.Average(s => s.ExecutionTime.TotalMilliseconds));
 		double successRate = similarQueries.Count(s => s.WasSuccessful) / (double)similarQueries.Count;
 
@@ -44,7 +44,7 @@ internal sealed class QueryTuner
 
 		return new(
 			RecommendedStrategy: bestStrategy,
-			AverageRU: avgRU,
+			AverageRU: avgRu,
 			AverageExecutionTime: avgTime,
 			SuccessRate: successRate,
 			SuggestedHints: hints);

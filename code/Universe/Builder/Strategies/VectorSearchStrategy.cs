@@ -7,10 +7,11 @@ namespace Universe.Builder.Strategies;
 /// </summary>
 internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 {
-	public string Name => "VectorSearch";
+	public string Name => QueryExecutionStrategy.VectorSearch.ToStrategyName();
+
 	public int Priority => 200; // High priority for vector queries
 
-	public bool CanHandle(QueryDefinition query, QueryContext context)
+	bool IQueryExecutionStrategy.CanHandle(QueryDefinition query, QueryContext context)
 	{
 		string queryText = query.QueryText.ToUpperInvariant();
 
@@ -19,7 +20,7 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 		       queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant());
 	}
 
-	public async Task<(Gravity gravity, IList<T> results)> ExecuteAsync<T>(
+	async Task<(Gravity gravity, IList<T> results)> IQueryExecutionStrategy.ExecuteAsync<T>(
 		Container container,
 		QueryDefinition query,
 		QueryContext context,
@@ -30,9 +31,8 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 
 		QueryRequestOptions requestOptions = new()
 		{
-			MaxItemCount = context.MaxItemCount ?? 100, // Smaller batches for vector queries
 			EnableOptimisticDirectExecution = true,
-			MaxConcurrency = Environment.ProcessorCount, // CPU-bound operations
+			MaxConcurrency = Environment.ProcessorCount // CPU-bound operations
 		};
 
 		// Vector search specific optimizations

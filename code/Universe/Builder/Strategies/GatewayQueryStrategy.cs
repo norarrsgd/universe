@@ -8,12 +8,13 @@ namespace Universe.Builder.Strategies;
 internal sealed class GatewayQueryStrategy : IQueryExecutionStrategy
 {
 	public string Name => QueryExecutionStrategy.Gateway.ToStrategyName();
+	
 	public int Priority => 50; // Lower priority, fallback strategy
 
 	// Can handle any query as fallback
-	public bool CanHandle(QueryDefinition query, QueryContext context) => true;
+	bool IQueryExecutionStrategy.CanHandle(QueryDefinition query, QueryContext context) => true;
 
-	public async Task<(Gravity gravity, IList<T> results)> ExecuteAsync<T>(
+	async Task<(Gravity gravity, IList<T> results)> IQueryExecutionStrategy.ExecuteAsync<T>(
 		Container container,
 		QueryDefinition query,
 		QueryContext context,

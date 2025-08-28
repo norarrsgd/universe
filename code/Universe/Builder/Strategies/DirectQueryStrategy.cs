@@ -8,9 +8,10 @@ namespace Universe.Builder.Strategies;
 internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
 {
 	public string Name => QueryExecutionStrategy.Direct.ToStrategyName();
+	
 	public int Priority => 100; // High priority for simple queries
 
-	public bool CanHandle(QueryDefinition query, QueryContext context)
+	bool IQueryExecutionStrategy.CanHandle(QueryDefinition query, QueryContext context)
 	{
 		// Handle simple queries without complex operations
 		string queryText = query.QueryText.ToUpperInvariant();
@@ -22,7 +23,7 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
 		        !queryText.Contains("GROUP BY"));
 	}
 
-	public async Task<(Gravity gravity, IList<T> results)> ExecuteAsync<T>(
+	async Task<(Gravity gravity, IList<T> results)> IQueryExecutionStrategy.ExecuteAsync<T>(
 		Container container,
 		QueryDefinition query,
 		QueryContext context,

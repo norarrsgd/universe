@@ -436,7 +436,7 @@ internal class UniverseBuilder(bool recordQueries)
 	private static string ComputeQueryHash(string queryText)
 	{
 		using System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create();
-		byte[] hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(queryText));
+		byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(queryText));
 		return Convert.ToHexString(hashBytes)[..16];
 	}
 }
