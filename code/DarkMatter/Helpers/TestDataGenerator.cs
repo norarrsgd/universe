@@ -47,7 +47,7 @@ public static class TestDataGenerator
 
 		for (int i = 1; i <= count; i++)
 		{
-			bulkItems.Add(new MyObject
+			bulkItems.Add(new()
 			{
 				Code = "BULK-" + i,
 				Name = $"Bulk Item {i}",
@@ -74,7 +74,7 @@ public static class TestDataGenerator
 		for (int i = 1; i <= count; i++)
 		{
 			string category = categories[_random.Next(categories.Length)];
-			categoryItems.Add(new MyObject
+			categoryItems.Add(new()
 			{
 				Code = $"CAT-ITEM-{i}",
 				Name = $"Category Item {i}",
@@ -108,7 +108,7 @@ public static class TestDataGenerator
 			string region = regions[_random.Next(regions.Length)];
 			string product = products[_random.Next(products.Length)];
 
-			salesData.Add(new MyObject
+			salesData.Add(new()
 			{
 				Code = $"SALE-{i}",
 				Name = $"{product} Sale",
@@ -140,7 +140,7 @@ public static class TestDataGenerator
 			bool isRecentItem = i % 2 == 0; // Every second item is recent
 			bool isSpecialCode = i % 4 == 0; // Every fourth item has special code
 
-			items.Add(new MyObject
+			items.Add(new()
 			{
 				Code = isSpecialCode ? "SPECIAL-" + i : "REG-" + i,
 				Name = isTestItem ? $"Test Item {i}" : $"Regular Item {i}",
@@ -171,7 +171,7 @@ public static class TestDataGenerator
 			string prefix = prefixes[_random.Next(prefixes.Length)];
 			string category = categories[_random.Next(categories.Length)];
 
-			items.Add(new MyObject
+			items.Add(new()
 			{
 				Code = $"{prefix}-{i:D3}",
 				Name = $"{category} Item {i}",
@@ -192,7 +192,7 @@ public static class TestDataGenerator
 	/// </summary>
 	public static List<MyObject> CreatePredefinedTestData() =>
 	[
-		new MyObject
+		new()
 		{
 			Code = "KNOWN-001",
 			Name = "Known Test Item 1",
@@ -203,7 +203,7 @@ public static class TestDataGenerator
 			Category = "Electronics",
 			AddedOn = DateTime.Now.AddDays(-10)
 		},
-		new MyObject
+		new()
 		{
 			Code = "KNOWN-002",
 			Name = "Known Test Item 2",
@@ -214,7 +214,7 @@ public static class TestDataGenerator
 			Category = "Books",
 			AddedOn = DateTime.Now.AddDays(-5)
 		},
-		new MyObject
+		new()
 		{
 			Code = "SPECIAL",
 			Name = "Special Known Item",

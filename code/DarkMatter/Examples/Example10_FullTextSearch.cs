@@ -469,7 +469,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 		return
 		[
 			// AI/ML Products
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "AI-001",
@@ -480,7 +480,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 50,
 				Links = ["https://example.com/ml-toolkit"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "AI-002",
@@ -491,7 +491,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 25,
 				Links = ["https://example.com/neural-processor"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "AI-003",
@@ -502,7 +502,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 999,
 				Links = ["https://example.com/deep-learning-framework"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "DATA-001",
@@ -513,7 +513,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 10,
 				Links = ["https://example.com/big-data-platform"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "TECH-001",
@@ -526,7 +526,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 			},
 
 			// Non-AI Products for contrast
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "FURN-001",
@@ -537,7 +537,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 30,
 				Links = ["https://example.com/office-chair"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "FURN-002",
@@ -548,7 +548,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 40,
 				Links = ["https://example.com/standing-desk"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "BOOK-001",
@@ -559,7 +559,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 100,
 				Links = ["https://example.com/ml-book"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "LEGACY-001",
@@ -570,7 +570,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Quantity = 5,
 				Links = ["https://example.com/legacy-db"]
 			},
-			new MyObject
+			new()
 			{
 				id = Guid.NewGuid().ToString(),
 				Code = "CLOUD-001",

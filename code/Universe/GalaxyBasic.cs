@@ -220,7 +220,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 	{
 		try
 		{
-			ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, new PartitionKey(partitionKey), requestOptions: new()
+			ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, new(partitionKey), requestOptions: new()
 			{
 				EnableContentResponseOnWrite = false
 			});
@@ -257,7 +257,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 	{
 		try
 		{
-			ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new PartitionKey(partitionKey));
+			ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new(partitionKey));
 			return (new(response.RequestCharge, null), response.Resource);
 		}
 		catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
