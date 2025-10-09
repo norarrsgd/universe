@@ -11,13 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        
+      - name: Install latest Semgrep
+        run: pip install --upgrade semgrep
 
-      - uses: returntocorp/semgrep-action@v1
-        with:
-          config: auto
-          generateSarif: true
-
-      - name: Upload SARIF to GitHub
+      - name: Run Semgrep scan
+        run: semgrep scan . --config auto --sarif --output semgrep.sarif
+        
+      - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
