@@ -6,7 +6,6 @@ namespace Universe.Builder.Strategies;
 internal readonly record struct QueryContext(
 	QueryType Type,
 	int? MaxItemCount = null,
-	bool IsHighPriority = false,
 	IReadOnlyDictionary<string, object> Hints = null);
 
 /// <summary>
@@ -37,25 +36,6 @@ public enum QueryType
 }
 
 /// <summary>
-/// Tracks query execution statistics for automatic tuning
-/// </summary>
-internal readonly record struct QueryExecutionStats(
-	string QueryHash,
-	string Strategy,
-	double RequestUnits,
-	TimeSpan ExecutionTime,
-	int ResultCount,
-	DateTime ExecutedAt,
-	QueryType QueryType,
-	bool WasSuccessful,
-	string ErrorMessage = null);
-
-/// <summary>
 /// Query tuning recommendations based on execution history
 /// </summary>
-public readonly record struct QueryTuningRecommendations(
-	string RecommendedStrategy = null,
-	double AverageRU = 0,
-	TimeSpan AverageExecutionTime = default,
-	double SuccessRate = 0,
-	IReadOnlyDictionary<string, object> SuggestedHints = null);
+public readonly record struct QueryTuningRecommendations(IReadOnlyDictionary<string, object> SuggestedHints = null);

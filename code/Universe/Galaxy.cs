@@ -99,7 +99,7 @@ public abstract class Galaxy<T>(
 		return new(0, string.Empty, (query.QueryText, query.GetQueryParameters()));
 	}
 
-	QueryTuningRecommendations IGalaxy<T>.GetQueryRecommendations(string queryPattern, QueryType queryType) => QBuilder.GetQueryRecommendations(queryPattern, queryType);
+	QueryTuningRecommendations IGalaxy<T>.GetQueryRecommendations(string queryPattern, QueryType queryType) => QBuilder.GetQueryRecommendations(queryType);
 
 	private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints) where TArgType : ICosmicEntity
 	{
