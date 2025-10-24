@@ -1,6 +1,5 @@
 using Universe.Response;
 using Universe.Builder.Strategies;
-using System.Diagnostics;
 
 namespace Universe.Builder;
 
@@ -200,7 +199,7 @@ internal class UniverseBuilder(bool recordQueries)
 		// Sorting Builder
 		if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
 		{
-			// Make sure that the clusters does not have VectorDistance or FTScore operator
+			// Make sure that the clusters do not have VectorDistance or FTScore operator
 			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
 				throw new UniverseException("Sorting scalar fields is not supported in the presence of rank catalysts.");
 
@@ -323,93 +322,19 @@ internal class UniverseBuilder(bool recordQueries)
 		QueryContext singleContext = context.Value with { MaxItemCount = 1 };
 
 		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, singleContext);
-		Stopwatch stopwatch = Stopwatch.StartNew();
-
-		try
-		{
-			(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries);
-			stopwatch.Stop();
-
-			// Record successful execution
-			_queryTuner.RecordExecution(new(
-				QueryHash: ComputeQueryHash(query.QueryText),
-				Strategy: strategy.Name,
-				RequestUnits: gravity.RU,
-				ExecutionTime: stopwatch.Elapsed,
-				ResultCount: results.Count,
-				ExecutedAt: DateTime.UtcNow,
-				QueryType: singleContext.Type,
-				WasSuccessful: true));
-
-			T result = results.Count != 0 ? results.First() : default(T);
-			return (gravity, result);
-		}
-		catch (SystemException ex)
-		{
-			stopwatch.Stop();
-
-			// Record failed execution
-			_queryTuner.RecordExecution(new(
-				QueryHash: ComputeQueryHash(query.QueryText),
-				Strategy: strategy.Name,
-				RequestUnits: 0,
-				ExecutionTime: stopwatch.Elapsed,
-				ResultCount: 0,
-				ExecutedAt: DateTime.UtcNow,
-				QueryType: singleContext.Type,
-				WasSuccessful: false,
-				ErrorMessage: ex.Message));
-
-			throw;
-		}
+		(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries);
+		T result = results.Count != 0 ? results.First() : default(T);
+		return (gravity, result);
 	}
 
 	internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
 	{
 		context ??= InferQueryContext(query);
-
 		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context.Value);
-		Stopwatch stopwatch = Stopwatch.StartNew();
-
-		try
-		{
-			(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries);
-			stopwatch.Stop();
-
-			// Record successful execution
-			_queryTuner.RecordExecution(new(
-				QueryHash: ComputeQueryHash(query.QueryText),
-				Strategy: strategy.Name,
-				RequestUnits: gravity.RU,
-				ExecutionTime: stopwatch.Elapsed,
-				ResultCount: results.Count,
-				ExecutedAt: DateTime.UtcNow,
-				QueryType: context.Value.Type,
-				WasSuccessful: true));
-
-			return (gravity, results);
-		}
-		catch (SystemException ex)
-		{
-			stopwatch.Stop();
-
-			// Record failed execution
-			_queryTuner.RecordExecution(new(
-				QueryHash: ComputeQueryHash(query.QueryText),
-				Strategy: strategy.Name,
-				RequestUnits: 0,
-				ExecutionTime: stopwatch.Elapsed,
-				ResultCount: 0,
-				ExecutedAt: DateTime.UtcNow,
-				QueryType: context.Value.Type,
-				WasSuccessful: false,
-				ErrorMessage: ex.Message));
-
-			throw;
-		}
+		return await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries);
 	}
 
-	internal QueryTuningRecommendations GetQueryRecommendations(string queryPattern, QueryType queryType) => _queryTuner.GetRecommendations(queryPattern, queryType);
+	internal QueryTuningRecommendations GetQueryRecommendations(QueryType queryType) => _queryTuner.GetRecommendations(queryType);
 
 	private static QueryContext InferQueryContext(QueryDefinition query)
 	{
@@ -431,12 +356,5 @@ internal class UniverseBuilder(bool recordQueries)
 			type = QueryType.Complex;
 
 		return new(type);
-	}
-
-	private static string ComputeQueryHash(string queryText)
-	{
-		using System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create();
-		byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(queryText));
-		return Convert.ToHexString(hashBytes)[..16];
 	}
 }

@@ -440,7 +440,7 @@
             Context information for query execution
             </summary>
         </member>
-        <member name="M:Universe.Builder.Strategies.QueryContext.#ctor(Universe.Builder.Strategies.QueryType,System.Nullable{System.Int32},System.Boolean,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Universe.Builder.Strategies.QueryContext.#ctor(Universe.Builder.Strategies.QueryType,System.Nullable{System.Int32},System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
             <summary>
             Context information for query execution
             </summary>
@@ -471,22 +471,12 @@
         <member name="F:Universe.Builder.Strategies.QueryType.Complex">
             <summary>Complex queries with multiple operations or RRF</summary>
         </member>
-        <member name="T:Universe.Builder.Strategies.QueryExecutionStats">
-            <summary>
-            Tracks query execution statistics for automatic tuning
-            </summary>
-        </member>
-        <member name="M:Universe.Builder.Strategies.QueryExecutionStats.#ctor(System.String,System.String,System.Double,System.TimeSpan,System.Int32,System.DateTime,Universe.Builder.Strategies.QueryType,System.Boolean,System.String)">
-            <summary>
-            Tracks query execution statistics for automatic tuning
-            </summary>
-        </member>
         <member name="T:Universe.Builder.Strategies.QueryTuningRecommendations">
             <summary>
             Query tuning recommendations based on execution history
             </summary>
         </member>
-        <member name="M:Universe.Builder.Strategies.QueryTuningRecommendations.#ctor(System.String,System.Double,System.TimeSpan,System.Double,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Universe.Builder.Strategies.QueryTuningRecommendations.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
             <summary>
             Query tuning recommendations based on execution history
             </summary>
@@ -503,7 +493,7 @@
         </member>
         <member name="T:Universe.Builder.Strategies.QueryTuner">
             <summary>
-            Analyzes query execution patterns and provides tuning recommendations
+            Provides query tuning recommendations based on query type
             </summary>
         </member>
         <member name="T:Universe.Builder.Strategies.VectorSearchStrategy">

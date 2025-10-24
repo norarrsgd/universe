@@ -102,10 +102,6 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
 		Console.WriteLine("4. Query Optimization Recommendations:");
 		QueryTuningRecommendations recommendations = galaxy.GetQueryRecommendations("category_filter", QueryType.Simple);
 
-		Console.WriteLine($"Recommended Strategy: {recommendations.RecommendedStrategy ?? "None available"}");
-		Console.WriteLine($"Average RU: {recommendations.AverageRU:F2}");
-		Console.WriteLine($"Success Rate: {recommendations.SuccessRate:P2}");
-
 		if (recommendations.SuggestedHints != null && recommendations.SuggestedHints.Any())
 		{
 			Console.WriteLine($"Suggested Hints: {string.Join(", ", recommendations.SuggestedHints.Select(h => $"{h.Key}={h.Value}"))}");
