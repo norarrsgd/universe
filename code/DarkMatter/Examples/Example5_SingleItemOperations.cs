@@ -27,9 +27,9 @@ public class Example5_SingleItemOperations(IGalaxy<MyObject> galaxy) : ExampleBa
 		(Gravity g5c, MyObject filteredObject) = await galaxy.Get(
 			clusters:
 			[
-				new Cluster(Catalysts:
+				new(Catalysts:
 				[
-					new Catalyst(nameof(MyObject.Name).ToLowerCamelCase(), newObject.Name)
+					new(nameof(MyObject.Name).ToLowerCamelCase(), newObject.Name)
 				])
 			]
 		);

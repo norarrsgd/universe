@@ -43,18 +43,18 @@ public abstract record CosmicEntity : IDisposable, ICosmicEntity
 
 	#region Dispose Pattern
 
-	[JsonIgnore] private bool disposedValue;
+	[JsonIgnore] private bool _disposedValue;
 
 	/// <summary></summary>
 	protected virtual void Dispose(bool disposing)
 	{
-		if (!disposedValue)
+		if (!_disposedValue)
 		{
 			if (disposing)
 			{
 			}
 
-			disposedValue = true;
+			_disposedValue = true;
 		}
 	}
 

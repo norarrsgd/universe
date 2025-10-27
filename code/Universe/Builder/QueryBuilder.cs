@@ -1,10 +1,24 @@
 using Universe.Response;
+using Universe.Builder.Strategies;
 
 namespace Universe.Builder;
 
 internal class UniverseBuilder(bool recordQueries)
 {
-	internal QueryDefinition CreateQuery(IList<Cluster> clusters, ColumnOptions? columnOptions = null, IList<Sorting.Option> sorting = null, IList<string> groups = null)
+	private readonly QueryTuner _queryTuner = new();
+	private readonly QueryStrategySelector _strategySelector = new(new());
+
+	public UniverseBuilder() : this(false)
+	{
+	}
+
+	public UniverseBuilder(bool recordQueries, QueryTuner queryTuner) : this(recordQueries)
+	{
+		_queryTuner = queryTuner;
+		_strategySelector = new(_queryTuner);
+	}
+
+	internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
 	{
 		// Column Options Builder
 		string columnsInQuery = "*";
@@ -25,6 +39,17 @@ internal class UniverseBuilder(bool recordQueries)
 					throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
 
 				groups ??= [];
+				List<string> formattedGroup = [];
+				foreach (string group in groups)
+				{
+					if (!group.StartsWith("c."))
+						formattedGroup.Add($"c.{group}");
+					else
+						formattedGroup.Add(group);
+				}
+
+				groups = [.. formattedGroup.Distinct()];
+
 				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c.{n}")).Distinct()];
 
 				if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
@@ -66,11 +91,11 @@ internal class UniverseBuilder(bool recordQueries)
 						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
 					break;
 				case 1:
-					{
-						Catalyst catalyst = vectorDistanceCatalysts.First();
-						columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
-						break;
-					}
+				{
+					Catalyst catalyst = vectorDistanceCatalysts.First();
+					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+					break;
+				}
 			}
 		}
 
@@ -161,7 +186,7 @@ internal class UniverseBuilder(bool recordQueries)
 				// Where Clause Builder
 				foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance && c.Operator is not Q.Operator.FTScore))
 				{
-					if (cluster.Catalysts.IndexOf(catalyst) == 0)
+					if (cluster.Catalysts.ToList().IndexOf(catalyst) == 0)
 						queryBuilder.Append(WhereClauseBuilder(catalyst));
 					else
 						queryBuilder.Append($" {catalyst.Where.Value()} {WhereClauseBuilder(catalyst)}");
@@ -174,7 +199,7 @@ internal class UniverseBuilder(bool recordQueries)
 		// Sorting Builder
 		if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
 		{
-			// Make sure that the clusters does not have VectorDistance or FTScore operator
+			// Make sure that the clusters do not have VectorDistance or FTScore operator
 			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
 				throw new UniverseException("Sorting scalar fields is not supported in the presence of rank catalysts.");
 
@@ -255,8 +280,8 @@ internal class UniverseBuilder(bool recordQueries)
 		}
 
 		// This error blocks code execution since this is not yet supported by CosmosDb
-		if (queryBuilder.ToString().Contains("ORDER BY") && groups is not null && groups.Any())
-			throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
+		// if (queryBuilder.ToString().Contains("ORDER BY") && groups is not null && groups.Any())
+		// 	throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
 
 		// Parameters Builder
 		QueryDefinition query = new(queryBuilder.ToString());
@@ -291,43 +316,45 @@ internal class UniverseBuilder(bool recordQueries)
 		};
 	}
 
-	internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query)
+	internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
 	{
-		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: new() { MaxItemCount = Q.Limits.MaxItems });
-		if (queryResponse.HasMoreResults)
-		{
-			FeedResponse<T> next = await queryResponse.ReadNextAsync();
-			return (
-				new
-				(
-					RU: next.RequestCharge,
-					ContinuationToken: null,
-					Query: recordQueries ? (query.QueryText, query.GetQueryParameters()) : default
-				),
-				next.Count != 0 ? next.Resource.FirstOrDefault() : default);
-		}
-		else
-			return new(new(0, null), default);
+		context ??= InferQueryContext(query);
+		QueryContext singleContext = context.Value with { MaxItemCount = 1 };
+
+		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, singleContext);
+		(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries);
+		T result = results.Count != 0 ? results.First() : default(T);
+		return (gravity, result);
 	}
 
-	internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query)
+	internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
 	{
-		double requestCharge = 0;
-		List<T> collection = [];
-		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: new() { MaxItemCount = Q.Limits.MaxItems });
-		while (queryResponse.HasMoreResults)
-		{
-			FeedResponse<T> next = await queryResponse.ReadNextAsync();
-			collection.AddRange(next);
-			requestCharge += next.RequestCharge;
-		}
+		context ??= InferQueryContext(query);
+		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context.Value);
+		return await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries);
+	}
 
-		return (
-			new
-			(
-				RU: requestCharge,
-				ContinuationToken: null,
-				Query: recordQueries ? (query.QueryText, query.GetQueryParameters()) : default
-			), collection);
+	internal QueryTuningRecommendations GetQueryRecommendations(QueryType queryType) => _queryTuner.GetRecommendations(queryType);
+
+	private static QueryContext InferQueryContext(QueryDefinition query)
+	{
+		string queryText = query.QueryText.ToUpperInvariant();
+
+		QueryType type = QueryType.Simple;
+
+		if (queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) && queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()))
+			type = QueryType.HybridSearch;
+		else if (queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()))
+			type = QueryType.VectorSearch;
+		else if (queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()))
+			type = QueryType.FullTextSearch;
+		else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
+			type = QueryType.Aggregation;
+		else if (queryText.Contains("JOIN"))
+			type = QueryType.Join;
+		else if (queryText.Contains("RRF") || queryText.Split(' ').Length > 20)
+			type = QueryType.Complex;
+
+		return new(type);
 	}
 }

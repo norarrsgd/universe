@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Universe.Response;
+using Universe.Builder.Strategies;
 
 namespace Universe;
 
@@ -11,18 +12,30 @@ public abstract class Galaxy<T>(
 	IReadOnlyList<string> partitionKey,
 	bool recordQueries = false) : GalaxyBasic<T>(client, database, container, partitionKey, recordQueries), IGalaxy<T> where T : class, ICosmicEntity
 {
-	async Task<(Gravity, T)> IGalaxy<T>.Get(IList<Cluster> clusters, IList<string> columns)
+	async Task<(Gravity, T)> IGalaxy<T>.Get(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns)
 		=> await InternalGet<T>(clusters, columns);
 
-	async Task<(Gravity g, S S)> IGalaxy<T>.Get<S>(IList<Cluster> clusters, IList<string> columns)
-		=> await InternalGet<S>(clusters, columns);
+	async Task<(Gravity g, TS S)> IGalaxy<T>.Get<TS>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns)
+		=> await InternalGet<TS>(clusters, columns);
 
-	private async Task<(Gravity g, ArgType S)> InternalGet<ArgType>(IList<Cluster> clusters, IList<string> columns) where ArgType : ICosmicEntity
+	async Task<(Gravity, IList<T>)> IGalaxy<T>.List(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints)
+		=> hints is null ? await InternalList<T>(clusters, columnOptions, sorting, group) : await InternalListWithHints<T>(clusters, columnOptions, sorting, group, hints);
+
+	async Task<(Gravity g, IList<TS> T)> IGalaxy<T>.List<TS>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints)
+		=> hints is null ? await InternalList<TS>(clusters, columnOptions, sorting, group) : await InternalListWithHints<TS>(clusters, columnOptions, sorting, group, hints);
+
+	async Task<(Gravity, IList<T>)> IGalaxy<T>.Paged(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
+		=> await InternalPaged<T>(page, clusters, columnOptions, sorting, group);
+
+	async Task<(Gravity g, IList<TS> T)> IGalaxy<T>.Paged<TS>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
+		=> await InternalPaged<TS>(page, clusters, columnOptions, sorting, group);
+
+	private async Task<(Gravity g, TArgType S)> InternalGet<TArgType>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns) where TArgType : ICosmicEntity
 	{
 		try
 		{
-			QueryDefinition query = _qBuilder.CreateQuery(clusters, columnOptions: columns is null || !columns.Any() ? null : new(columns));
-			return await _qBuilder.GetOneFromQuery<ArgType>(_container, query);
+			QueryDefinition query = QBuilder.CreateQuery(clusters, columnOptions: columns is null || !columns.Any() ? null : new(columns));
+			return await QBuilder.GetOneFromQuery<TArgType>(_container, query);
 		}
 		catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
 		{
@@ -34,18 +47,12 @@ public abstract class Galaxy<T>(
 		}
 	}
 
-	async Task<(Gravity, IList<T>)> IGalaxy<T>.List(IList<Cluster> clusters, ColumnOptions? columnOptions, IList<Sorting.Option> sorting, IList<string> group)
-		=> await InternalList<T>(clusters, columnOptions, sorting, group);
-
-	async Task<(Gravity g, IList<S> T)> IGalaxy<T>.List<S>(IList<Cluster> clusters, ColumnOptions? columnOptions, IList<Sorting.Option> sorting, IList<string> group)
-		=> await InternalList<S>(clusters, columnOptions, sorting, group);
-
-	private async Task<(Gravity g, IList<ArgType> T)> InternalList<ArgType>(IList<Cluster> clusters, ColumnOptions? columnOptions, IList<Sorting.Option> sorting, IList<string> group) where ArgType : ICosmicEntity
+	private async Task<(Gravity g, IList<TArgType> T)> InternalList<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group) where TArgType : ICosmicEntity
 	{
 		try
 		{
-			QueryDefinition query = _qBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
-			return await _qBuilder.GetListFromQuery<ArgType>(_container, query);
+			QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+			return await QBuilder.GetListFromQuery<TArgType>(_container, query);
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
@@ -53,28 +60,22 @@ public abstract class Galaxy<T>(
 		}
 	}
 
-	async Task<(Gravity, IList<T>)> IGalaxy<T>.Paged(Q.Page page, IList<Cluster> clusters, ColumnOptions? columnOptions, IList<Sorting.Option> sorting, IList<string> group)
-		=> await InternalPaged<T>(page, clusters, columnOptions, sorting, group);
-
-	async Task<(Gravity g, IList<S> T)> IGalaxy<T>.Paged<S>(Q.Page page, IList<Cluster> clusters, ColumnOptions? columnOptions, IList<Sorting.Option> sorting, IList<string> group)
-		=> await InternalPaged<S>(page, clusters, columnOptions, sorting, group);
-
-	private async Task<(Gravity g, IList<ArgType> T)> InternalPaged<ArgType>(Q.Page page, IList<Cluster> clusters, ColumnOptions? columnOptions, IList<Sorting.Option> sorting, IList<string> group) where ArgType : ICosmicEntity
+	private async Task<(Gravity g, IList<TArgType> T)> InternalPaged<TArgType>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group) where TArgType : ICosmicEntity
 	{
 		try
 		{
-			QueryDefinition query = _qBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+			QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
 
 			double requestUnit = 0;
 			string continuationToken = string.Empty;
-			List<ArgType> collection = [];
-			using FeedIterator<ArgType> queryResponse = _container.GetItemQueryIterator<ArgType>(query,
+			List<TArgType> collection = [];
+			using FeedIterator<TArgType> queryResponse = _container.GetItemQueryIterator<TArgType>(query,
 				requestOptions: new() { MaxItemCount = page.Size },
 				continuationToken: string.IsNullOrWhiteSpace(page.ContinuationToken) ? null : page.ContinuationToken
 			);
 			while (queryResponse.HasMoreResults)
 			{
-				FeedResponse<ArgType> next = await queryResponse.ReadNextAsync();
+				FeedResponse<TArgType> next = await queryResponse.ReadNextAsync();
 				collection.AddRange(next);
 				requestUnit += next.RequestCharge;
 				if (next.Count > 0 && !query.QueryText.Contains("GROUP BY"))
@@ -90,5 +91,52 @@ public abstract class Galaxy<T>(
 		{
 			throw;
 		}
+	}
+
+	Gravity IGalaxy<T>.GenerateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
+	{
+		QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+		return new(0, string.Empty, (query.QueryText, query.GetQueryParameters()));
+	}
+
+	QueryTuningRecommendations IGalaxy<T>.GetQueryRecommendations(string queryPattern, QueryType queryType) => QBuilder.GetQueryRecommendations(queryType);
+
+	private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints) where TArgType : ICosmicEntity
+	{
+		try
+		{
+			QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+
+			QueryContext context = new(
+				Type: InferQueryType(query),
+				Hints: hints?.ToContextHints()
+			);
+
+			return await QBuilder.GetListFromQuery<TArgType>(_container, query, context);
+		}
+		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
+		{
+			throw;
+		}
+	}
+
+	private static QueryType InferQueryType(QueryDefinition query)
+	{
+		string queryText = query.QueryText.ToUpperInvariant();
+
+		if (queryText.Contains("VECTORDISTANCE") && queryText.Contains("FULLTEXTSCORE"))
+			return QueryType.HybridSearch;
+		else if (queryText.Contains("VECTORDISTANCE"))
+			return QueryType.VectorSearch;
+		else if (queryText.Contains("FULLTEXTSCORE"))
+			return QueryType.FullTextSearch;
+		else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
+			return QueryType.Aggregation;
+		else if (queryText.Contains("JOIN"))
+			return QueryType.Join;
+		else if (queryText.Contains("RRF") || queryText.Split(' ').Length > 20)
+			return QueryType.Complex;
+
+		return QueryType.Simple;
 	}
 }

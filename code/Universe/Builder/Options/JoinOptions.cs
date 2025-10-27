@@ -10,5 +10,5 @@ namespace Universe.Builder.Options;
 public record JoinOptions(
 	string Alias,
 	string ArrayPath,
-	IList<string> Columns,
-	IEnumerable<AggregationOption> Aggregates = null);
+	IReadOnlyList<string> Columns,
+	IReadOnlyList<AggregationOption> Aggregates = null);

@@ -1,0 +1,20 @@
+name: Semgrep
+on: [pull_request]
+
+jobs:
+  semgrep:
+    name: Semgrep PR Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install latest Semgrep
+        run: pip install --upgrade semgrep
+
+      - name: Run Semgrep scan
+        run: semgrep scan . --config auto --sarif --output semgrep.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif

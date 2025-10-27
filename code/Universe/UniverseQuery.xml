@@ -62,7 +62,7 @@
             </param>
             <param name="Join">Options for joining a sub-collection.</param>
         </member>
-        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption},Universe.Builder.Options.JoinOptions)">
+        <member name="M:Universe.Builder.Options.ColumnOptions.#ctor(System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,System.Int32,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.AggregationOption},Universe.Builder.Options.JoinOptions)">
             <summary></summary>
             <param name="Names">List of column names to be part of the query</param>
             <param name="IsDistinct">Adds DISTINCT in the generated query</param>
@@ -100,7 +100,7 @@
             <param name="Columns">The columns to include in the join.</param>
             <param name="Aggregates">The aggregation options for the join.</param>
         </member>
-        <member name="M:Universe.Builder.Options.JoinOptions.#ctor(System.String,System.String,System.Collections.Generic.IList{System.String},System.Collections.Generic.IEnumerable{Universe.Builder.Options.AggregationOption})">
+        <member name="M:Universe.Builder.Options.JoinOptions.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.AggregationOption})">
             <summary>
             Options for joining tables.
             </summary>
@@ -170,11 +170,53 @@
         <member name="M:Universe.Builder.Options.CatalystExtension.ParameterName(Universe.Builder.Options.Catalyst)">
             <summary></summary>
         </member>
+        <member name="T:Universe.Builder.Options.QueryExecutionStrategy">
+            <summary>
+            Supported query execution strategies
+            </summary>
+        </member>
+        <member name="F:Universe.Builder.Options.QueryExecutionStrategy.Direct">
+            <summary>Direct execution strategy for simple queries</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.QueryExecutionStrategy.Gateway">
+            <summary>Gateway mode strategy for complex queries and fallbacks</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.QueryExecutionStrategy.VectorSearch">
+            <summary>Specialized strategy for vector search queries</summary>
+        </member>
+        <member name="T:Universe.Builder.Options.QueryExecutionStrategyExtensions">
+            <summary>
+            Extension methods for QueryExecutionStrategy
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Options.QueryExecutionStrategyExtensions.ToStrategyName(Universe.Builder.Options.QueryExecutionStrategy)">
+            <summary>
+            Get the strategy name as used internally
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Options.QueryHints">
+            <summary>
+            Query hints for optimization
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Options.QueryHints.#ctor(System.Nullable{Universe.Builder.Options.QueryExecutionStrategy},System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Boolean},System.Nullable{System.Int32})">
+            <summary>
+            Query hints for optimization
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Options.QueryHints.ToContextHints">
+            <summary>
+            Convert to context hints dictionary
+            </summary>
+        </member>
         <member name="T:Universe.Builder.Options.Q">
             <summary>Query Options</summary>
         </member>
         <member name="T:Universe.Builder.Options.Q.Limits">
             <summary>Query Limits</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Limits.MaxVectorItems">
+            <summary>Maximum number of items return for vector search queries</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Limits.MaxItems">
             <summary>Maximum number of items to return</summary>
@@ -345,7 +387,7 @@
             <param name="Catalysts">Catalysts under one group / cluster</param>
             <param name="Where">Where operator (eg AND / OR)</param>
         </member>
-        <member name="M:Universe.Builder.Options.Cluster.#ctor(System.Collections.Generic.IList{Universe.Builder.Options.Catalyst},Universe.Builder.Options.Q.Where)">
+        <member name="M:Universe.Builder.Options.Cluster.#ctor(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Catalyst},Universe.Builder.Options.Q.Where)">
             <summary>
             Clusters are group of Catalysts that are joined by a Where operator (eg AND / OR). This will divide the where clause into multiple groups.
             </summary>
@@ -357,6 +399,107 @@
         </member>
         <member name="P:Universe.Builder.Options.Cluster.Where">
             <summary>Where operator (eg AND / OR)</summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.DirectQueryStrategy">
+            <summary>
+            Direct execution strategy for simple queries
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.GatewayQueryStrategy">
+            <summary>
+            Gateway mode strategy for complex queries and when direct mode fails
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.IQueryExecutionStrategy">
+            <summary>
+            Defines the contract for query execution strategies
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.IQueryExecutionStrategy.Name">
+            <summary>
+            Strategy name for identification
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.IQueryExecutionStrategy.CanHandle(Microsoft.Azure.Cosmos.QueryDefinition,Universe.Builder.Strategies.QueryContext)">
+            <summary>
+            Determines if this strategy can handle the given query
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.IQueryExecutionStrategy.Priority">
+            <summary>
+            Gets the priority of this strategy (higher = more preferred)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.IQueryExecutionStrategy.ExecuteAsync``1(Microsoft.Azure.Cosmos.Container,Microsoft.Azure.Cosmos.QueryDefinition,Universe.Builder.Strategies.QueryContext,System.Boolean)">
+            <summary>
+            Executes the query and returns results with gravity information
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.QueryContext">
+            <summary>
+            Context information for query execution
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryContext.#ctor(Universe.Builder.Strategies.QueryType,System.Nullable{System.Int32},System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+            <summary>
+            Context information for query execution
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.QueryType">
+            <summary>
+            Types of queries for strategy selection
+            </summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.Simple">
+            <summary>Simple queries without complex operations</summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.Aggregation">
+            <summary>Queries with aggregation operations like GROUP BY, COUNT, SUM</summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.VectorSearch">
+            <summary>Vector similarity search queries</summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.FullTextSearch">
+            <summary>Full-text search queries</summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.HybridSearch">
+            <summary>Hybrid queries combining vector and full-text search</summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.Join">
+            <summary>Queries with JOIN operations</summary>
+        </member>
+        <member name="F:Universe.Builder.Strategies.QueryType.Complex">
+            <summary>Complex queries with multiple operations or RRF</summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.QueryTuningRecommendations">
+            <summary>
+            Query tuning recommendations based on execution history
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuningRecommendations.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+            <summary>
+            Query tuning recommendations based on execution history
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.QueryStrategySelector">
+            <summary>
+            Selects the best execution strategy for a given query
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryStrategySelector.#ctor(Universe.Builder.Strategies.QueryTuner)">
+            <summary>
+            Selects the best execution strategy for a given query
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.QueryTuner">
+            <summary>
+            Provides query tuning recommendations based on query type
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.VectorSearchStrategy">
+            <summary>
+            Specialized strategy for vector search queries
+            </summary>
         </member>
         <member name="T:Universe.Exception.UniverseException">
             <summary></summary>
@@ -474,34 +617,44 @@
         <member name="T:Universe.Interfaces.IGalaxy`1">
             <summary></summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get one model from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Get``1(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get one model from the database with a different type
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints})">
             <summary>
-            Get list from the database
+            Get list from the database with optional query optimization hints
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints})">
             <summary>
             Get list from the database with a different type
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get a paginated list from the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxy`1.Paged``1(Universe.Builder.Options.Q.Page,System.Collections.Generic.IList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IList{System.String})">
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged``1(Universe.Builder.Options.Q.Page,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get a paginated list from the database
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.GenerateQuery(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Generate SQL query without executing it
+            </summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.GetQueryRecommendations(System.String,Universe.Builder.Strategies.QueryType)">
+            <summary>
+            Get query execution recommendations for optimization
             </summary>
         </member>
         <member name="T:Universe.Interfaces.IGalaxyBasic`1">
@@ -512,7 +665,7 @@
             Create a new model in the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Create(System.Collections.Generic.IList{`0})">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Create(System.Collections.Generic.IReadOnlyList{`0})">
             <summary>
             Bulk create new models in the database
             </summary>
@@ -522,7 +675,7 @@
             Modify a model in the database
             </summary>
         </member>
-        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Modify(System.Collections.Generic.IList{`0})">
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Modify(System.Collections.Generic.IReadOnlyList{`0})">
             <summary>
             Bulk modify models in the database
             </summary>

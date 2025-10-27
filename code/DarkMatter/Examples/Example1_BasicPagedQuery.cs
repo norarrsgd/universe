@@ -12,7 +12,7 @@ public class Example1_BasicPagedQuery(IGalaxy<MyObject> galaxy) : ExampleBase(ga
 	{
 		Console.WriteLine("\n=== EXAMPLE 1: Basic Paged Query ===\n");
 		(Gravity g1, IList<MyObject> results1) = await galaxy.Paged(
-			page: new Q.Page(50),
+			page: new(50),
 			clusters:
 			[
 				new(Catalysts:

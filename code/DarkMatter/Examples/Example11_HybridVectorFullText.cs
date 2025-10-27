@@ -270,7 +270,7 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
 			Console.WriteLine($"  Item {i + 1}: {item.Code} - {item.Name}");
 			Console.WriteLine($"    Category: {item.Category}, Price: ${item.Price:F2}");
 
-			if (!string.IsNullOrEmpty(item.Description))
+			if (!string.IsNullOrWhiteSpace(item.Description))
 			{
 				string desc = item.Description.Length > 80
 					? $"{item.Description[..80]}..."

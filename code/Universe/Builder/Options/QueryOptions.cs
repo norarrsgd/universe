@@ -6,6 +6,9 @@ public struct Q
 	/// <summary>Query Limits</summary>
 	public struct Limits
 	{
+		/// <summary>Maximum number of items return for vector search queries</summary>
+		public const int MaxVectorItems = 50;
+		
 		/// <summary>Maximum number of items to return</summary>
 		public const int MaxItems = 1000;
 

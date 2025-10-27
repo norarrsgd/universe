@@ -31,7 +31,7 @@ public abstract class GalaxyProcedure(
 		{
 			StoredProcedureExecuteResponse<T> response = await _container.Scripts.ExecuteStoredProcedureAsync<T>(
 				procedureName,
-				new PartitionKey(partitionKey),
+				new(partitionKey),
 				parameters
 			);
 			return (new(response.RequestCharge, null), response.Resource);
