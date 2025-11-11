@@ -20,12 +20,15 @@ internal class UniverseBuilder(bool recordQueries)
 
 	internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
 	{
+		// Sanitize and validate input identifiers
+		SanitizeInputs(clusters, columnOptions, sorting, groups);
+
 		// Column Options Builder
 		string columnsInQuery = "*";
 		if (columnOptions is not null)
 		{
 			if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
-				columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c.{c}"));
+				columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => FormatProperty("c", c)));
 
 			if (columnOptions.Value.Top > 0)
 				columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
@@ -40,17 +43,11 @@ internal class UniverseBuilder(bool recordQueries)
 
 				groups ??= [];
 				List<string> formattedGroup = [];
-				foreach (string group in groups)
-				{
-					if (!group.StartsWith("c."))
-						formattedGroup.Add($"c.{group}");
-					else
-						formattedGroup.Add(group);
-				}
+				formattedGroup.AddRange(groups.Select(group => FormatProperty("c", group)));
 
 				groups = [.. formattedGroup.Distinct()];
 
-				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c.{n}")).Distinct()];
+				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => FormatProperty("c", n))).Distinct()];
 
 				if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
 					throw new UniverseException("Aggregate columns must not be null or empty.");
@@ -60,10 +57,10 @@ internal class UniverseBuilder(bool recordQueries)
 					string toAppend = aggregate.Aggregate switch
 					{
 						Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), "c", aggregate.Column),
-						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), "c", aggregate.Column),
-						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), "c", aggregate.Column),
-						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), "c", aggregate.Column),
+						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
 						_ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
 					};
 
@@ -87,13 +84,17 @@ internal class UniverseBuilder(bool recordQueries)
 			switch (vectorDistanceCatalysts.Count)
 			{
 				case > 1:
-					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
-						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
+					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
+					{
+						string alias = catalyst.Alias ?? "c";
+						return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
+					});
 					break;
 				case 1:
 				{
 					Catalyst catalyst = vectorDistanceCatalysts.First();
-					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+					string alias = catalyst.Alias ?? "c";
+					columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
 					break;
 				}
 			}
@@ -113,7 +114,7 @@ internal class UniverseBuilder(bool recordQueries)
 			// Add join columns to the select if specified
 			if (join.Columns?.Any() == true)
 			{
-				string joinColumns = string.Join(", ", join.Columns.Select(col => $"{join.Alias}.{col}"));
+				string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
 				columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -128,10 +129,10 @@ internal class UniverseBuilder(bool recordQueries)
 					string toAppend = aggregate.Aggregate switch
 					{
 						Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), join.Alias, aggregate.Column),
-						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), join.Alias, aggregate.Column),
-						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), join.Alias, aggregate.Column),
-						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), join.Alias, aggregate.Column),
+						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
 						_ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
 					};
 
@@ -142,7 +143,7 @@ internal class UniverseBuilder(bool recordQueries)
 
 				// Add join columns to GROUP BY
 				if (join.Columns?.Any() == true)
-					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => $"{join.Alias}.{col}"))];
+					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => FormatProperty(join.Alias, col)))];
 
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -200,16 +201,16 @@ internal class UniverseBuilder(bool recordQueries)
 		if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
 		{
 			// Make sure that the clusters do not have VectorDistance or FTScore operator
-			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
+			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
 				throw new UniverseException("Sorting scalar fields is not supported in the presence of rank catalysts.");
 
-			queryBuilder.Append($" ORDER BY c.{sorting[0].Column} {sorting[0].Direction.Value()}");
+			queryBuilder.Append($" ORDER BY {FormatProperty("c", sorting[0].Column)} {sorting[0].Direction.Value()}");
 			foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column))
-				queryBuilder.Append($", c.{sort.Column} {sort.Direction.Value()}");
+				queryBuilder.Append($", {FormatProperty("c", sort.Column)} {sort.Direction.Value()}");
 		}
-		else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
+		else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
 		{
-			List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance || catalyst.Operator is Q.Operator.FTScore)];
+			List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)];
 
 			if (rankCatalysts.Count > 1)
 			{
@@ -221,10 +222,10 @@ internal class UniverseBuilder(bool recordQueries)
 						queryBuilder.Append(", ");
 
 					if (catalyst.Operator is Q.Operator.VectorDistance)
-						queryBuilder.Append($"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+						queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{catalyst.ParameterName()})");
 					else if (catalyst.Operator is Q.Operator.FTScore)
 					{
-						queryBuilder.Append($"{catalyst.Operator.Value()}(c.{catalyst.Column}, ");
+						queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
 						if (catalyst.Value is IEnumerable<string> stringVals)
 							queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 						else
@@ -260,14 +261,14 @@ internal class UniverseBuilder(bool recordQueries)
 				Catalyst catalyst = rankCatalysts.First();
 				if (catalyst.Operator is Q.Operator.FTScore)
 				{
-					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column}, ");
+					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
 					if (catalyst.Value is IEnumerable<string> stringVals)
 						queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 
 					queryBuilder.Append(')');
 				}
 				else
-					queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+					queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{catalyst.ParameterName()})");
 			}
 		}
 
@@ -296,24 +297,150 @@ internal class UniverseBuilder(bool recordQueries)
 		return query;
 	}
 
+	private static void SanitizeInputs(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups)
+	{
+		// Validate column options
+		if (columnOptions.HasValue)
+		{
+			if (columnOptions.Value.Names is not null)
+			{
+				foreach (string columnName in columnOptions.Value.Names)
+					ValidateIdentifier(columnName, "ColumnOption.Names");
+			}
+
+			if (columnOptions.Value.Aggregates is not null)
+			{
+				foreach (AggregationOption aggregate in columnOptions.Value.Aggregates)
+					ValidateIdentifier(aggregate.Column, "AggregationOption.Column");
+			}
+
+			if (columnOptions.Value.Join is not null)
+			{
+				JoinOptions join = columnOptions.Value.Join;
+				ValidateIdentifier(join.Alias, "JoinOptions.Alias");
+				ValidateIdentifier(join.ArrayPath, "JoinOptions.ArrayPath");
+
+				if (join.Columns is not null)
+				{
+					foreach (string column in join.Columns)
+						ValidateIdentifier(column, "JoinOptions.Columns");
+				}
+
+				if (join.Aggregates is not null)
+				{
+					foreach (AggregationOption aggregate in join.Aggregates)
+						ValidateIdentifier(aggregate.Column, "JoinOptions.Aggregates.Column");
+				}
+			}
+		}
+
+		// Validate cluster catalysts
+		if (clusters is not null)
+		{
+			foreach (Cluster cluster in clusters.Where(c => c.Catalysts is not null))
+			{
+				foreach (Catalyst catalyst in cluster.Catalysts)
+				{
+					ValidateIdentifier(catalyst.Column, "Catalyst.Column");
+					if (!string.IsNullOrWhiteSpace(catalyst.Alias))
+						ValidateIdentifier(catalyst.Alias, "Catalyst.Alias");
+				}
+			}
+		}
+
+		// Validate sorting columns
+		if (sorting is not null)
+		{
+			foreach (Sorting.Option sort in sorting)
+			{
+				// Skip validation for weight values that are already bracket-wrapped like [FieldName]
+				// or WEIGHTED direction columns (used in ORDER BY RANK), as these are intentionally
+				// formatted for ORDER BY RANK and not raw user identifiers
+				if (sort.Direction is not Sorting.Direction.WEIGHTED)
+					ValidateIdentifier(sort.Column, "Sorting.Column");
+			}
+		}
+
+		// Validate group columns
+		if (groups is not null)
+		{
+			foreach (string group in groups)
+				ValidateIdentifier(group, "Group");
+		}
+	}
+
+	private static void ValidateIdentifier(string identifier, string parameterName)
+	{
+		if (string.IsNullOrWhiteSpace(identifier))
+			throw new UniverseException($"{parameterName} cannot be null or empty.");
+
+		// Reject identifiers that consist solely of dots (e.g., ".", "..", "...")
+		// These would produce invalid SQL when processed by FormatProperty
+		if (identifier.All(c => c == '.'))
+			throw new UniverseException($"{parameterName} cannot consist solely of dots.");
+
+		// Check for suspicious patterns that might indicate SQL injection attempts
+		if (identifier.Contains(';') || identifier.Contains("--") || identifier.Contains("/*") || identifier.Contains("*/"))
+			throw new UniverseException($"{parameterName} contains invalid characters. SQL injection attempt detected.");
+
+		// Reject double-quote and closing bracket characters which can break bracketed identifiers.
+		// Bracket escape patterns include:
+		//   - c] OR 1=1 -- (closes bracket, adds condition, comments rest)
+		//   - name"], [c.id (closes bracket+quote, opens new bracket)
+		//   - items] OR 1=1 -- (closes bracket, adds SQL condition)
+		// Both "] and ] characters must be rejected unconditionally to prevent all bracket escape attacks.
+		if (identifier.Contains('"'))
+			throw new UniverseException($"{parameterName} contains double-quote (\") characters, which are not allowed in identifiers.");
+		if (identifier.Contains(']'))
+			throw new UniverseException($"{parameterName} contains closing bracket (]) characters, which are not allowed in identifiers.");
+
+		// Ensure the identifier doesn't exceed a reasonable length
+		// Per Azure Cosmos DB documentation: database/container names are limited to 255 characters
+		// Document properties have no practical limit, but we enforce this as a sanity check
+		if (identifier.Length > 255)
+			throw new UniverseException($"{parameterName} exceeds maximum identifier length of 255 characters.");
+
+		// Reject control characters which could lead to query corruption
+		if (identifier.Any(char.IsControl))
+			throw new UniverseException($"{parameterName} contains control characters.");
+	}
+
 	private static string WhereClauseBuilder(Catalyst catalyst)
 	{
 		string alias = catalyst.Alias ?? "c";
+		string formattedProperty = FormatProperty(alias, catalyst.Column);
 		return catalyst.Operator switch
 		{
 			Q.Operator.In or
-				Q.Operator.NotIn => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}, @{catalyst.ParameterName()})",
-			Q.Operator.Len => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}) = @{catalyst.ParameterName()}",
+				Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
+			Q.Operator.Len => $"{catalyst.Operator.Value()}({formattedProperty}) = @{catalyst.ParameterName()}",
 			Q.Operator.Defined or
-				Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column})",
+				Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({formattedProperty})",
 			Q.Operator.FTContains or
 				Q.Operator.NotFTContains or
 				Q.Operator.FTContainsAll or
 				Q.Operator.NotFTContainsAll or
 				Q.Operator.FTContainsAny or
-				Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}, @{catalyst.ParameterName()})",
-			_ => $"{alias}.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
+				Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
+			_ => $"{formattedProperty} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
 		};
+	}
+
+	private static string FormatProperty(string alias, string column)
+	{
+		// Handle nested JSON paths by splitting on '.' and wrapping each segment
+		// Example: "metadata.sku" becomes alias["metadata"]["sku"]
+
+		string[] segments = column.Split('.');
+		StringBuilder result = new(alias);
+
+		foreach (string segment in segments)
+		{
+			if (!string.IsNullOrWhiteSpace(segment))
+				result.Append($"[\"{segment}\"]");
+		}
+
+		return result.ToString();
 	}
 
 	internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
