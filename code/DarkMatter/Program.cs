@@ -60,6 +60,7 @@ class Program
 		totalRu += await new Example11_HybridVectorFullText(vectorGalaxy).RunAsync();
 		totalRu += await new Example12_QueryGeneration(galaxy).RunAsync();
 		totalRu += await new Example13_QueryOptimization(vectorGalaxy).RunAsync();
+		totalRu += await new Example14_SqlInjectionProtection(galaxy).RunAsync();
 
 		// Display summary information
 		Console.WriteLine($"\nTotal RU spent across all examples: {totalRu}");
