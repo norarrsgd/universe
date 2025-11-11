@@ -57,10 +57,10 @@ internal class UniverseBuilder(bool recordQueries)
 					string toAppend = aggregate.Aggregate switch
 					{
 						Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), "c", FormatProperty("c", aggregate.Column)),
-						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), "c", FormatProperty("c", aggregate.Column)),
-						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), "c", FormatProperty("c", aggregate.Column)),
-						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), "c", FormatProperty("c", aggregate.Column)),
+						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
 						_ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
 					};
 
@@ -125,10 +125,10 @@ internal class UniverseBuilder(bool recordQueries)
 					string toAppend = aggregate.Aggregate switch
 					{
 						Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
-						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
-						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
-						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
+						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
 						_ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
 					};
 
