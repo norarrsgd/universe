@@ -376,6 +376,10 @@ internal class UniverseBuilder(bool recordQueries)
 		if (identifier.Contains("], "))
 			throw new UniverseException($"{parameterName} contains bracket escape patterns which could indicate SQL injection attempt.");
 
+		// Reject double-quote characters which can break bracketed identifiers
+		if (identifier.Contains('"'))
+			throw new UniverseException($"{parameterName} contains double-quote (\") characters, which are not allowed in identifiers.");
+
 		// Ensure the identifier doesn't exceed a reasonable length
 		// Per Azure Cosmos DB documentation: database/container names are limited to 255 characters
 		// Document properties have no practical limit, but we enforce this as a sanity check
