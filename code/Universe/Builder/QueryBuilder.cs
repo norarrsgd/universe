@@ -333,16 +333,13 @@ internal class UniverseBuilder(bool recordQueries)
 		// Validate cluster catalysts
 		if (clusters is not null)
 		{
-			foreach (Cluster cluster in clusters)
+			foreach (Cluster cluster in clusters.Where(c => c.Catalysts is not null))
 			{
-				if (cluster.Catalysts is not null)
+				foreach (Catalyst catalyst in cluster.Catalysts)
 				{
-					foreach (Catalyst catalyst in cluster.Catalysts)
-					{
-						ValidateIdentifier(catalyst.Column, "Catalyst.Column");
-						if (!string.IsNullOrWhiteSpace(catalyst.Alias))
-							ValidateIdentifier(catalyst.Alias, "Catalyst.Alias");
-					}
+					ValidateIdentifier(catalyst.Column, "Catalyst.Column");
+					if (!string.IsNullOrWhiteSpace(catalyst.Alias))
+						ValidateIdentifier(catalyst.Alias, "Catalyst.Alias");
 				}
 			}
 		}
@@ -371,14 +368,16 @@ internal class UniverseBuilder(bool recordQueries)
 		if (identifier.Contains(';') || identifier.Contains("--") || identifier.Contains("/*") || identifier.Contains("*/"))
 			throw new UniverseException($"{parameterName} contains invalid characters. SQL injection attempt detected.");
 
-		// Check for the specific bracket escape pattern used in injection attacks
-		// Block "], [" which is used to break out of bracketed identifiers and start new ones
-		if (identifier.Contains("], "))
-			throw new UniverseException($"{parameterName} contains bracket escape patterns which could indicate SQL injection attempt.");
-
-		// Reject double-quote characters which can break bracketed identifiers
+		// Reject double-quote and closing bracket characters which can break bracketed identifiers.
+		// Bracket escape patterns include:
+		//   - c] OR 1=1 -- (closes bracket, adds condition, comments rest)
+		//   - name"], [c.id (closes bracket+quote, opens new bracket)
+		//   - items] OR 1=1 -- (closes bracket, adds SQL condition)
+		// Both "] and ] characters must be rejected unconditionally to prevent all bracket escape attacks.
 		if (identifier.Contains('"'))
 			throw new UniverseException($"{parameterName} contains double-quote (\") characters, which are not allowed in identifiers.");
+		if (identifier.Contains(']'))
+			throw new UniverseException($"{parameterName} contains closing bracket (]) characters, which are not allowed in identifiers.");
 
 		// Ensure the identifier doesn't exceed a reasonable length
 		// Per Azure Cosmos DB documentation: database/container names are limited to 255 characters
