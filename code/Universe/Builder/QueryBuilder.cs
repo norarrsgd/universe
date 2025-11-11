@@ -28,7 +28,7 @@ internal class UniverseBuilder(bool recordQueries)
 		if (columnOptions is not null)
 		{
 			if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
-				columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c[\"{c}\"]"));
+				columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => FormatProperty("c", c)));
 
 			if (columnOptions.Value.Top > 0)
 				columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
@@ -43,11 +43,11 @@ internal class UniverseBuilder(bool recordQueries)
 
 				groups ??= [];
 				List<string> formattedGroup = [];
-				formattedGroup.AddRange(groups.Select(group => $"c[\"{group}\"]"));
+				formattedGroup.AddRange(groups.Select(group => FormatProperty("c", group)));
 
 				groups = [.. formattedGroup.Distinct()];
 
-				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c[\"{n}\"]")).Distinct()];
+				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => FormatProperty("c", n))).Distinct()];
 
 				if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
 					throw new UniverseException("Aggregate columns must not be null or empty.");
@@ -57,10 +57,10 @@ internal class UniverseBuilder(bool recordQueries)
 					string toAppend = aggregate.Aggregate switch
 					{
 						Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), "c", aggregate.Column),
-						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), "c", aggregate.Column),
-						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), "c", aggregate.Column),
-						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), "c", aggregate.Column),
+						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), "c", FormatProperty("c", aggregate.Column)),
+						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), "c", FormatProperty("c", aggregate.Column)),
+						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), "c", FormatProperty("c", aggregate.Column)),
+						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), "c", FormatProperty("c", aggregate.Column)),
 						_ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
 					};
 
@@ -85,12 +85,12 @@ internal class UniverseBuilder(bool recordQueries)
 			{
 				case > 1:
 					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
-						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
+						=> $"{current}, {catalyst.Operator.Value()}({FormatProperty(catalyst.Alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
 					break;
 				case 1:
 				{
 					Catalyst catalyst = vectorDistanceCatalysts.First();
-					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+					columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(catalyst.Alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
 					break;
 				}
 			}
@@ -110,7 +110,7 @@ internal class UniverseBuilder(bool recordQueries)
 			// Add join columns to the select if specified
 			if (join.Columns?.Any() == true)
 			{
-				string joinColumns = string.Join(", ", join.Columns.Select(col => $"{join.Alias}[\"{col}\"]"));
+				string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
 				columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -125,10 +125,10 @@ internal class UniverseBuilder(bool recordQueries)
 					string toAppend = aggregate.Aggregate switch
 					{
 						Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), join.Alias, aggregate.Column),
-						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), join.Alias, aggregate.Column),
-						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), join.Alias, aggregate.Column),
-						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), join.Alias, aggregate.Column),
+						Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
+						Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
+						Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
+						Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), join.Alias, FormatProperty(join.Alias, aggregate.Column)),
 						_ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
 					};
 
@@ -139,7 +139,7 @@ internal class UniverseBuilder(bool recordQueries)
 
 				// Add join columns to GROUP BY
 				if (join.Columns?.Any() == true)
-					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => $"{join.Alias}[\"{col}\"]"))];
+					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => FormatProperty(join.Alias, col)))];
 
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -200,9 +200,9 @@ internal class UniverseBuilder(bool recordQueries)
 			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
 				throw new UniverseException("Sorting scalar fields is not supported in the presence of rank catalysts.");
 
-			queryBuilder.Append($" ORDER BY c[\"{sorting[0].Column}\"] {sorting[0].Direction.Value()}");
+			queryBuilder.Append($" ORDER BY {FormatProperty("c", sorting[0].Column)} {sorting[0].Direction.Value()}");
 			foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column))
-				queryBuilder.Append($", c[\"{sort.Column}\"] {sort.Direction.Value()}");
+				queryBuilder.Append($", {FormatProperty("c", sort.Column)} {sort.Direction.Value()}");
 		}
 		else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
 		{
@@ -218,10 +218,10 @@ internal class UniverseBuilder(bool recordQueries)
 						queryBuilder.Append(", ");
 
 					if (catalyst.Operator is Q.Operator.VectorDistance)
-						queryBuilder.Append($"{catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], @{catalyst.ParameterName()})");
+						queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{catalyst.ParameterName()})");
 					else if (catalyst.Operator is Q.Operator.FTScore)
 					{
-						queryBuilder.Append($"{catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], ");
+						queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
 						if (catalyst.Value is IEnumerable<string> stringVals)
 							queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 						else
@@ -257,14 +257,14 @@ internal class UniverseBuilder(bool recordQueries)
 				Catalyst catalyst = rankCatalysts.First();
 				if (catalyst.Operator is Q.Operator.FTScore)
 				{
-					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], ");
+					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
 					if (catalyst.Value is IEnumerable<string> stringVals)
 						queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 
 					queryBuilder.Append(')');
 				}
 				else
-					queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], @{catalyst.ParameterName()})");
+					queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{catalyst.ParameterName()})");
 			}
 		}
 
@@ -393,21 +393,39 @@ internal class UniverseBuilder(bool recordQueries)
 	private static string WhereClauseBuilder(Catalyst catalyst)
 	{
 		string alias = catalyst.Alias ?? "c";
+		string formattedProperty = FormatProperty(alias, catalyst.Column);
 		return catalyst.Operator switch
 		{
 			Q.Operator.In or
-				Q.Operator.NotIn => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()})",
-			Q.Operator.Len => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"]) = @{catalyst.ParameterName()}",
+				Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
+			Q.Operator.Len => $"{catalyst.Operator.Value()}({formattedProperty}) = @{catalyst.ParameterName()}",
 			Q.Operator.Defined or
-				Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"])",
+				Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({formattedProperty})",
 			Q.Operator.FTContains or
 				Q.Operator.NotFTContains or
 				Q.Operator.FTContainsAll or
 				Q.Operator.NotFTContainsAll or
 				Q.Operator.FTContainsAny or
-				Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()})",
-			_ => $"{alias}[\"{catalyst.Column}\"] {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
+				Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
+			_ => $"{formattedProperty} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
 		};
+	}
+
+	private static string FormatProperty(string alias, string column)
+	{
+		// Handle nested JSON paths by splitting on '.' and wrapping each segment
+		// Example: "metadata.sku" becomes alias["metadata"]["sku"]
+
+		string[] segments = column.Split('.');
+		StringBuilder result = new(alias);
+
+		foreach (string segment in segments)
+		{
+			if (!string.IsNullOrWhiteSpace(segment))
+				result.Append($"[\"{segment}\"]");
+		}
+
+		return result.ToString();
 	}
 
 	internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
