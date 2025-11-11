@@ -348,7 +348,13 @@ internal class UniverseBuilder(bool recordQueries)
 		if (sorting is not null)
 		{
 			foreach (Sorting.Option sort in sorting)
-				ValidateIdentifier(sort.Column, "Sorting.Column");
+			{
+				// Skip validation for weight values that are already bracket-wrapped like [FieldName]
+				// or WEIGHTED direction columns (used in ORDER BY RANK), as these are intentionally
+				// formatted for ORDER BY RANK and not raw user identifiers
+				if (!(sort.Column.StartsWith('[') && sort.Column.EndsWith(']')) && sort.Direction is not Sorting.Direction.WEIGHTED)
+					ValidateIdentifier(sort.Column, "Sorting.Column");
+			}
 		}
 
 		// Validate group columns
