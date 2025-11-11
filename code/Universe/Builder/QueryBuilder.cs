@@ -84,13 +84,17 @@ internal class UniverseBuilder(bool recordQueries)
 			switch (vectorDistanceCatalysts.Count)
 			{
 				case > 1:
-					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
-						=> $"{current}, {catalyst.Operator.Value()}({FormatProperty(catalyst.Alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
+					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
+					{
+						string alias = catalyst.Alias ?? "c";
+						return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
+					});
 					break;
 				case 1:
 				{
 					Catalyst catalyst = vectorDistanceCatalysts.First();
-					columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(catalyst.Alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+					string alias = catalyst.Alias ?? "c";
+					columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
 					break;
 				}
 			}
@@ -352,7 +356,7 @@ internal class UniverseBuilder(bool recordQueries)
 				// Skip validation for weight values that are already bracket-wrapped like [FieldName]
 				// or WEIGHTED direction columns (used in ORDER BY RANK), as these are intentionally
 				// formatted for ORDER BY RANK and not raw user identifiers
-				if (!(sort.Column.StartsWith('[') && sort.Column.EndsWith(']')) && sort.Direction is not Sorting.Direction.WEIGHTED)
+				if (sort.Direction is not Sorting.Direction.WEIGHTED)
 					ValidateIdentifier(sort.Column, "Sorting.Column");
 			}
 		}
@@ -369,6 +373,11 @@ internal class UniverseBuilder(bool recordQueries)
 	{
 		if (string.IsNullOrWhiteSpace(identifier))
 			throw new UniverseException($"{parameterName} cannot be null or empty.");
+
+		// Reject identifiers that consist solely of dots (e.g., ".", "..", "...")
+		// These would produce invalid SQL when processed by FormatProperty
+		if (identifier.All(c => c == '.'))
+			throw new UniverseException($"{parameterName} cannot consist solely of dots.");
 
 		// Check for suspicious patterns that might indicate SQL injection attempts
 		if (identifier.Contains(';') || identifier.Contains("--") || identifier.Contains("/*") || identifier.Contains("*/"))
