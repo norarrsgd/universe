@@ -20,6 +20,9 @@ internal class UniverseBuilder(bool recordQueries)
 
 	internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
 	{
+		// Sanitize and validate input identifiers
+		SanitizeInputs(clusters, columnOptions, sorting, groups);
+
 		// Column Options Builder
 		string columnsInQuery = "*";
 		if (columnOptions is not null)
@@ -288,6 +291,95 @@ internal class UniverseBuilder(bool recordQueries)
 		}
 
 		return query;
+	}
+
+	private static void SanitizeInputs(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups)
+	{
+		// Validate column options
+		if (columnOptions.HasValue)
+		{
+			if (columnOptions.Value.Names is not null)
+			{
+				foreach (string columnName in columnOptions.Value.Names)
+					ValidateIdentifier(columnName, "ColumnOption.Names");
+			}
+
+			if (columnOptions.Value.Aggregates is not null)
+			{
+				foreach (AggregationOption aggregate in columnOptions.Value.Aggregates)
+					ValidateIdentifier(aggregate.Column, "AggregationOption.Column");
+			}
+
+			if (columnOptions.Value.Join is not null)
+			{
+				JoinOptions join = columnOptions.Value.Join;
+				ValidateIdentifier(join.Alias, "JoinOptions.Alias");
+				ValidateIdentifier(join.ArrayPath, "JoinOptions.ArrayPath");
+
+				if (join.Columns is not null)
+				{
+					foreach (string column in join.Columns)
+						ValidateIdentifier(column, "JoinOptions.Columns");
+				}
+
+				if (join.Aggregates is not null)
+				{
+					foreach (AggregationOption aggregate in join.Aggregates)
+						ValidateIdentifier(aggregate.Column, "JoinOptions.Aggregates.Column");
+				}
+			}
+		}
+
+		// Validate cluster catalysts
+		if (clusters is not null)
+		{
+			foreach (Cluster cluster in clusters)
+			{
+				if (cluster.Catalysts is not null)
+				{
+					foreach (Catalyst catalyst in cluster.Catalysts)
+					{
+						ValidateIdentifier(catalyst.Column, "Catalyst.Column");
+						if (!string.IsNullOrWhiteSpace(catalyst.Alias))
+							ValidateIdentifier(catalyst.Alias, "Catalyst.Alias");
+					}
+				}
+			}
+		}
+
+		// Validate sorting columns
+		if (sorting is not null)
+		{
+			foreach (Sorting.Option sort in sorting)
+				ValidateIdentifier(sort.Column, "Sorting.Column");
+		}
+
+		// Validate group columns
+		if (groups is not null)
+		{
+			foreach (string group in groups)
+				ValidateIdentifier(group, "Group");
+		}
+	}
+
+	private static void ValidateIdentifier(string identifier, string parameterName)
+	{
+		if (string.IsNullOrWhiteSpace(identifier))
+			throw new UniverseException($"{parameterName} cannot be null or empty.");
+
+		// Check for suspicious patterns that might indicate SQL injection attempts
+		if (identifier.Contains(';') || identifier.Contains("--") || identifier.Contains("/*") || identifier.Contains("*/"))
+			throw new UniverseException($"{parameterName} contains invalid characters. SQL injection attempt detected.");
+
+		// Ensure the identifier doesn't exceed a reasonable length
+		// Per Azure Cosmos DB documentation: database/container names are limited to 255 characters
+		// Document properties have no practical limit, but we enforce this as a sanity check
+		if (identifier.Length > 255)
+			throw new UniverseException($"{parameterName} exceeds maximum identifier length of 255 characters.");
+
+		// Reject control characters which could lead to query corruption
+		if (identifier.Any(char.IsControl))
+			throw new UniverseException($"{parameterName} contains control characters.");
 	}
 
 	private static string WhereClauseBuilder(Catalyst catalyst)
