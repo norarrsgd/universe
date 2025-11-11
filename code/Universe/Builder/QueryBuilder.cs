@@ -25,7 +25,7 @@ internal class UniverseBuilder(bool recordQueries)
 		if (columnOptions is not null)
 		{
 			if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
-				columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c.{c}"));
+				columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => $"c[\"{c}\"]"));
 
 			if (columnOptions.Value.Top > 0)
 				columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
@@ -40,17 +40,11 @@ internal class UniverseBuilder(bool recordQueries)
 
 				groups ??= [];
 				List<string> formattedGroup = [];
-				foreach (string group in groups)
-				{
-					if (!group.StartsWith("c."))
-						formattedGroup.Add($"c.{group}");
-					else
-						formattedGroup.Add(group);
-				}
+				formattedGroup.AddRange(groups.Select(group => $"c[\"{group}\"]"));
 
 				groups = [.. formattedGroup.Distinct()];
 
-				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c.{n}")).Distinct()];
+				groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => $"c[\"{n}\"]")).Distinct()];
 
 				if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
 					throw new UniverseException("Aggregate columns must not be null or empty.");
@@ -88,12 +82,12 @@ internal class UniverseBuilder(bool recordQueries)
 			{
 				case > 1:
 					columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst)
-						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
+						=> $"{current}, {catalyst.Operator.Value()}({catalyst.Alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}");
 					break;
 				case 1:
 				{
 					Catalyst catalyst = vectorDistanceCatalysts.First();
-					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}.{catalyst.Column}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+					columnsInQuery += $", {catalyst.Operator.Value()}({catalyst.Alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
 					break;
 				}
 			}
@@ -113,7 +107,7 @@ internal class UniverseBuilder(bool recordQueries)
 			// Add join columns to the select if specified
 			if (join.Columns?.Any() == true)
 			{
-				string joinColumns = string.Join(", ", join.Columns.Select(col => $"{join.Alias}.{col}"));
+				string joinColumns = string.Join(", ", join.Columns.Select(col => $"{join.Alias}[\"{col}\"]"));
 				columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -142,7 +136,7 @@ internal class UniverseBuilder(bool recordQueries)
 
 				// Add join columns to GROUP BY
 				if (join.Columns?.Any() == true)
-					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => $"{join.Alias}.{col}"))];
+					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => $"{join.Alias}[\"{col}\"]"))];
 
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
@@ -200,16 +194,16 @@ internal class UniverseBuilder(bool recordQueries)
 		if (sorting is not null && sorting.Any(s => s.Direction is not Sorting.Direction.WEIGHTED))
 		{
 			// Make sure that the clusters do not have VectorDistance or FTScore operator
-			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
+			if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
 				throw new UniverseException("Sorting scalar fields is not supported in the presence of rank catalysts.");
 
-			queryBuilder.Append($" ORDER BY c.{sorting[0].Column} {sorting[0].Direction.Value()}");
+			queryBuilder.Append($" ORDER BY c[\"{sorting[0].Column}\"] {sorting[0].Direction.Value()}");
 			foreach (Sorting.Option sort in sorting.Where(s => s.Column != sorting[0].Column))
-				queryBuilder.Append($", c.{sort.Column} {sort.Direction.Value()}");
+				queryBuilder.Append($", c[\"{sort.Column}\"] {sort.Direction.Value()}");
 		}
-		else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance || cat.Operator is Q.Operator.FTScore)))
+		else if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)))
 		{
-			List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance || catalyst.Operator is Q.Operator.FTScore)];
+			List<Catalyst> rankCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore)];
 
 			if (rankCatalysts.Count > 1)
 			{
@@ -221,10 +215,10 @@ internal class UniverseBuilder(bool recordQueries)
 						queryBuilder.Append(", ");
 
 					if (catalyst.Operator is Q.Operator.VectorDistance)
-						queryBuilder.Append($"{catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+						queryBuilder.Append($"{catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], @{catalyst.ParameterName()})");
 					else if (catalyst.Operator is Q.Operator.FTScore)
 					{
-						queryBuilder.Append($"{catalyst.Operator.Value()}(c.{catalyst.Column}, ");
+						queryBuilder.Append($"{catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], ");
 						if (catalyst.Value is IEnumerable<string> stringVals)
 							queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 						else
@@ -260,14 +254,14 @@ internal class UniverseBuilder(bool recordQueries)
 				Catalyst catalyst = rankCatalysts.First();
 				if (catalyst.Operator is Q.Operator.FTScore)
 				{
-					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c.{catalyst.Column}, ");
+					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], ");
 					if (catalyst.Value is IEnumerable<string> stringVals)
 						queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
 
 					queryBuilder.Append(')');
 				}
 				else
-					queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c.{catalyst.Column}, @{catalyst.ParameterName()})");
+					queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}(c[\"{catalyst.Column}\"], @{catalyst.ParameterName()})");
 			}
 		}
 
@@ -302,17 +296,17 @@ internal class UniverseBuilder(bool recordQueries)
 		return catalyst.Operator switch
 		{
 			Q.Operator.In or
-				Q.Operator.NotIn => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}, @{catalyst.ParameterName()})",
-			Q.Operator.Len => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}) = @{catalyst.ParameterName()}",
+				Q.Operator.NotIn => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()})",
+			Q.Operator.Len => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"]) = @{catalyst.ParameterName()}",
 			Q.Operator.Defined or
-				Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column})",
+				Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"])",
 			Q.Operator.FTContains or
 				Q.Operator.NotFTContains or
 				Q.Operator.FTContainsAll or
 				Q.Operator.NotFTContainsAll or
 				Q.Operator.FTContainsAny or
-				Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({alias}.{catalyst.Column}, @{catalyst.ParameterName()})",
-			_ => $"{alias}.{catalyst.Column} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
+				Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({alias}[\"{catalyst.Column}\"], @{catalyst.ParameterName()})",
+			_ => $"{alias}[\"{catalyst.Column}\"] {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
 		};
 	}
 
