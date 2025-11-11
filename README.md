@@ -4,7 +4,7 @@ A simpler way of querying a CosmosDb Namespace
 ## Installation
 
 ```
-dotnet add package Universe
+dotnet add package UniverseQuery
 ```
 
 ## How-to:
