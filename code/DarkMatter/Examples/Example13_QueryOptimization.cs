@@ -16,7 +16,7 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
 
 	public async Task<double> RunAsync()
 	{
-		Console.WriteLine("=== Query Execution Strategy Examples ===\n");
+		Console.WriteLine("=== EXAMPLE 13: Query Execution Strategy Examples ===\n");
 
 		double totalRU = 0;
 
@@ -98,17 +98,36 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
 		Console.WriteLine($"Results: {results3.Count}");
 		Console.WriteLine();
 
-		// Example 4: Get optimization recommendations
+		// Example 4: Get optimization recommendations (adaptive learning)
 		Console.WriteLine("4. Query Optimization Recommendations:");
 		QueryTuningRecommendations recommendations = galaxy.GetQueryRecommendations("category_filter", QueryType.Simple);
 
+		Console.WriteLine($"Data-Driven: {recommendations.IsDataDriven}");
+		Console.WriteLine($"Sample Size: {recommendations.SampleSize}");
+
+		if (recommendations.AverageRU.HasValue)
+			Console.WriteLine($"Average RU: {recommendations.AverageRU:F2}");
+
+		if (recommendations.SuccessRate.HasValue)
+			Console.WriteLine($"Success Rate: {recommendations.SuccessRate:P2}");
+
+		if (recommendations.AverageExecutionTime.HasValue)
+			Console.WriteLine($"Average Execution Time: {recommendations.AverageExecutionTime.Value.TotalMilliseconds:F2}ms");
+
+		if (recommendations.RecommendedStrategy != null)
+			Console.WriteLine($"Recommended Strategy: {recommendations.RecommendedStrategy}");
+
 		if (recommendations.SuggestedHints != null && recommendations.SuggestedHints.Any())
 		{
-			Console.WriteLine($"Suggested Hints: {string.Join(", ", recommendations.SuggestedHints.Select(h => $"{h.Key}={h.Value}"))}");
+			Console.WriteLine("Suggested Hints:");
+			foreach (var hint in recommendations.SuggestedHints)
+			{
+				Console.WriteLine($"  {hint.Key} = {hint.Value}");
+			}
 		}
 		else
 		{
-			Console.WriteLine("Suggested Hints: None available (need more query history)");
+			Console.WriteLine("No specific hints suggested (need more query history for data-driven recommendations)");
 		}
 
 		Console.WriteLine();

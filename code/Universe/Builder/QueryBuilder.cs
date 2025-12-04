@@ -91,12 +91,12 @@ internal class UniverseBuilder(bool recordQueries)
 					});
 					break;
 				case 1:
-				{
-					Catalyst catalyst = vectorDistanceCatalysts.First();
-					string alias = catalyst.Alias ?? "c";
-					columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
-					break;
-				}
+					{
+						Catalyst catalyst = vectorDistanceCatalysts.First();
+						string alias = catalyst.Alias ?? "c";
+						columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+						break;
+					}
 			}
 		}
 
@@ -108,12 +108,16 @@ internal class UniverseBuilder(bool recordQueries)
 
 		if (columnOptions?.Join is not null)
 		{
+			// SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
+			// ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
 			JoinOptions join = columnOptions.Value.Join;
 			queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 
 			// Add join columns to the select if specified
 			if (join.Columns?.Any() == true)
 			{
+				// SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
+				// ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
 				string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
 				columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
@@ -145,6 +149,8 @@ internal class UniverseBuilder(bool recordQueries)
 				if (join.Columns?.Any() == true)
 					groups = [.. groups.Concat(join.Columns.Distinct().Select(col => FormatProperty(join.Alias, col)))];
 
+				// SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
+				// ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
 				queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
 			}
 		}
@@ -449,7 +455,7 @@ internal class UniverseBuilder(bool recordQueries)
 		QueryContext singleContext = context.Value with { MaxItemCount = 1 };
 
 		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, singleContext);
-		(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries);
+		(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries, _queryTuner);
 		T result = results.Count != 0 ? results.First() : default(T);
 		return (gravity, result);
 	}
@@ -458,7 +464,7 @@ internal class UniverseBuilder(bool recordQueries)
 	{
 		context ??= InferQueryContext(query);
 		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context.Value);
-		return await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries);
+		return await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries, _queryTuner);
 	}
 
 	internal QueryTuningRecommendations GetQueryRecommendations(QueryType queryType) => _queryTuner.GetRecommendations(queryType);

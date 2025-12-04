@@ -1,17 +1,180 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using Universe.Builder.Strategies.Storage;
+
 namespace Universe.Builder.Strategies;
 
 /// <summary>
-/// Provides query tuning recommendations based on query type
+/// Provides query tuning recommendations based on query type and historical performance
 /// </summary>
 internal sealed class QueryTuner
 {
-	public QueryTuningRecommendations GetRecommendations(QueryType queryType)
-	{
-		Dictionary<string, object> hints = GenerateHints(queryType);
+	private readonly ConcurrentQueue<QueryExecutionStatistics> _recentExecutions;
+	private readonly IQueryStatisticsStorage _storage;
+	private const int MaxStoredExecutions = 1000;
+	private const int MinSampleSizeForRecommendations = 10;
 
-		return new(SuggestedHints: hints);
+	public QueryTuner(IQueryStatisticsStorage storage = null)
+	{
+		_recentExecutions = new ConcurrentQueue<QueryExecutionStatistics>();
+		_storage = storage ?? new InMemoryStatisticsStorage();
+
+		// Load persisted statistics on startup (async, don't block constructor)
+		_ = Task.Run(LoadPersistedStatisticsAsync);
 	}
 
+	/// <summary>
+	/// Record a query execution for learning
+	/// </summary>
+	public void RecordExecution(QueryExecutionStatistics stats)
+	{
+		// Add to in-memory queue
+		_recentExecutions.Enqueue(stats);
+
+		// Maintain size limit
+		while (_recentExecutions.Count > MaxStoredExecutions)
+		{
+			_recentExecutions.TryDequeue(out _);
+		}
+
+		// Persist synchronously to ensure writes complete
+		// Using synchronous I/O for reliability - query recording happens after query completes
+		// so a small synchronous delay is acceptable for ensuring data persistence
+		try
+		{
+			_storage.SaveAsync(stats).Wait();
+		}
+		catch
+		{
+			// Silently ignore storage errors to not affect query execution
+		}
+	}
+
+	/// <summary>
+	/// Get recommendations for a query type
+	/// </summary>
+	public QueryTuningRecommendations GetRecommendations(QueryType queryType)
+	{
+		DateTime last24Hours = DateTime.UtcNow.AddHours(-24);
+
+		// Get relevant statistics from last 24 hours
+		List<QueryExecutionStatistics> relevantStats = _recentExecutions
+			.Where(s => s.Type == queryType && s.Timestamp >= last24Hours)
+			.ToList();
+
+		// If insufficient data, fall back to rule-based recommendations
+		if (relevantStats.Count < MinSampleSizeForRecommendations)
+		{
+			return GetRuleBasedRecommendations(queryType);
+		}
+
+		// Generate data-driven recommendations
+		return new QueryTuningRecommendations(
+			SuggestedHints: CalculateOptimalHints(relevantStats),
+			RecommendedStrategy: DetermineOptimalStrategy(relevantStats),
+			AverageRU: relevantStats.Average(s => s.RU),
+			SuccessRate: relevantStats.Count(s => s.Success) / (double)relevantStats.Count,
+			SampleSize: relevantStats.Count,
+			AverageExecutionTime: TimeSpan.FromMilliseconds(
+				relevantStats.Average(s => s.ExecutionTime.TotalMilliseconds)
+			),
+			IsDataDriven: true
+		);
+	}
+
+	/// <summary>
+	/// Compute hash for query pattern recognition
+	/// </summary>
+	public static string ComputeQueryHash(QueryContext context, string queryText)
+	{
+		// Hash the query structure (not the values) for pattern recognition
+		string signature = $"{context.Type}|{queryText.Length}|{queryText.GetHashCode()}";
+		using SHA256 sha256 = SHA256.Create();
+		byte[] bytes = Encoding.UTF8.GetBytes(signature);
+		byte[] hash = sha256.ComputeHash(bytes);
+		return Convert.ToBase64String(hash)[..16]; // Take first 16 chars
+	}
+
+	/// <summary>
+	/// Fallback to rule-based recommendations (v3.1.x behavior)
+	/// </summary>
+	private static QueryTuningRecommendations GetRuleBasedRecommendations(QueryType queryType)
+	{
+		Dictionary<string, object> hints = GenerateHints(queryType);
+		return new(
+			SuggestedHints: hints,
+			IsDataDriven: false
+		);
+	}
+
+	/// <summary>
+	/// Calculate optimal hints based on historical performance
+	/// </summary>
+	private static Dictionary<string, object> CalculateOptimalHints(List<QueryExecutionStatistics> stats)
+	{
+		// Analyze performance by different hint configurations
+		var hintPerformance = stats
+			.Where(s => s.HintsUsed != null && s.HintsUsed.Count > 0)
+			.GroupBy(s => GetHintsSignature(s.HintsUsed!))
+			.Select(g => new
+			{
+				Hints = g.First().HintsUsed!,
+				AverageRU = g.Average(s => s.RU),
+				SuccessRate = g.Count(s => s.Success) / (double)g.Count(),
+				Count = g.Count()
+			})
+			.Where(x => x.Count >= 3) // Require at least 3 samples
+			.OrderBy(x => x.AverageRU) // Prefer lower RU
+			.ThenByDescending(x => x.SuccessRate) // Then higher success rate
+			.FirstOrDefault();
+
+		if (hintPerformance != null)
+		{
+			Dictionary<string, object> hints = new();
+			foreach (var hint in hintPerformance.Hints)
+			{
+				hints[hint.Key] = hint.Value;
+			}
+			return hints;
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Determine which strategy performs best for this query type
+	/// </summary>
+	private static string DetermineOptimalStrategy(List<QueryExecutionStatistics> stats)
+	{
+		var strategyPerformance = stats
+			.GroupBy(s => s.StrategyUsed)
+			.Select(g => new
+			{
+				Strategy = g.Key,
+				AverageRU = g.Average(s => s.RU),
+				SuccessRate = g.Count(s => s.Success) / (double)g.Count(),
+				Count = g.Count()
+			})
+			.Where(x => x.Count >= 5) // Require at least 5 samples
+			.OrderByDescending(x => x.SuccessRate) // Prefer higher success rate
+			.ThenBy(x => x.AverageRU) // Then lower RU
+			.FirstOrDefault();
+
+		return strategyPerformance?.Strategy;
+	}
+
+	/// <summary>
+	/// Generate a signature for a set of hints (for grouping)
+	/// </summary>
+	private static string GetHintsSignature(IReadOnlyDictionary<string, object> hints)
+	{
+		var sorted = hints.OrderBy(kvp => kvp.Key);
+		return string.Join("|", sorted.Select(kvp => $"{kvp.Key}:{kvp.Value}"));
+	}
+
+	/// <summary>
+	/// Rule-based hint generation (v3.1.x logic kept as fallback)
+	/// </summary>
 	private static Dictionary<string, object> GenerateHints(QueryType queryType)
 	{
 		Dictionary<string, object> hints = [];
@@ -46,5 +209,24 @@ internal sealed class QueryTuner
 		}
 
 		return hints;
+	}
+
+	/// <summary>
+	/// Load persisted statistics on startup
+	/// </summary>
+	private async Task LoadPersistedStatisticsAsync()
+	{
+		try
+		{
+			IList<QueryExecutionStatistics> persisted = await _storage.LoadRecentAsync(MaxStoredExecutions);
+			foreach (QueryExecutionStatistics stat in persisted)
+			{
+				_recentExecutions.Enqueue(stat);
+			}
+		}
+		catch
+		{
+			// Silently fail if storage load fails (don't break initialization)
+		}
 	}
 }

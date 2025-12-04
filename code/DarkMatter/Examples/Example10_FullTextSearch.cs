@@ -464,10 +464,7 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 	/// <summary>
 	/// Generates sample data with rich text content for full-text search demonstrations
 	/// </summary>
-	private static List<MyObject> GenerateTextRichSampleData()
-	{
-		return
-		[
+	private static List<MyObject> GenerateTextRichSampleData() => [
 			// AI/ML Products
 			new()
 			{
@@ -582,5 +579,4 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
 				Links = ["https://example.com/cloud-platform"]
 			}
 		];
-	}
 }

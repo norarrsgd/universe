@@ -5,13 +5,29 @@ using Universe.Builder.Strategies;
 namespace Universe;
 
 /// <summary>Inherit repositories to implement a more advanced Universe</summary>
-public abstract class Galaxy<T>(
-	CosmosClient client,
-	string database,
-	string container,
-	IReadOnlyList<string> partitionKey,
-	bool recordQueries = false) : GalaxyBasic<T>(client, database, container, partitionKey, recordQueries), IGalaxy<T> where T : class, ICosmicEntity
+public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, ICosmicEntity
 {
+	/// <summary>Create a new Galaxy with default settings</summary>
+	protected Galaxy(
+		CosmosClient client,
+		string database,
+		string container,
+		IReadOnlyList<string> partitionKey,
+		bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries)
+	{
+	}
+
+	/// <summary>Create a new Galaxy with custom Universe options</summary>
+	protected Galaxy(
+		CosmosClient client,
+		string database,
+		string container,
+		IReadOnlyList<string> partitionKey,
+		UniverseOptions options,
+		bool recordQueries = false) : base(client, database, container, partitionKey, options, recordQueries)
+	{
+	}
+
 	async Task<(Gravity, T)> IGalaxy<T>.Get(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns)
 		=> await InternalGet<T>(clusters, columns);
 

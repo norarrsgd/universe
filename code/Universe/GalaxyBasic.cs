@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Universe.Builder;
+using Universe.Builder.Strategies;
 using Universe.Response;
 
 namespace Universe;
@@ -10,13 +11,26 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 {
 	internal readonly UniverseBuilder QBuilder;
 
-	/// <summary></summary>
+	/// <summary>Create a new Galaxy with default settings</summary>
 	protected GalaxyBasic(
 		CosmosClient client,
 		string database,
 		string container,
 		IReadOnlyList<string> partitionKey,
 		bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => QBuilder = new(_recordQuery);
+
+	/// <summary>Create a new Galaxy with custom Universe options</summary>
+	protected GalaxyBasic(
+		CosmosClient client,
+		string database,
+		string container,
+		IReadOnlyList<string> partitionKey,
+		UniverseOptions options,
+		bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries)
+	{
+		QueryTuner queryTuner = new(options.StatisticsStorage);
+		QBuilder = new(_recordQuery, queryTuner);
+	}
 
 	async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
 	{

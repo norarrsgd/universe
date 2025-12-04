@@ -29,5 +29,6 @@ internal interface IQueryExecutionStrategy
 		Container container,
 		QueryDefinition query,
 		QueryContext context,
-		bool recordQueries);
+		bool recordQueries,
+		QueryTuner queryTuner = null);
 }

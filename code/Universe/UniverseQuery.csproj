@@ -21,12 +21,13 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.1.1</Version>
+		<Version>3.2.0-preview1</Version>
 		<PackageReleaseNotes>
-			View release on https://github.com/kuromukira/universe/releases/tag/untagged-cdcf4202c2656450c07b
+			View release on
+			https://github.com/kuromukira/universe/releases/tag/untagged-cdcf4202c2656450c07b
 		</PackageReleaseNotes>
-		<AssemblyVersion>3.1.1.0</AssemblyVersion>
-		<FileVersion>3.1.1.0</FileVersion>
+		<AssemblyVersion>3.2.0.0</AssemblyVersion>
+		<FileVersion>3.2.0.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Universe.Response;
 
 namespace Universe.Builder.Strategies;
@@ -16,54 +17,97 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
 		string queryText = query.QueryText.ToUpperInvariant();
 
 		return context.Type is QueryType.VectorSearch or QueryType.HybridSearch ||
-		       queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) ||
-		       queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant());
+			   queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) ||
+			   queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant());
 	}
 
 	async Task<(Gravity gravity, IList<T> results)> IQueryExecutionStrategy.ExecuteAsync<T>(
 		Container container,
 		QueryDefinition query,
 		QueryContext context,
-		bool recordQueries)
+		bool recordQueries,
+		QueryTuner queryTuner)
 	{
+		Stopwatch stopwatch = Stopwatch.StartNew();
+		string queryHash = queryTuner != null ? QueryTuner.ComputeQueryHash(context, query.QueryText) : string.Empty;
+
 		double requestCharge = 0;
 		List<T> collection = [];
 
-		QueryRequestOptions requestOptions = new()
+		try
 		{
-			EnableOptimisticDirectExecution = false,
-			MaxConcurrency = Environment.ProcessorCount // CPU-bound operations
-		};
+			QueryRequestOptions requestOptions = new()
+			{
+				EnableOptimisticDirectExecution = false,
+				MaxConcurrency = Environment.ProcessorCount // CPU-bound operations
+			};
 
-		// Vector search specific optimizations
-		if (context.Hints is not null)
-		{
-			if (context.Hints.TryGetValue(nameof(QueryHints.MaxBufferedItemCount), out object bufferedCount))
-				requestOptions.MaxBufferedItemCount = (int)bufferedCount;
-			
-			if (context.Hints.TryGetValue(nameof(QueryHints.MaxItemCount), out object itemCount))
-				requestOptions.MaxItemCount = (int)itemCount;
+			// Vector search specific optimizations
+			if (context.Hints is not null)
+			{
+				if (context.Hints.TryGetValue(nameof(QueryHints.MaxBufferedItemCount), out object bufferedCount))
+					requestOptions.MaxBufferedItemCount = bufferedCount.ToInt();
 
-			if (context.Hints.TryGetValue(nameof(QueryHints.MaxConcurrency), out object concurrency))
-				requestOptions.MaxConcurrency = (int)concurrency;
+				if (context.Hints.TryGetValue(nameof(QueryHints.MaxItemCount), out object itemCount))
+					requestOptions.MaxItemCount = itemCount.ToInt();
 
-			if (context.Hints.TryGetValue(nameof(QueryHints.EnableOptimisticDirectExecution), out object optimistic))
-				requestOptions.EnableOptimisticDirectExecution = (bool)optimistic;
+				if (context.Hints.TryGetValue(nameof(QueryHints.MaxConcurrency), out object concurrency))
+					requestOptions.MaxConcurrency = concurrency.ToInt();
+
+				if (context.Hints.TryGetValue(nameof(QueryHints.EnableOptimisticDirectExecution), out object optimistic))
+					requestOptions.EnableOptimisticDirectExecution = optimistic.ToBool();
+			}
+
+			using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);
+
+			while (queryResponse.HasMoreResults)
+			{
+				FeedResponse<T> next = await queryResponse.ReadNextAsync();
+				collection.AddRange(next);
+				requestCharge += next.RequestCharge;
+			}
+
+			stopwatch.Stop();
+
+			// Record successful execution
+			queryTuner?.RecordExecution(new QueryExecutionStatistics
+			{
+				QueryHash = queryHash,
+				Type = context.Type,
+				RU = requestCharge,
+				ExecutionTime = stopwatch.Elapsed,
+				ResultCount = collection.Count,
+				Success = true,
+				Timestamp = DateTime.UtcNow,
+				StrategyUsed = Name,
+				HintsUsed = context.Hints
+			});
+
+			return (new(
+				RU: requestCharge,
+				ContinuationToken: null,
+				Query: recordQueries ? (query.QueryText, query.GetQueryParameters()) : default
+			), collection);
 		}
-		
-		using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);
-
-		while (queryResponse.HasMoreResults)
+		catch (SystemException)
 		{
-			FeedResponse<T> next = await queryResponse.ReadNextAsync();
-			collection.AddRange(next);
-			requestCharge += next.RequestCharge;
-		}
+			stopwatch.Stop();
 
-		return (new(
-			RU: requestCharge,
-			ContinuationToken: null,
-			Query: recordQueries ? (query.QueryText, query.GetQueryParameters()) : default
-		), collection);
+			// Record failed execution
+			queryTuner?.RecordExecution(new QueryExecutionStatistics
+			{
+				QueryHash = queryHash,
+				Type = context.Type,
+				RU = requestCharge,
+				ExecutionTime = stopwatch.Elapsed,
+				ResultCount = 0,
+				Success = false,
+				Timestamp = DateTime.UtcNow,
+				StrategyUsed = Name,
+				HintsUsed = context.Hints
+			});
+
+			throw;
+		}
 	}
 }

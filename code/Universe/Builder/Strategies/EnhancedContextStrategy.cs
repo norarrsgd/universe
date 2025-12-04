@@ -15,6 +15,7 @@ internal sealed class EnhancedContextStrategy(IQueryExecutionStrategy innerStrat
 		Container container,
 		QueryDefinition query,
 		QueryContext _,
-		bool recordQueries)
-		=> innerStrategy.ExecuteAsync<T>(container, query, enhancedContext, recordQueries);
+		bool recordQueries,
+		QueryTuner queryTuner)
+		=> innerStrategy.ExecuteAsync<T>(container, query, enhancedContext, recordQueries, queryTuner);
 }

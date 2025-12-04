@@ -430,55 +430,95 @@
             Gets the priority of this strategy (higher = more preferred)
             </summary>
         </member>
-        <member name="M:Universe.Builder.Strategies.IQueryExecutionStrategy.ExecuteAsync``1(Microsoft.Azure.Cosmos.Container,Microsoft.Azure.Cosmos.QueryDefinition,Universe.Builder.Strategies.QueryContext,System.Boolean)">
+        <member name="M:Universe.Builder.Strategies.IQueryExecutionStrategy.ExecuteAsync``1(Microsoft.Azure.Cosmos.Container,Microsoft.Azure.Cosmos.QueryDefinition,Universe.Builder.Strategies.QueryContext,System.Boolean,Universe.Builder.Strategies.QueryTuner)">
             <summary>
             Executes the query and returns results with gravity information
             </summary>
         </member>
-        <member name="T:Universe.Builder.Strategies.QueryContext">
-            <summary>
-            Context information for query execution
-            </summary>
-        </member>
-        <member name="M:Universe.Builder.Strategies.QueryContext.#ctor(Universe.Builder.Strategies.QueryType,System.Nullable{System.Int32},System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
-            <summary>
-            Context information for query execution
-            </summary>
-        </member>
         <member name="T:Universe.Builder.Strategies.QueryType">
             <summary>
-            Types of queries for strategy selection
+            Types of queries supported in Universe
             </summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.Simple">
             <summary>Simple queries without complex operations</summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.Aggregation">
-            <summary>Queries with aggregation operations like GROUP BY, COUNT, SUM</summary>
+            <summary>Aggregation queries for summarizing data</summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.VectorSearch">
-            <summary>Vector similarity search queries</summary>
+            <summary>Vector search queries for high-dimensional data</summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.FullTextSearch">
-            <summary>Full-text search queries</summary>
+            <summary>Full-text search queries for unstructured text data</summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.HybridSearch">
-            <summary>Hybrid queries combining vector and full-text search</summary>
+            <summary>Hybrid search queries combining multiple techniques</summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.Join">
-            <summary>Queries with JOIN operations</summary>
+            <summary>Join queries for combining data from multiple sources</summary>
         </member>
         <member name="F:Universe.Builder.Strategies.QueryType.Complex">
-            <summary>Complex queries with multiple operations or RRF</summary>
+            <summary>Complex queries involving advanced logic and multiple steps</summary>
         </member>
         <member name="T:Universe.Builder.Strategies.QueryTuningRecommendations">
             <summary>
-            Query tuning recommendations based on execution history
+            Recommendations for query tuning based on collected statistics
             </summary>
         </member>
-        <member name="M:Universe.Builder.Strategies.QueryTuningRecommendations.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Universe.Builder.Strategies.QueryTuningRecommendations.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.String,System.Nullable{System.Double},System.Nullable{System.Double},System.Int32,System.Nullable{System.TimeSpan},System.Boolean)">
             <summary>
-            Query tuning recommendations based on execution history
+            Recommendations for query tuning based on collected statistics
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.QueryExecutionStatistics">
+            <summary>
+            Represents performance metrics for a single query execution
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.QueryHash">
+            <summary>
+            Hash of the query structure (not the raw query text)
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.Type">
+            <summary>
+            Detected query type
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.RU">
+            <summary>
+            Request Units consumed
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.ExecutionTime">
+            <summary>
+            Total execution time
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.ResultCount">
+            <summary>
+            Number of results returned
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.Success">
+            <summary>
+            Whether the query succeeded
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.Timestamp">
+            <summary>
+            Timestamp of execution (UTC)
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.StrategyUsed">
+            <summary>
+            Strategy used for execution
+            </summary>
+        </member>
+        <member name="P:Universe.Builder.Strategies.QueryExecutionStatistics.HintsUsed">
+            <summary>
+            Query hints that were applied
             </summary>
         </member>
         <member name="T:Universe.Builder.Strategies.QueryStrategySelector">
@@ -493,7 +533,123 @@
         </member>
         <member name="T:Universe.Builder.Strategies.QueryTuner">
             <summary>
-            Provides query tuning recommendations based on query type
+            Provides query tuning recommendations based on query type and historical performance
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.RecordExecution(Universe.Builder.Strategies.QueryExecutionStatistics)">
+            <summary>
+            Record a query execution for learning
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.GetRecommendations(Universe.Builder.Strategies.QueryType)">
+            <summary>
+            Get recommendations for a query type
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.ComputeQueryHash(Universe.Builder.Strategies.QueryContext,System.String)">
+            <summary>
+            Compute hash for query pattern recognition
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.GetRuleBasedRecommendations(Universe.Builder.Strategies.QueryType)">
+            <summary>
+            Fallback to rule-based recommendations (v3.1.x behavior)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.CalculateOptimalHints(System.Collections.Generic.List{Universe.Builder.Strategies.QueryExecutionStatistics})">
+            <summary>
+            Calculate optimal hints based on historical performance
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.DetermineOptimalStrategy(System.Collections.Generic.List{Universe.Builder.Strategies.QueryExecutionStatistics})">
+            <summary>
+            Determine which strategy performs best for this query type
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.GetHintsSignature(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+            <summary>
+            Generate a signature for a set of hints (for grouping)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.GenerateHints(Universe.Builder.Strategies.QueryType)">
+            <summary>
+            Rule-based hint generation (v3.1.x logic kept as fallback)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.QueryTuner.LoadPersistedStatisticsAsync">
+            <summary>
+            Load persisted statistics on startup
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.Storage.FileStatisticsStorage">
+            <summary>
+            File-based storage (JSON persistence)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.#ctor(System.String)">
+            <summary>
+            Create a new file-based statistics storage
+            </summary>
+            <param name="filePath">Optional custom file path. If null, uses default location in the current working directory</param>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
+            <summary>
+            Save a query execution statistic
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.LoadRecentAsync(System.Int32)">
+            <summary>
+            Load recent statistics
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.ClearOldAsync(System.TimeSpan)">
+            <summary>
+            Clear old statistics (older than specified timespan)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.LoadAllAsync">
+            <summary>
+            Load all statistics from file
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage">
+            <summary>
+            In-memory storage (default, no persistence across restarts)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
+            <summary>
+            Save is a no-op for in-memory storage (handled by QueryTuner's queue)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage.LoadRecentAsync(System.Int32)">
+            <summary>
+            Load is a no-op for in-memory storage (QueryTuner maintains its own queue)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage.ClearOldAsync(System.TimeSpan)">
+            <summary>
+            Clear is a no-op for in-memory storage
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.Storage.IQueryStatisticsStorage">
+            <summary>
+            Interface for persisting query statistics
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.IQueryStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
+            <summary>
+            Save a query execution statistic
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.IQueryStatisticsStorage.LoadRecentAsync(System.Int32)">
+            <summary>
+            Load recent statistics
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.IQueryStatisticsStorage.ClearOldAsync(System.TimeSpan)">
+            <summary>
+            Clear old statistics (older than specified timespan)
             </summary>
         </member>
         <member name="T:Universe.Builder.Strategies.VectorSearchStrategy">
@@ -512,6 +668,21 @@
         </member>
         <member name="M:Universe.Exception.UniverseException.#ctor(System.String,System.Exception)">
             <summary>Custom exception</summary>
+        </member>
+        <member name="T:Universe.Extensions.HintValueExtensions">
+            <summary>
+            Extension methods for safely converting hint values that may be JsonElement objects from deserialized JSON
+            </summary>
+        </member>
+        <member name="M:Universe.Extensions.HintValueExtensions.ToInt(System.Object)">
+            <summary>
+            Converts an object to int, handling both JsonElement (from deserialized JSON) and primitive types
+            </summary>
+        </member>
+        <member name="M:Universe.Extensions.HintValueExtensions.ToBool(System.Object)">
+            <summary>
+            Converts an object to bool, handling both JsonElement (from deserialized JSON) and primitive types
+            </summary>
         </member>
         <member name="T:Universe.Extensions.CosmicEntityExtensions">
             <summary> Extensions for ICosmicEntity </summary>
@@ -544,13 +715,19 @@
             <summary>Inherit repositories to implement a more advanced Universe</summary>
         </member>
         <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
-            <summary>Inherit repositories to implement a more advanced Universe</summary>
+            <summary>Create a new Galaxy with default settings</summary>
+        </member>
+        <member name="M:Universe.Galaxy`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},Universe.UniverseOptions,System.Boolean)">
+            <summary>Create a new Galaxy with custom Universe options</summary>
         </member>
         <member name="T:Universe.GalaxyBasic`1">
             <summary>Inherit repositories to implement the very basic Universe</summary>
         </member>
         <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
-            <summary></summary>
+            <summary>Create a new Galaxy with default settings</summary>
+        </member>
+        <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},Universe.UniverseOptions,System.Boolean)">
+            <summary>Create a new Galaxy with custom Universe options</summary>
         </member>
         <member name="T:Universe.GalaxyCore">
             <summary>
@@ -757,6 +934,28 @@
         </member>
         <member name="P:Universe.Response.Gravity.Query">
             <summary>Query that was executed</summary>
+        </member>
+        <member name="T:Universe.UniverseOptions">
+            <summary>
+            Configuration options for Universe query optimization
+            </summary>
+        </member>
+        <member name="P:Universe.UniverseOptions.StatisticsStorage">
+            <summary>
+            Storage backend for query statistics. Defaults to InMemoryStatisticsStorage.
+            </summary>
+        </member>
+        <member name="M:Universe.UniverseOptions.#ctor">
+            <summary>
+            Creates default Universe options with in-memory storage
+            </summary>
+        </member>
+        <member name="M:Universe.UniverseOptions.WithFilePersistence(System.String)">
+            <summary>
+            Creates Universe options with file-based persistence
+            </summary>
+            <param name="statisticsFilePath">Optional custom path for statistics file. If null, uses default location.</param>
+            <returns>UniverseOptions configured for file persistence</returns>
         </member>
     </members>
 </doc>
