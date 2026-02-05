@@ -138,7 +138,7 @@ public class MyRepository : Galaxy<MyObject>
     }
 }
 
-// Option 2: File-based persistence (survives restarts)
+// Option 2: File-based persistence (JSON, survives restarts)
 public class MyRepository : Galaxy<MyObject>
 {
     public MyRepository(CosmosClient client)
@@ -148,12 +148,26 @@ public class MyRepository : Galaxy<MyObject>
     }
 }
 
-// Option 3: Custom file path
+// Option 3: SQLite persistence (recommended for production)
 public class MyRepository : Galaxy<MyObject>
 {
     public MyRepository(CosmosClient client)
         : base(client, "database", "container", ["partitionKey"],
-               UniverseOptions.WithFilePersistence("/custom/path/stats.json"))
+               UniverseOptions.WithSqlitePersistence())
+    {
+    }
+}
+
+// Option 4: SQLite with custom configuration
+public class MyRepository : Galaxy<MyObject>
+{
+    public MyRepository(CosmosClient client)
+        : base(client, "database", "container", ["partitionKey"],
+               UniverseOptions.WithSqlitePersistence(
+                   path: "/data/stats.db",
+                   retentionDays: 14,
+                   batchSize: 20,
+                   flushIntervalSeconds: 10))
     {
     }
 }
@@ -306,10 +320,14 @@ When you request recommendations:
 | Storage Type | Persistence | Use Case |
 |-------------|-------------|----------|
 | **In-memory** (default) | Until restart | Development, testing |
-| **File-based** | Across restarts | Production with single instance |
+| **File-based** | Across restarts | Simple apps, debugging |
+| **SQLite** | Across restarts | Production, high volume |
 | **Custom** | User-defined | Advanced scenarios |
 
 Default file location: `{CurrentWorkingDirectory}/query-statistics.json`
+Default SQLite location: `{AppDirectory}/universe-stats.db`
+
+See [SQLITE_STATISTICS_STORAGE.md](./SQLITE_STATISTICS_STORAGE.md) for detailed SQLite configuration.
 
 ## Integration with Existing Code
 
@@ -328,6 +346,16 @@ public class MyRepository : Galaxy<MyObject>
     public MyRepository(CosmosClient client)
         : base(client, "database", "container", ["partitionKey"],
                UniverseOptions.WithFilePersistence())
+    {
+    }
+}
+
+// v3.2.0+ with SQLite persistence (recommended for production)
+public class MyRepository : Galaxy<MyObject>
+{
+    public MyRepository(CosmosClient client)
+        : base(client, "database", "container", ["partitionKey"],
+               UniverseOptions.WithSqlitePersistence())
     {
     }
 }

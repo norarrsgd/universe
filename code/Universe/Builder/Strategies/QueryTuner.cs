@@ -58,9 +58,7 @@ internal sealed class QueryTuner
 		DateTime last24Hours = DateTime.UtcNow.AddHours(-24);
 
 		// Get relevant statistics from last 24 hours
-		List<QueryExecutionStatistics> relevantStats = _recentExecutions
-			.Where(s => s.Type == queryType && s.Timestamp >= last24Hours)
-			.ToList();
+		List<QueryExecutionStatistics> relevantStats = [.. _recentExecutions.Where(s => s.Type == queryType && s.Timestamp >= last24Hours)];
 
 		// If insufficient data, fall back to rule-based recommendations
 		if (relevantStats.Count < MinSampleSizeForRecommendations)
@@ -130,7 +128,7 @@ internal sealed class QueryTuner
 
 		if (hintPerformance != null)
 		{
-			Dictionary<string, object> hints = new();
+			Dictionary<string, object> hints = [];
 			foreach (var hint in hintPerformance.Hints)
 			{
 				hints[hint.Key] = hint.Value;

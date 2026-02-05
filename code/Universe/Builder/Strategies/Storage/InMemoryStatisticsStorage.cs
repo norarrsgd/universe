@@ -14,7 +14,13 @@ public sealed class InMemoryStatisticsStorage : IQueryStatisticsStorage
 	/// Load is a no-op for in-memory storage (QueryTuner maintains its own queue)
 	/// </summary>
 	public Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
-		=> Task.FromResult<IList<QueryExecutionStatistics>>(Array.Empty<QueryExecutionStatistics>());
+		=> Task.FromResult<IList<QueryExecutionStatistics>>([]);
+
+	/// <summary>
+	/// GetByQueryHash is a no-op for in-memory storage (QueryTuner maintains its own queue)
+	/// </summary>
+	public Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
+		=> Task.FromResult<IList<QueryExecutionStatistics>>([]);
 
 	/// <summary>
 	/// Clear is a no-op for in-memory storage

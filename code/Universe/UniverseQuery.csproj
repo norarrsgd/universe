@@ -21,7 +21,7 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.2.0-preview2</Version>
+		<Version>3.2.0-preview3</Version>
 		<PackageReleaseNotes>
 			View release on
 			https://github.com/kuromukira/universe/releases/tag/untagged-cdcf4202c2656450c07b
@@ -40,7 +40,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.56.0" />
+		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.57.0" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 	</ItemGroup>
 

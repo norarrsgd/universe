@@ -1,4 +1,5 @@
 using DarkMatter.Models;
+using Universe;
 using Universe.Interfaces;
 using Universe.Builder.Options;
 using Universe.Builder.Strategies;
@@ -162,6 +163,55 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
 		Console.WriteLine();
 
 		Console.WriteLine($"Total RU consumed: {totalRU:F2}");
+		Console.WriteLine();
+
+		// Example 6: SQLite Persistence Options
+		Console.WriteLine("6. SQLite Persistence Configuration Examples:");
+		Console.WriteLine();
+
+		// Option 1: Default path (app directory)
+		Console.WriteLine("   Option 1 - Default path:");
+		Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence();");
+		UniverseOptions defaultOptions = UniverseOptions.WithSqlitePersistence();
+		Console.WriteLine($"   Creates: universe-stats.db in app directory");
+		Console.WriteLine();
+
+		// Option 2: Custom path
+		Console.WriteLine("   Option 2 - Custom path:");
+		Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence(\"/path/to/stats.db\");");
+		Console.WriteLine();
+
+		// Option 3: With retention policy
+		Console.WriteLine("   Option 3 - With retention policy:");
+		Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence(retentionDays: 14);");
+		UniverseOptions retentionOptions = UniverseOptions.WithSqlitePersistence(retentionDays: 14);
+		Console.WriteLine($"   Keeps statistics for 14 days before auto-cleanup");
+		Console.WriteLine();
+
+		// Option 4: Full configuration
+		Console.WriteLine("   Option 4 - Full configuration:");
+		Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence(");
+		Console.WriteLine("       path: \"/data/cosmos-stats.db\",");
+		Console.WriteLine("       retentionDays: 30,");
+		Console.WriteLine("       batchSize: 20,");
+		Console.WriteLine("       flushIntervalSeconds: 10);");
+		Console.WriteLine();
+
+		// Demonstrate SQLite storage features
+		Console.WriteLine("   SQLite Storage Features:");
+		Console.WriteLine("   - WAL mode for concurrent read/write performance");
+		Console.WriteLine("   - Non-blocking, fire-and-forget writes");
+		Console.WriteLine("   - Batched inserts for efficiency");
+		Console.WriteLine("   - Automatic cleanup of old statistics");
+		Console.WriteLine("   - Indexed queries for fast lookups by query hash");
+		Console.WriteLine();
+
+		// Cleanup disposable options
+		if (defaultOptions.StatisticsStorage is IDisposable defaultDisposable)
+			defaultDisposable.Dispose();
+		if (retentionOptions.StatisticsStorage is IDisposable retentionDisposable)
+			retentionDisposable.Dispose();
+
 		return totalRU;
 	}
 }

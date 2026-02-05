@@ -39,10 +39,9 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 			existing.Add(stats);
 
 			// Keep only last 1000 entries
-			List<QueryExecutionStatistics> toSave = existing
+			List<QueryExecutionStatistics> toSave = [.. existing
 				.OrderByDescending(s => s.Timestamp)
-				.Take(1000)
-				.ToList();
+				.Take(1000)];
 
 			string json = JsonSerializer.Serialize(toSave, new JsonSerializerOptions
 			{
@@ -69,9 +68,17 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 	public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
 	{
 		List<QueryExecutionStatistics> all = await LoadAllAsync();
-		return all.OrderByDescending(s => s.Timestamp)
-				  .Take(count)
-				  .ToList();
+		return [.. all.OrderByDescending(s => s.Timestamp).Take(count)];
+	}
+
+	/// <summary>
+	/// Load statistics for a specific query hash within a time window
+	/// </summary>
+	public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
+	{
+		DateTime cutoff = DateTime.UtcNow - window;
+		List<QueryExecutionStatistics> all = await LoadAllAsync();
+		return [.. all.Where(s => s.QueryHash == queryHash && s.Timestamp >= cutoff).OrderByDescending(s => s.Timestamp)];
 	}
 
 	/// <summary>
@@ -84,7 +91,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 		{
 			DateTime cutoff = DateTime.UtcNow - olderThan;
 			List<QueryExecutionStatistics> existing = await LoadAllAsync();
-			List<QueryExecutionStatistics> toKeep = existing.Where(s => s.Timestamp >= cutoff).ToList();
+			List<QueryExecutionStatistics> toKeep = [.. existing.Where(s => s.Timestamp >= cutoff)];
 
 			string json = JsonSerializer.Serialize(toKeep, new JsonSerializerOptions
 			{
@@ -105,18 +112,18 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 	private async Task<List<QueryExecutionStatistics>> LoadAllAsync()
 	{
 		if (!File.Exists(_filePath))
-			return new List<QueryExecutionStatistics>();
+			return [];
 
 		try
 		{
 			string json = await File.ReadAllTextAsync(_filePath);
 			return JsonSerializer.Deserialize<List<QueryExecutionStatistics>>(json)
-				   ?? new List<QueryExecutionStatistics>();
+				   ?? [];
 		}
 		catch (JsonException)
 		{
 			// If file is corrupted, return empty list
-			return new List<QueryExecutionStatistics>();
+			return [];
 		}
 	}
 }

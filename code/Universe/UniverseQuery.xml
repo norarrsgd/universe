@@ -602,6 +602,11 @@
             Load recent statistics
             </summary>
         </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.GetByQueryHashAsync(System.String,System.TimeSpan)">
+            <summary>
+            Load statistics for a specific query hash within a time window
+            </summary>
+        </member>
         <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.ClearOldAsync(System.TimeSpan)">
             <summary>
             Clear old statistics (older than specified timespan)
@@ -627,6 +632,11 @@
             Load is a no-op for in-memory storage (QueryTuner maintains its own queue)
             </summary>
         </member>
+        <member name="M:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage.GetByQueryHashAsync(System.String,System.TimeSpan)">
+            <summary>
+            GetByQueryHash is a no-op for in-memory storage (QueryTuner maintains its own queue)
+            </summary>
+        </member>
         <member name="M:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage.ClearOldAsync(System.TimeSpan)">
             <summary>
             Clear is a no-op for in-memory storage
@@ -647,9 +657,60 @@
             Load recent statistics
             </summary>
         </member>
+        <member name="M:Universe.Builder.Strategies.Storage.IQueryStatisticsStorage.GetByQueryHashAsync(System.String,System.TimeSpan)">
+            <summary>
+            Load statistics for a specific query hash within a time window
+            </summary>
+            <param name="queryHash">The query hash to filter by</param>
+            <param name="window">Time window from now to look back</param>
+            <returns>Statistics matching the query hash within the time window</returns>
+        </member>
         <member name="M:Universe.Builder.Strategies.Storage.IQueryStatisticsStorage.ClearOldAsync(System.TimeSpan)">
             <summary>
             Clear old statistics (older than specified timespan)
+            </summary>
+        </member>
+        <member name="T:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage">
+            <summary>
+            SQLite-based storage for query statistics with high-performance features:
+            - WAL mode for concurrent read/write
+            - Non-blocking fire-and-forget writes
+            - Batched inserts for efficiency
+            - Auto-cleanup of old data
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.#ctor(System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Creates a new SQLite statistics storage
+            </summary>
+            <param name="dbPath">Path to the SQLite database file. If null, uses default location.</param>
+            <param name="retentionDays">Number of days to retain statistics. Older records are auto-cleaned.</param>
+            <param name="batchSize">Number of records to batch before flushing to database.</param>
+            <param name="flushIntervalSeconds">Interval in seconds between automatic flushes.</param>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
+            <summary>
+            Queue a statistic for saving (non-blocking)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.LoadRecentAsync(System.Int32)">
+            <summary>
+            Load recent statistics from the database
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.GetByQueryHashAsync(System.String,System.TimeSpan)">
+            <summary>
+            Load statistics for a specific query hash within a time window
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.ClearOldAsync(System.TimeSpan)">
+            <summary>
+            Clear old statistics (older than specified timespan)
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.Dispose">
+            <summary>
+            Dispose the storage, flushing any pending writes
             </summary>
         </member>
         <member name="T:Universe.Builder.Strategies.VectorSearchStrategy">
@@ -952,10 +1013,21 @@
         </member>
         <member name="M:Universe.UniverseOptions.WithFilePersistence(System.String)">
             <summary>
-            Creates Universe options with file-based persistence
+            Creates Universe options with file-based persistence (JSON)
             </summary>
             <param name="statisticsFilePath">Optional custom path for statistics file. If null, uses default location.</param>
             <returns>UniverseOptions configured for file persistence</returns>
+        </member>
+        <member name="M:Universe.UniverseOptions.WithSqlitePersistence(System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Creates Universe options with SQLite-based persistence for high-performance statistics storage.
+            Features WAL mode for concurrent access, batched writes, and automatic cleanup.
+            </summary>
+            <param name="path">Optional custom path for the SQLite database file. If null, uses 'universe-stats.db' in the application directory.</param>
+            <param name="retentionDays">Number of days to retain statistics. Older records are automatically cleaned up. Default is 7 days.</param>
+            <param name="batchSize">Number of records to batch before flushing to database. Default is 10.</param>
+            <param name="flushIntervalSeconds">Interval in seconds between automatic flushes. Default is 5 seconds.</param>
+            <returns>UniverseOptions configured for SQLite persistence</returns>
         </member>
     </members>
 </doc>
