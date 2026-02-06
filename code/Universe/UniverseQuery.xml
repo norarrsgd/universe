@@ -617,6 +617,9 @@
             Load all statistics from file
             </summary>
         </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.Dispose">
+            <inheritdoc/>
+        </member>
         <member name="T:Universe.Builder.Strategies.Storage.InMemoryStatisticsStorage">
             <summary>
             In-memory storage (default, no persistence across restarts)
@@ -783,6 +786,9 @@
         </member>
         <member name="T:Universe.GalaxyBasic`1">
             <summary>Inherit repositories to implement the very basic Universe</summary>
+        </member>
+        <member name="M:Universe.GalaxyBasic`1.Dispose(System.Boolean)">
+            <inheritdoc/>
         </member>
         <member name="M:Universe.GalaxyBasic`1.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
             <summary>Create a new Galaxy with default settings</summary>

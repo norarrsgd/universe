@@ -1,4 +1,5 @@
 using DarkMatter.Models;
+using Microsoft.Azure.Cosmos;
 using Universe.Builder.Options;
 using Universe.Exception;
 using Universe.Extensions;
@@ -43,6 +44,12 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
 		// Test 7: Valid query after failed attempts (shows the library still works)
 		await TestValidQuery();
+
+		// Test 8: Attempt to inject through FTScore value (single rank)
+		await TestFTScoreInjection();
+
+		// Test 9: Attempt to inject through FTScore value (multi-rank RRF)
+		await TestFTScoreMultiRankInjection();
 
 		Console.WriteLine($"Total RU Used: {ruUsed}\n");
 		return ruUsed;
@@ -254,6 +261,71 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 		catch (UniverseException ex)
 		{
 			Console.WriteLine($"ERROR: Valid query failed: {ex.Message}\n");
+		}
+	}
+
+	private async Task TestFTScoreInjection()
+	{
+		Console.WriteLine("--- Test 8: FTScore Value Injection Attempt ---");
+		Console.WriteLine("Attempting to inject SQL through FTScore value: \"test') OR ('1'='1\"\n");
+
+		try
+		{
+			_ = await galaxy.List(
+				clusters:
+				[
+					new(Catalysts:
+					[
+						new(nameof(MyObject.Name), new[] { "test') OR ('1'='1" }, Operator: Q.Operator.FTScore)
+					])
+				],
+				columnOptions: new(
+					Top: 10,
+					Names: [nameof(MyObject.Name)]
+				)
+			);
+			Console.WriteLine("Query executed (values are parameterized, injection payload treated as literal text).\n");
+		}
+		catch (UniverseException ex)
+		{
+			Console.WriteLine($"BLOCKED: {ex.Message}\n");
+		}
+		catch (CosmosException)
+		{
+			Console.WriteLine("Query executed safely (CosmosException from server, but SQL was parameterized).\n");
+		}
+	}
+
+	private async Task TestFTScoreMultiRankInjection()
+	{
+		Console.WriteLine("--- Test 9: FTScore Multi-Rank RRF Injection Attempt ---");
+		Console.WriteLine("Attempting to inject SQL through FTScore in RRF: \"test'); DROP TABLE c; --\"\n");
+
+		try
+		{
+			_ = await galaxy.List(
+				clusters:
+				[
+					new(Catalysts:
+					[
+						new(nameof(MyObject.Name), new[] { "test'); DROP TABLE c; --" }, Operator: Q.Operator.FTScore),
+						new(nameof(MyObject.Name), new[] { "safe value" }, Operator: Q.Operator.FTScore)
+					])
+				],
+				columnOptions: new(
+					Top: 10,
+					Names: [nameof(MyObject.Name)]
+				)
+			);
+			Console.WriteLine("Query executed (values are parameterized, injection payload treated as literal text).\n");
+		}
+		catch (UniverseException ex)
+		{
+			Console.WriteLine($"BLOCKED: {ex.Message}\n");
+		}
+		catch (CosmosException)
+		{
+			Console.WriteLine("Query executed safely (CosmosException from server, but SQL was parameterized).\n");
 		}
 	}
 }

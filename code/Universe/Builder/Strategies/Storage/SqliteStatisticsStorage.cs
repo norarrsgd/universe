@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
@@ -23,6 +24,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	private readonly Timer _flushTimer;
 	private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
 	private bool _disposed;
+	private DateTime _lastCleanup = DateTime.UtcNow;
+	private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
 
 	// Prepared statement cache
 	private SqliteCommand _insertCommand;
@@ -262,9 +265,9 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 				{
 					hints = JsonSerializer.Deserialize<Dictionary<string, object>>(hintsJson);
 				}
-				catch
+				catch (System.Exception ex)
 				{
-					// Ignore deserialization errors
+					Trace.TraceWarning($"[UniverseQuery] Failed to deserialize query hints: {ex.Message}");
 				}
 			}
 
@@ -325,21 +328,23 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 			await transaction.CommitAsync();
 		}
-		catch
+		catch (System.Exception ex)
 		{
-			// Silently fail to not break query execution
-			// SQLite persistence is a best-effort feature
+			Trace.TraceWarning($"[UniverseQuery] SQLite flush failed: {ex.Message}");
 		}
 		finally
 		{
 			_writeLock.Release();
 		}
+
+		if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
+		{
+			_lastCleanup = DateTime.UtcNow;
+			_ = CleanupOldRecordsAsync();
+		}
 	}
 
-	private async Task CleanupOldRecordsAsync()
-	{
-		await ClearOldAsync(TimeSpan.FromDays(_retentionDays));
-	}
+	private async Task CleanupOldRecordsAsync() => await ClearOldAsync(TimeSpan.FromDays(_retentionDays));
 
 	/// <summary>
 	/// Dispose the storage, flushing any pending writes

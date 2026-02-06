@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Universe.Builder.Strategies.Storage;
 
@@ -7,7 +8,7 @@ namespace Universe.Builder.Strategies;
 /// <summary>
 /// Provides query tuning recommendations based on query type and historical performance
 /// </summary>
-internal sealed class QueryTuner
+internal sealed class QueryTuner : IDisposable
 {
 	private readonly ConcurrentQueue<QueryExecutionStatistics> _recentExecutions;
 	private readonly IQueryStatisticsStorage _storage;
@@ -28,25 +29,23 @@ internal sealed class QueryTuner
 	/// </summary>
 	public void RecordExecution(QueryExecutionStatistics stats)
 	{
-		// Add to in-memory queue
 		_recentExecutions.Enqueue(stats);
-
-		// Maintain size limit
 		while (_recentExecutions.Count > MaxStoredExecutions)
 		{
 			_recentExecutions.TryDequeue(out _);
 		}
+		_ = PersistAsync(stats);
+	}
 
-		// Persist synchronously to ensure writes complete
-		// Using synchronous I/O for reliability - query recording happens after query completes
-		// so a small synchronous delay is acceptable for ensuring data persistence
+	private async Task PersistAsync(QueryExecutionStatistics stats)
+	{
 		try
 		{
-			_storage.SaveAsync(stats).Wait();
+			await _storage.SaveAsync(stats);
 		}
-		catch
+		catch (System.Exception ex)
 		{
-			// Silently ignore storage errors to not affect query execution
+			Trace.TraceWarning($"[UniverseQuery] Failed to persist query statistics: {ex.Message}");
 		}
 	}
 
@@ -85,12 +84,10 @@ internal sealed class QueryTuner
 	/// </summary>
 	public static string ComputeQueryHash(QueryContext context, string queryText)
 	{
-		// Hash the query structure (not the values) for pattern recognition
-		string signature = $"{context.Type}|{queryText.Length}|{queryText.GetHashCode()}";
-		using SHA256 sha256 = SHA256.Create();
+		string signature = $"{context.Type}|{queryText}";
 		byte[] bytes = Encoding.UTF8.GetBytes(signature);
-		byte[] hash = sha256.ComputeHash(bytes);
-		return Convert.ToBase64String(hash)[..16]; // Take first 16 chars
+		byte[] hash = SHA256.HashData(bytes);
+		return Convert.ToBase64String(hash)[..16];
 	}
 
 	/// <summary>
@@ -222,9 +219,15 @@ internal sealed class QueryTuner
 				_recentExecutions.Enqueue(stat);
 			}
 		}
-		catch
+		catch (System.Exception ex)
 		{
-			// Silently fail if storage load fails (don't break initialization)
+			Trace.TraceWarning($"[UniverseQuery] Failed to load persisted statistics: {ex.Message}");
 		}
+	}
+
+	public void Dispose()
+	{
+		if (_storage is IDisposable disposable)
+			disposable.Dispose();
 	}
 }

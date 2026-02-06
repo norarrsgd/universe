@@ -11,6 +11,16 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 {
 	internal readonly UniverseBuilder QBuilder;
 
+	/// <inheritdoc/>
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			QBuilder?.Dispose();
+		}
+		base.Dispose(disposing);
+	}
+
 	/// <summary>Create a new Galaxy with default settings</summary>
 	protected GalaxyBasic(
 		CosmosClient client,

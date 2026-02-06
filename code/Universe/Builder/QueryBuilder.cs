@@ -3,7 +3,7 @@ using Universe.Builder.Strategies;
 
 namespace Universe.Builder;
 
-internal class UniverseBuilder(bool recordQueries)
+internal class UniverseBuilder(bool recordQueries) : IDisposable
 {
 	private readonly QueryTuner _queryTuner = new();
 	private readonly QueryStrategySelector _strategySelector = new(new());
@@ -17,6 +17,8 @@ internal class UniverseBuilder(bool recordQueries)
 		_queryTuner = queryTuner;
 		_strategySelector = new(_queryTuner);
 	}
+
+	public void Dispose() => _queryTuner?.Dispose();
 
 	internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
 	{
@@ -104,6 +106,9 @@ internal class UniverseBuilder(bool recordQueries)
 		if (columnsInQuery.Contains('*') && groups is not null && groups.Any())
 			columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", groups));
 
+		// nosemgrep: sql-injection -- columnsInQuery is built from validated identifiers only:
+		// column names pass through ValidateIdentifier() (rejects ;, --, /*, */, ", ], control chars)
+		// and FormatProperty() (bracket-wraps segments); Top is an int; aggregates use enum values
 		StringBuilder queryBuilder = new($"SELECT {columnsInQuery} FROM c");
 
 		if (columnOptions?.Join is not null)
@@ -233,7 +238,10 @@ internal class UniverseBuilder(bool recordQueries)
 					{
 						queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
 						if (catalyst.Value is IEnumerable<string> stringVals)
-							queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
+						{
+							string[] vals = stringVals.ToArray();
+							queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{catalyst.ParameterName()}_ft{i}")));
+						}
 						else
 							throw new UniverseException("FullTextScore operator requires a string[] value.");
 						queryBuilder.Append(')');
@@ -269,7 +277,10 @@ internal class UniverseBuilder(bool recordQueries)
 				{
 					queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
 					if (catalyst.Value is IEnumerable<string> stringVals)
-						queryBuilder.Append($"{string.Join(", ", stringVals.Select(v => $"'{v}'"))}");
+					{
+						string[] vals = stringVals.ToArray();
+						queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{catalyst.ParameterName()}_ft{i}")));
+					}
 
 					queryBuilder.Append(')');
 				}
@@ -295,9 +306,21 @@ internal class UniverseBuilder(bool recordQueries)
 
 		if (clusters is not null && clusters.Any())
 		{
-			query = clusters.SelectMany(cluster => cluster.Catalysts)
-				.Aggregate(query, (current, catalyst) =>
-					current.WithParameter($"@{catalyst.ParameterName()}", catalyst.Value));
+			foreach (Catalyst catalyst in clusters.SelectMany(cluster => cluster.Catalysts))
+			{
+				if (catalyst.Operator is Q.Operator.FTScore && catalyst.Value is IEnumerable<string> ftValues)
+				{
+					string[] vals = ftValues.ToArray();
+					for (int i = 0; i < vals.Length; i++)
+					{
+						query = query.WithParameter($"@{catalyst.ParameterName()}_ft{i}", vals[i]);
+					}
+				}
+				else
+				{
+					query = query.WithParameter($"@{catalyst.ParameterName()}", catalyst.Value);
+				}
+			}
 		}
 
 		return query;

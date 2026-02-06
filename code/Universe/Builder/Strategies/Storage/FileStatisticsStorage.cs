@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Universe.Builder.Strategies.Storage;
@@ -5,7 +6,7 @@ namespace Universe.Builder.Strategies.Storage;
 /// <summary>
 /// File-based storage (JSON persistence)
 /// </summary>
-public sealed class FileStatisticsStorage : IQueryStatisticsStorage
+public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 {
 	private readonly string _filePath;
 	private readonly SemaphoreSlim _lock = new(1, 1);
@@ -51,10 +52,9 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 
 			await File.WriteAllTextAsync(_filePath, json);
 		}
-		catch
+		catch (System.Exception ex)
 		{
-			// Silently fail to not break query execution
-			// File persistence is a best-effort feature
+			Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");
 		}
 		finally
 		{
@@ -67,8 +67,16 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 	/// </summary>
 	public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
 	{
-		List<QueryExecutionStatistics> all = await LoadAllAsync();
-		return [.. all.OrderByDescending(s => s.Timestamp).Take(count)];
+		await _lock.WaitAsync();
+		try
+		{
+			List<QueryExecutionStatistics> all = await LoadAllAsync();
+			return [.. all.OrderByDescending(s => s.Timestamp).Take(count)];
+		}
+		finally
+		{
+			_lock.Release();
+		}
 	}
 
 	/// <summary>
@@ -76,9 +84,17 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 	/// </summary>
 	public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
 	{
-		DateTime cutoff = DateTime.UtcNow - window;
-		List<QueryExecutionStatistics> all = await LoadAllAsync();
-		return [.. all.Where(s => s.QueryHash == queryHash && s.Timestamp >= cutoff).OrderByDescending(s => s.Timestamp)];
+		await _lock.WaitAsync();
+		try
+		{
+			DateTime cutoff = DateTime.UtcNow - window;
+			List<QueryExecutionStatistics> all = await LoadAllAsync();
+			return [.. all.Where(s => s.QueryHash == queryHash && s.Timestamp >= cutoff).OrderByDescending(s => s.Timestamp)];
+		}
+		finally
+		{
+			_lock.Release();
+		}
 	}
 
 	/// <summary>
@@ -126,4 +142,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage
 			return [];
 		}
 	}
+
+	/// <inheritdoc/>
+	public void Dispose() => _lock.Dispose();
 }
