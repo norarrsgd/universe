@@ -66,6 +66,10 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 
 			await File.WriteAllTextAsync(_filePath, json);
 		}
+		catch (JsonException ex)
+		{
+			Trace.TraceWarning($"[UniverseQuery] File statistics serialization failed: {ex.Message}");
+		}
 		catch (SystemException ex)
 		{
 			Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");

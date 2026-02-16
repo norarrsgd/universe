@@ -159,20 +159,22 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 	public void RecordExecution_WithSqlite_StaysResponsive()
 	{
 		string dbPath = Path.Combine(AppContext.BaseDirectory, $"perf-record-{Guid.NewGuid()}.db");
-		using var storage = new SqliteStatisticsStorage(dbPath, batchSize: 10, flushIntervalSeconds: 60);
-		using var tuner = new QueryTuner(storage);
 
-		var sw = Stopwatch.StartNew();
-		for (int i = 0; i < 100; i++)
-			tuner.RecordExecution(TestStatisticsFactory.Create(queryHash: $"perf-{i}"));
-		sw.Stop();
+		using (var storage = new SqliteStatisticsStorage(dbPath, batchSize: 10, flushIntervalSeconds: 60))
+		using (var tuner = new QueryTuner(storage))
+		{
+			var sw = Stopwatch.StartNew();
+			for (int i = 0; i < 100; i++)
+				tuner.RecordExecution(TestStatisticsFactory.Create(queryHash: $"perf-{i}"));
+			sw.Stop();
 
-		_output.WriteLine($"100 RecordExecution calls with SQLite: {sw.Elapsed.TotalMilliseconds:F2}ms");
-		_output.WriteLine($"Per call: {sw.Elapsed.TotalMilliseconds / 100:F4}ms");
+			_output.WriteLine($"100 RecordExecution calls with SQLite: {sw.Elapsed.TotalMilliseconds:F2}ms");
+			_output.WriteLine($"Per call: {sw.Elapsed.TotalMilliseconds / 100:F4}ms");
 
-		// Fire-and-forget persistence should keep RecordExecution fast
-		Assert.True(sw.Elapsed.TotalMilliseconds < 1000,
-			$"100 RecordExecution calls took {sw.Elapsed.TotalMilliseconds:F2}ms, expected < 1000ms");
+			// Fire-and-forget persistence should keep RecordExecution fast
+			Assert.True(sw.Elapsed.TotalMilliseconds < 1000,
+				$"100 RecordExecution calls took {sw.Elapsed.TotalMilliseconds:F2}ms, expected < 1000ms");
+		}
 
 		TryDeleteFiles(dbPath);
 	}
@@ -205,20 +207,24 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 		var inMemoryTime = sw.Elapsed;
 
 		// Measure SQLite startup (loading 1000 records into queue)
-		sw.Restart();
-		using var sqliteStorage = new SqliteStatisticsStorage(dbPath, batchSize: 50, flushIntervalSeconds: 60);
-		using var sqliteTuner = new QueryTuner(sqliteStorage);
-
-		// Wait for async loading to complete
-		QueryTuningRecommendations sqliteRec = default;
-		for (int attempt = 0; attempt < 50; attempt++)
+		QueryTuningRecommendations sqliteRec;
+		TimeSpan sqliteTime;
+		using (var sqliteStorage = new SqliteStatisticsStorage(dbPath, batchSize: 50, flushIntervalSeconds: 60))
+		using (var sqliteTuner = new QueryTuner(sqliteStorage))
 		{
-			sqliteRec = sqliteTuner.GetRecommendations(QueryType.Simple);
-			if (sqliteRec.IsDataDriven) break;
-			await Task.Delay(100);
+			sw.Restart();
+
+			// Wait for async loading to complete
+			sqliteRec = default;
+			for (int attempt = 0; attempt < 50; attempt++)
+			{
+				sqliteRec = sqliteTuner.GetRecommendations(QueryType.Simple);
+				if (sqliteRec.IsDataDriven) break;
+				await Task.Delay(100);
+			}
+			sw.Stop();
+			sqliteTime = sw.Elapsed;
 		}
-		sw.Stop();
-		var sqliteTime = sw.Elapsed;
 
 		_output.WriteLine($"InMemory startup: {inMemoryTime.TotalMilliseconds:F2}ms (IsDataDriven: {inMemoryRec.IsDataDriven})");
 		_output.WriteLine($"SQLite startup (1000 records): {sqliteTime.TotalMilliseconds:F2}ms (IsDataDriven: {sqliteRec.IsDataDriven})");

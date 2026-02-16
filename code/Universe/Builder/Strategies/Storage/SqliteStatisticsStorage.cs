@@ -29,6 +29,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
 	private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(30);
 	private const int CurrentSchemaVersion = 1;
+	private const int MaxFlushRetries = 3;
+	private readonly ConcurrentDictionary<QueryExecutionStatistics, int> _retryCounts = new(ReferenceEqualityComparer.Instance);
 
 	// Prepared statement cache
 	private SqliteCommand _insertCommand;
@@ -393,9 +395,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 		if (!await _writeLock.WaitAsync(LockTimeout))
 		{
-			Trace.TraceWarning("[UniverseQuery] Lock acquisition timed out in FlushAsync. Re-queuing items.");
-			foreach (QueryExecutionStatistics item in toWrite)
-				_writeQueue.Enqueue(item);
+			Trace.TraceWarning("[UniverseQuery] Lock acquisition timed out in FlushAsync. Re-queuing eligible items.");
+			RequeueWithRetryLimit(toWrite);
 			return;
 		}
 		try
@@ -425,10 +426,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		catch (SystemException ex)
 		{
 			Trace.TraceWarning($"[UniverseQuery] SQLite flush failed: {ex.Message}");
-
-			// Re-enqueue failed items to prevent data loss
-			foreach (QueryExecutionStatistics item in toWrite)
-				_writeQueue.Enqueue(item);
+			RequeueWithRetryLimit(toWrite);
 		}
 		finally
 		{
@@ -439,6 +437,23 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		{
 			_lastCleanup = DateTime.UtcNow;
 			_ = CleanupOldRecordsAsync();
+		}
+	}
+
+	private void RequeueWithRetryLimit(List<QueryExecutionStatistics> items)
+	{
+		foreach (QueryExecutionStatistics item in items)
+		{
+			int retries = _retryCounts.AddOrUpdate(item, 1, (_, count) => count + 1);
+			if (retries <= MaxFlushRetries)
+			{
+				_writeQueue.Enqueue(item);
+			}
+			else
+			{
+				_retryCounts.TryRemove(item, out _);
+				Trace.TraceWarning($"[UniverseQuery] Dropping statistics for query '{item.QueryHash}' after {MaxFlushRetries} failed flush attempts.");
+			}
 		}
 	}
 
