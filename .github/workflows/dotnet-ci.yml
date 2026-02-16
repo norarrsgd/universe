@@ -1,5 +1,7 @@
 on: push
 name: dotnet-ci
+permissions:
+  contents: read
 
 jobs:
   restore:
