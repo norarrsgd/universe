@@ -102,6 +102,9 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		string fullPath = Path.GetFullPath(path);
 		string allowedRoot = Path.GetFullPath(AppContext.BaseDirectory);
 
+		if (!allowedRoot.EndsWith(Path.DirectorySeparatorChar))
+			allowedRoot += Path.DirectorySeparatorChar;
+
 		if (!fullPath.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase))
 			throw new UniverseException($"Storage path must be within the application directory '{allowedRoot}'.");
 
@@ -125,7 +128,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		try
 		{
 			using SqliteCommand cmd = _connection.CreateCommand();
-			cmd.CommandText = "PRAGMA integrity_check";
+			cmd.CommandText = "PRAGMA quick_check";
 			string result = cmd.ExecuteScalar() as string;
 			if (result != "ok")
 				Trace.TraceWarning($"[UniverseQuery] SQLite integrity check failed: {result}");
@@ -265,10 +268,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		await FlushAsync();
 
 		if (!await _writeLock.WaitAsync(LockTimeout))
-		{
-			Trace.TraceWarning("[UniverseQuery] Lock acquisition timed out in LoadRecentAsync.");
-			return [];
-		}
+			throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
 		try
 		{
 			_selectRecentCommand.Parameters.Clear();
@@ -296,10 +296,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
 
 		if (!await _writeLock.WaitAsync(LockTimeout))
-		{
-			Trace.TraceWarning("[UniverseQuery] Lock acquisition timed out in GetByQueryHashAsync.");
-			return [];
-		}
+			throw new TimeoutException("Lock acquisition timed out in GetByQueryHashAsync.");
 		try
 		{
 			_selectByHashCommand.Parameters.Clear();

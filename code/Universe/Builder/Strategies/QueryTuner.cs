@@ -39,15 +39,31 @@ internal sealed partial class QueryTuner : IDisposable
 		_partitions[stats.Type].Enqueue(stats);
 		Interlocked.Increment(ref _totalCount);
 
+		int evictionAttempts = 0;
 		while (Interlocked.CompareExchange(ref _totalCount, 0, 0) > MaxStoredExecutions)
 		{
 			if (TryEvictOldest())
+			{
 				Interlocked.Decrement(ref _totalCount);
-			else
+				evictionAttempts = 0;
+			}
+			else if (++evictionAttempts > MaxStoredExecutions)
+			{
+				// Queues are truly empty but _totalCount is stale — reconcile
+				Interlocked.Exchange(ref _totalCount, CountActual());
 				break;
+			}
 		}
 
 		_ = PersistAsync(stats);
+	}
+
+	private int CountActual()
+	{
+		int count = 0;
+		foreach (var kvp in _partitions)
+			count += kvp.Value.Count;
+		return count;
 	}
 
 	private bool TryEvictOldest()

@@ -33,6 +33,9 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 		string fullPath = Path.GetFullPath(path);
 		string allowedRoot = Path.GetFullPath(AppContext.BaseDirectory);
 
+		if (!allowedRoot.EndsWith(Path.DirectorySeparatorChar))
+			allowedRoot += Path.DirectorySeparatorChar;
+
 		if (!fullPath.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase))
 			throw new UniverseException($"Storage path must be within the application directory '{allowedRoot}'.");
 
