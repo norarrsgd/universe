@@ -712,15 +712,23 @@
             <summary>
             Load recent statistics from the database
             </summary>
+            <exception cref="T:System.TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.GetByQueryHashAsync(System.String,System.TimeSpan)">
             <summary>
             Load statistics for a specific query hash within a time window
             </summary>
+            <exception cref="T:System.TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.ClearOldAsync(System.TimeSpan)">
             <summary>
             Clear old statistics (older than specified timespan)
+            </summary>
+            <exception cref="T:System.TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.FireAndForget(System.Func{System.Threading.Tasks.Task})">
+            <summary>
+            Runs an async task fire-and-forget, logging any exceptions instead of leaving them unobserved.
             </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.Dispose">

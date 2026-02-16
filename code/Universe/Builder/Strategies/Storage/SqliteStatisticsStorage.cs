@@ -89,11 +89,11 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		PrepareStatements();
 
 		// Run initial cleanup
-		_ = CleanupOldRecordsAsync();
+		FireAndForget(CleanupOldRecordsAsync);
 
 		// Start flush timer
 		_flushTimer = new Timer(
-			_ => _ = FlushAsync(),
+			_ => FireAndForget(FlushAsync),
 			null,
 			_flushInterval,
 			_flushInterval);
@@ -254,7 +254,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 		// Trigger flush if batch size reached
 		if (_writeQueue.Count >= _batchSize)
-			_ = FlushAsync();
+			FireAndForget(FlushAsync);
 
 		return Task.CompletedTask;
 	}
@@ -262,6 +262,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Load recent statistics from the database
 	/// </summary>
+	/// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
 	public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
 	{
 		if (_disposed) return [];
@@ -288,6 +289,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Load statistics for a specific query hash within a time window
 	/// </summary>
+	/// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
 	public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
 	{
 		if (_disposed) return [];
@@ -317,6 +319,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Clear old statistics (older than specified timespan)
 	/// </summary>
+	/// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
 	public async Task ClearOldAsync(TimeSpan olderThan)
 	{
 		if (_disposed) return;
@@ -324,10 +327,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(olderThan).ToUnixTimeSeconds();
 
 		if (!await _writeLock.WaitAsync(LockTimeout))
-		{
-			Trace.TraceWarning("[UniverseQuery] Lock acquisition timed out in ClearOldAsync.");
-			return;
-		}
+			throw new TimeoutException("Lock acquisition timed out in ClearOldAsync.");
 		try
 		{
 			_deleteOldCommand.Parameters.Clear();
@@ -395,9 +395,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 		if (!await _writeLock.WaitAsync(LockTimeout))
 		{
-			Trace.TraceWarning("[UniverseQuery] Lock acquisition timed out in FlushAsync. Re-queuing eligible items.");
 			RequeueWithRetryLimit(toWrite);
-			return;
+			throw new TimeoutException("Lock acquisition timed out in FlushAsync.");
 		}
 		try
 		{
@@ -422,6 +421,10 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 			}
 
 			await transaction.CommitAsync();
+
+			// Clear retry tracking for successfully persisted items
+			foreach (QueryExecutionStatistics stat in toWrite)
+				_retryCounts.TryRemove(stat, out _);
 		}
 		catch (SystemException ex)
 		{
@@ -436,7 +439,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
 		{
 			_lastCleanup = DateTime.UtcNow;
-			_ = CleanupOldRecordsAsync();
+			FireAndForget(CleanupOldRecordsAsync);
 		}
 	}
 
@@ -454,6 +457,21 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 				_retryCounts.TryRemove(item, out _);
 				Trace.TraceWarning($"[UniverseQuery] Dropping statistics for query '{item.QueryHash}' after {MaxFlushRetries} failed flush attempts.");
 			}
+		}
+	}
+
+	/// <summary>
+	/// Runs an async task fire-and-forget, logging any exceptions instead of leaving them unobserved.
+	/// </summary>
+	private static async void FireAndForget(Func<Task> action)
+	{
+		try
+		{
+			await action();
+		}
+		catch (System.Exception ex)
+		{
+			Trace.TraceWarning($"[UniverseQuery] Background operation failed: {ex.Message}");
 		}
 	}
 

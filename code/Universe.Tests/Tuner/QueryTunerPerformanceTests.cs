@@ -41,8 +41,10 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 		_output.WriteLine($"Ratio: {loadedTime.TotalMilliseconds / Math.Max(emptyTime.TotalMilliseconds, 0.001):F2}x");
 
 		// Loaded should be measurably slower due to LINQ iteration over the full queue
-		Assert.True(loadedTime > emptyTime,
-			$"Expected loaded ({loadedTime.TotalMilliseconds:F2}ms) > empty ({emptyTime.TotalMilliseconds:F2}ms)");
+		// Use ratio threshold to tolerate CI variability
+		double ratio = loadedTime.TotalMilliseconds / Math.Max(emptyTime.TotalMilliseconds, 0.001);
+		Assert.True(ratio > 1.1 || loadedTime.TotalMilliseconds > emptyTime.TotalMilliseconds + 0.5,
+			$"Expected loaded ({loadedTime.TotalMilliseconds:F2}ms) to be meaningfully slower than empty ({emptyTime.TotalMilliseconds:F2}ms), ratio: {ratio:F2}x");
 	}
 
 	[Fact]
@@ -74,9 +76,10 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 			_output.WriteLine($"Queue size {targetSize,4}: {sw.Elapsed.TotalMilliseconds:F2}ms for 100 calls");
 		}
 
-		// Verify general upward trend
-		Assert.True(timings[1000] > timings[0],
-			$"Expected 1000-item timing ({timings[1000]:F2}ms) > 0-item timing ({timings[0]:F2}ms)");
+		// Verify general upward trend with tolerance for CI variability
+		double scalingRatio = timings[1000] / Math.Max(timings[0], 0.001);
+		Assert.True(scalingRatio > 1.1 || timings[1000] > timings[0] + 0.5,
+			$"Expected 1000-item timing ({timings[1000]:F2}ms) to be meaningfully slower than 0-item timing ({timings[0]:F2}ms), ratio: {scalingRatio:F2}x");
 	}
 
 	[Fact]
@@ -134,8 +137,10 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 		_output.WriteLine($"Ratio: {simpleTime.TotalMilliseconds / Math.Max(aggTime.TotalMilliseconds, 0.001):F2}x");
 
 		// Aggregation with 50 items should be faster than Simple with 950 items
-		Assert.True(aggTime < simpleTime,
-			$"Expected Aggregation ({aggTime.TotalMilliseconds:F2}ms) < Simple ({simpleTime.TotalMilliseconds:F2}ms)");
+		// Use ratio threshold to tolerate CI variability
+		double typeRatio = simpleTime.TotalMilliseconds / Math.Max(aggTime.TotalMilliseconds, 0.001);
+		Assert.True(typeRatio > 1.1 || simpleTime.TotalMilliseconds > aggTime.TotalMilliseconds + 0.5,
+			$"Expected Simple ({simpleTime.TotalMilliseconds:F2}ms) to be meaningfully slower than Aggregation ({aggTime.TotalMilliseconds:F2}ms), ratio: {typeRatio:F2}x");
 	}
 
 	[Fact]
