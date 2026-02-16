@@ -141,6 +141,11 @@ Currently (v3.1.x), optimization is rule-based. Full adaptive learning is planne
 - **Main branch**: `dev` (for PRs)
 - **Production branch**: `prod`
 - **Current branch**: `beta`
+- **Code Review**: After every commit or before pushing, run a local CodeRabbit review:
+  ```bash
+  coderabbit review
+  ```
+  Address any findings before pushing to the remote.
 
 ## CI/CD
 - **GitHub Actions**: `.github/workflows/dotnet-ci.yml` runs restore and build on every push
