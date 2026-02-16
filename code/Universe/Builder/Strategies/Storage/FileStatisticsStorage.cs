@@ -14,18 +14,32 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 	/// <summary>
 	/// Create a new file-based statistics storage
 	/// </summary>
-	/// <param name="filePath">Optional custom file path. If null, uses default location in the current working directory</param>
+	/// <param name="filePath">Optional custom file path. Must be within the application directory. If null, uses default location.</param>
 	public FileStatisticsStorage(string filePath = null)
 	{
-		_filePath = filePath ?? Path.Combine(
-			Directory.GetCurrentDirectory(),
+		_filePath = ValidateStoragePath(filePath ?? Path.Combine(
+			AppContext.BaseDirectory,
 			"query-statistics.json"
-		);
+		));
 
 		// Ensure directory exists
 		string directory = Path.GetDirectoryName(_filePath)!;
 		if (!Directory.Exists(directory))
 			Directory.CreateDirectory(directory);
+	}
+
+	private static string ValidateStoragePath(string path)
+	{
+		string fullPath = Path.GetFullPath(path);
+		string allowedRoot = Path.GetFullPath(AppContext.BaseDirectory);
+
+		if (!allowedRoot.EndsWith(Path.DirectorySeparatorChar))
+			allowedRoot += Path.DirectorySeparatorChar;
+
+		if (!fullPath.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase))
+			throw new UniverseException($"Storage path must be within the application directory '{allowedRoot}'.");
+
+		return fullPath;
 	}
 
 	/// <summary>
@@ -52,7 +66,11 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 
 			await File.WriteAllTextAsync(_filePath, json);
 		}
-		catch (System.Exception ex)
+		catch (JsonException ex)
+		{
+			Trace.TraceWarning($"[UniverseQuery] File statistics serialization failed: {ex.Message}");
+		}
+		catch (SystemException ex)
 		{
 			Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");
 		}

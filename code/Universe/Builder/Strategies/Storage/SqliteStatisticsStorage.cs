@@ -11,6 +11,7 @@ namespace Universe.Builder.Strategies.Storage;
 /// - Non-blocking fire-and-forget writes
 /// - Batched inserts for efficiency
 /// - Auto-cleanup of old data
+/// - Schema versioning for safe upgrades
 /// </summary>
 public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposable
 {
@@ -26,6 +27,10 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	private bool _disposed;
 	private DateTime _lastCleanup = DateTime.UtcNow;
 	private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
+	private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(30);
+	private const int CurrentSchemaVersion = 1;
+	private const int MaxFlushRetries = 3;
+	private readonly ConcurrentDictionary<QueryExecutionStatistics, int> _retryCounts = new(ReferenceEqualityComparer.Instance);
 
 	// Prepared statement cache
 	private SqliteCommand _insertCommand;
@@ -36,17 +41,21 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Creates a new SQLite statistics storage
 	/// </summary>
-	/// <param name="dbPath">Path to the SQLite database file. If null, uses default location.</param>
-	/// <param name="retentionDays">Number of days to retain statistics. Older records are auto-cleaned.</param>
-	/// <param name="batchSize">Number of records to batch before flushing to database.</param>
-	/// <param name="flushIntervalSeconds">Interval in seconds between automatic flushes.</param>
+	/// <param name="dbPath">Path to the SQLite database file. Must be within the application directory. If null, uses default location.</param>
+	/// <param name="retentionDays">Number of days to retain statistics (minimum 1). Older records are auto-cleaned.</param>
+	/// <param name="batchSize">Number of records to batch before flushing to database (minimum 1).</param>
+	/// <param name="flushIntervalSeconds">Interval in seconds between automatic flushes (minimum 1).</param>
 	public SqliteStatisticsStorage(
 		string dbPath = null,
 		int retentionDays = 7,
 		int batchSize = 10,
 		int flushIntervalSeconds = 5)
 	{
-		_dbPath = dbPath ?? Path.Combine(AppContext.BaseDirectory, "universe-stats.db");
+		ArgumentOutOfRangeException.ThrowIfLessThan(retentionDays, 1);
+		ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
+		ArgumentOutOfRangeException.ThrowIfLessThan(flushIntervalSeconds, 1);
+
+		_dbPath = ValidateStoragePath(dbPath ?? Path.Combine(AppContext.BaseDirectory, "universe-stats.db"));
 		_retentionDays = retentionDays;
 		_batchSize = batchSize;
 		_flushInterval = TimeSpan.FromSeconds(flushIntervalSeconds);
@@ -70,21 +79,38 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		// Enable WAL mode and other performance optimizations
 		ExecutePragmas();
 
-		// Initialize schema
+		// Run integrity check on startup
+		RunIntegrityCheck();
+
+		// Initialize schema with versioning
 		InitializeSchema();
 
 		// Prepare statements
 		PrepareStatements();
 
 		// Run initial cleanup
-		_ = CleanupOldRecordsAsync();
+		FireAndForget(CleanupOldRecordsAsync);
 
 		// Start flush timer
 		_flushTimer = new Timer(
-			_ => _ = FlushAsync(),
+			_ => FireAndForget(FlushAsync),
 			null,
 			_flushInterval,
 			_flushInterval);
+	}
+
+	internal static string ValidateStoragePath(string path)
+	{
+		string fullPath = Path.GetFullPath(path);
+		string allowedRoot = Path.GetFullPath(AppContext.BaseDirectory);
+
+		if (!allowedRoot.EndsWith(Path.DirectorySeparatorChar))
+			allowedRoot += Path.DirectorySeparatorChar;
+
+		if (!fullPath.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase))
+			throw new UniverseException($"Storage path must be within the application directory '{allowedRoot}'.");
+
+		return fullPath;
 	}
 
 	private void ExecutePragmas()
@@ -99,10 +125,30 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		pragmaCommand.ExecuteNonQuery();
 	}
 
+	private void RunIntegrityCheck()
+	{
+		try
+		{
+			using SqliteCommand cmd = _connection.CreateCommand();
+			cmd.CommandText = "PRAGMA quick_check";
+			string result = cmd.ExecuteScalar() as string;
+			if (result != "ok")
+				Trace.TraceWarning($"[UniverseQuery] SQLite integrity check failed: {result}");
+		}
+		catch (SystemException ex)
+		{
+			Trace.TraceWarning($"[UniverseQuery] SQLite integrity check error: {ex.Message}");
+		}
+	}
+
 	private void InitializeSchema()
 	{
 		using SqliteCommand schemaCommand = _connection.CreateCommand();
 		schemaCommand.CommandText = """
+			CREATE TABLE IF NOT EXISTS schema_version (
+				version INTEGER NOT NULL
+			);
+
 			CREATE TABLE IF NOT EXISTS query_statistics (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				query_hash TEXT NOT NULL,
@@ -121,8 +167,46 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 			CREATE INDEX IF NOT EXISTS idx_timestamp
 				ON query_statistics(timestamp);
+
+			CREATE INDEX IF NOT EXISTS idx_query_type_timestamp
+				ON query_statistics(query_type, timestamp DESC);
+
+			CREATE INDEX IF NOT EXISTS idx_strategy_used
+				ON query_statistics(strategy_used);
 			""";
 		schemaCommand.ExecuteNonQuery();
+
+		// Check and set schema version
+		using SqliteCommand versionCheck = _connection.CreateCommand();
+		versionCheck.CommandText = "SELECT version FROM schema_version LIMIT 1";
+		object result = versionCheck.ExecuteScalar();
+
+		if (result == null)
+		{
+			using SqliteCommand insertVersion = _connection.CreateCommand();
+			insertVersion.CommandText = "INSERT INTO schema_version (version) VALUES (@version)";
+			insertVersion.Parameters.AddWithValue("@version", CurrentSchemaVersion);
+			insertVersion.ExecuteNonQuery();
+		}
+		else
+		{
+			int existingVersion = Convert.ToInt32(result);
+			if (existingVersion < CurrentSchemaVersion)
+				MigrateSchema(existingVersion);
+		}
+	}
+
+	private void MigrateSchema(int fromVersion)
+	{
+		Trace.TraceInformation($"[UniverseQuery] Migrating SQLite schema from version {fromVersion} to {CurrentSchemaVersion}.");
+
+		// Future migrations go here, e.g.:
+		// if (fromVersion < 2) { ... apply v2 migration ... }
+
+		using SqliteCommand updateVersion = _connection.CreateCommand();
+		updateVersion.CommandText = "UPDATE schema_version SET version = @version";
+		updateVersion.Parameters.AddWithValue("@version", CurrentSchemaVersion);
+		updateVersion.ExecuteNonQuery();
 	}
 
 	private void PrepareStatements()
@@ -170,7 +254,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 		// Trigger flush if batch size reached
 		if (_writeQueue.Count >= _batchSize)
-			_ = FlushAsync();
+			FireAndForget(FlushAsync);
 
 		return Task.CompletedTask;
 	}
@@ -178,6 +262,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Load recent statistics from the database
 	/// </summary>
+	/// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
 	public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
 	{
 		if (_disposed) return [];
@@ -185,7 +270,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		// Flush pending writes first to ensure consistency
 		await FlushAsync();
 
-		await _writeLock.WaitAsync();
+		if (!await _writeLock.WaitAsync(LockTimeout))
+			throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
 		try
 		{
 			_selectRecentCommand.Parameters.Clear();
@@ -203,6 +289,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Load statistics for a specific query hash within a time window
 	/// </summary>
+	/// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
 	public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
 	{
 		if (_disposed) return [];
@@ -212,7 +299,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 		long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
 
-		await _writeLock.WaitAsync();
+		if (!await _writeLock.WaitAsync(LockTimeout))
+			throw new TimeoutException("Lock acquisition timed out in GetByQueryHashAsync.");
 		try
 		{
 			_selectByHashCommand.Parameters.Clear();
@@ -231,13 +319,15 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Clear old statistics (older than specified timespan)
 	/// </summary>
+	/// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
 	public async Task ClearOldAsync(TimeSpan olderThan)
 	{
 		if (_disposed) return;
 
 		long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(olderThan).ToUnixTimeSeconds();
 
-		await _writeLock.WaitAsync();
+		if (!await _writeLock.WaitAsync(LockTimeout))
+			throw new TimeoutException("Lock acquisition timed out in ClearOldAsync.");
 		try
 		{
 			_deleteOldCommand.Parameters.Clear();
@@ -265,7 +355,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 				{
 					hints = JsonSerializer.Deserialize<Dictionary<string, object>>(hintsJson);
 				}
-				catch (System.Exception ex)
+				catch (SystemException ex)
 				{
 					Trace.TraceWarning($"[UniverseQuery] Failed to deserialize query hints: {ex.Message}");
 				}
@@ -303,7 +393,11 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
 		if (toWrite.Count == 0) return;
 
-		await _writeLock.WaitAsync();
+		if (!await _writeLock.WaitAsync(LockTimeout))
+		{
+			RequeueWithRetryLimit(toWrite);
+			throw new TimeoutException("Lock acquisition timed out in FlushAsync.");
+		}
 		try
 		{
 			using SqliteTransaction transaction = _connection.BeginTransaction();
@@ -327,10 +421,15 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 			}
 
 			await transaction.CommitAsync();
+
+			// Clear retry tracking for successfully persisted items
+			foreach (QueryExecutionStatistics stat in toWrite)
+				_retryCounts.TryRemove(stat, out _);
 		}
-		catch (System.Exception ex)
+		catch (SystemException ex)
 		{
 			Trace.TraceWarning($"[UniverseQuery] SQLite flush failed: {ex.Message}");
+			RequeueWithRetryLimit(toWrite);
 		}
 		finally
 		{
@@ -340,7 +439,39 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
 		{
 			_lastCleanup = DateTime.UtcNow;
-			_ = CleanupOldRecordsAsync();
+			FireAndForget(CleanupOldRecordsAsync);
+		}
+	}
+
+	private void RequeueWithRetryLimit(List<QueryExecutionStatistics> items)
+	{
+		foreach (QueryExecutionStatistics item in items)
+		{
+			int retries = _retryCounts.AddOrUpdate(item, 1, (_, count) => count + 1);
+			if (retries <= MaxFlushRetries)
+			{
+				_writeQueue.Enqueue(item);
+			}
+			else
+			{
+				_retryCounts.TryRemove(item, out _);
+				Trace.TraceWarning($"[UniverseQuery] Dropping statistics for query '{item.QueryHash}' after {MaxFlushRetries} failed flush attempts.");
+			}
+		}
+	}
+
+	/// <summary>
+	/// Runs an async task fire-and-forget, logging any exceptions instead of leaving them unobserved.
+	/// </summary>
+	private static async void FireAndForget(Func<Task> action)
+	{
+		try
+		{
+			await action();
+		}
+		catch (System.Exception ex)
+		{
+			Trace.TraceWarning($"[UniverseQuery] Background operation failed: {ex.Message}");
 		}
 	}
 
@@ -352,12 +483,22 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	public void Dispose()
 	{
 		if (_disposed) return;
-		_disposed = true;
 
+		// Stop timer callbacks before final flush
+		_flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
 		_flushTimer?.Dispose();
 
-		// Final flush
-		FlushAsync().GetAwaiter().GetResult();
+		// Final flush BEFORE setting _disposed (FlushAsync checks _disposed and would skip)
+		try
+		{
+			FlushAsync().Wait(TimeSpan.FromSeconds(10));
+		}
+		catch (SystemException ex)
+		{
+			Trace.TraceWarning($"[UniverseQuery] Final flush during dispose failed: {ex.Message}");
+		}
+
+		_disposed = true;
 
 		_insertCommand?.Dispose();
 		_selectRecentCommand?.Dispose();

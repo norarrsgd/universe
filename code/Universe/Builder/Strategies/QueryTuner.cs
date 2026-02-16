@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Universe.Builder.Strategies.Storage;
 
 namespace Universe.Builder.Strategies;
@@ -8,16 +9,22 @@ namespace Universe.Builder.Strategies;
 /// <summary>
 /// Provides query tuning recommendations based on query type and historical performance
 /// </summary>
-internal sealed class QueryTuner : IDisposable
+internal sealed partial class QueryTuner : IDisposable
 {
-	private readonly ConcurrentQueue<QueryExecutionStatistics> _recentExecutions;
+	private readonly ConcurrentDictionary<QueryType, ConcurrentQueue<QueryExecutionStatistics>> _partitions;
 	private readonly IQueryStatisticsStorage _storage;
+	private int _totalCount;
 	private const int MaxStoredExecutions = 1000;
 	private const int MinSampleSizeForRecommendations = 10;
 
+	[GeneratedRegex(@"@\w+")]
+	private static partial Regex ParameterNamePattern();
+
 	public QueryTuner(IQueryStatisticsStorage storage = null)
 	{
-		_recentExecutions = new ConcurrentQueue<QueryExecutionStatistics>();
+		_partitions = new ConcurrentDictionary<QueryType, ConcurrentQueue<QueryExecutionStatistics>>();
+		foreach (QueryType type in Enum.GetValues<QueryType>())
+			_partitions[type] = new ConcurrentQueue<QueryExecutionStatistics>();
 		_storage = storage ?? new InMemoryStatisticsStorage();
 
 		// Load persisted statistics on startup (async, don't block constructor)
@@ -29,12 +36,54 @@ internal sealed class QueryTuner : IDisposable
 	/// </summary>
 	public void RecordExecution(QueryExecutionStatistics stats)
 	{
-		_recentExecutions.Enqueue(stats);
-		while (_recentExecutions.Count > MaxStoredExecutions)
+		_partitions[stats.Type].Enqueue(stats);
+		Interlocked.Increment(ref _totalCount);
+
+		int evictionAttempts = 0;
+		while (Interlocked.CompareExchange(ref _totalCount, 0, 0) > MaxStoredExecutions)
 		{
-			_recentExecutions.TryDequeue(out _);
+			if (TryEvictOldest())
+			{
+				Interlocked.Decrement(ref _totalCount);
+				evictionAttempts = 0;
+			}
+			else if (++evictionAttempts > MaxStoredExecutions)
+			{
+				// Queues are truly empty but _totalCount is stale — reconcile
+				Interlocked.Exchange(ref _totalCount, CountActual());
+				break;
+			}
 		}
+
 		_ = PersistAsync(stats);
+	}
+
+	private int CountActual()
+	{
+		int count = 0;
+		foreach (var kvp in _partitions)
+			count += kvp.Value.Count;
+		return count;
+	}
+
+	private bool TryEvictOldest()
+	{
+		QueryType? oldestType = null;
+		DateTime oldestTimestamp = DateTime.MaxValue;
+
+		foreach (var kvp in _partitions)
+		{
+			if (kvp.Value.TryPeek(out var front) && front.Timestamp < oldestTimestamp)
+			{
+				oldestTimestamp = front.Timestamp;
+				oldestType = kvp.Key;
+			}
+		}
+
+		if (oldestType.HasValue)
+			return _partitions[oldestType.Value].TryDequeue(out _);
+
+		return false;
 	}
 
 	private async Task PersistAsync(QueryExecutionStatistics stats)
@@ -57,7 +106,8 @@ internal sealed class QueryTuner : IDisposable
 		DateTime last24Hours = DateTime.UtcNow.AddHours(-24);
 
 		// Get relevant statistics from last 24 hours
-		List<QueryExecutionStatistics> relevantStats = [.. _recentExecutions.Where(s => s.Type == queryType && s.Timestamp >= last24Hours)];
+		List<QueryExecutionStatistics> relevantStats = [.. _partitions[queryType]
+			.Where(s => s.Timestamp >= last24Hours)];
 
 		// If insufficient data, fall back to rule-based recommendations
 		if (relevantStats.Count < MinSampleSizeForRecommendations)
@@ -84,7 +134,11 @@ internal sealed class QueryTuner : IDisposable
 	/// </summary>
 	public static string ComputeQueryHash(QueryContext context, string queryText)
 	{
-		string signature = $"{context.Type}|{queryText}";
+		// Normalize parameter names to produce consistent hashes for structurally identical queries.
+		// Parameter names contain dynamic CatalystIds (GUIDs) that vary per instance,
+		// so identical logical queries would otherwise get different hashes.
+		string normalizedQuery = ParameterNamePattern().Replace(queryText, "@p");
+		string signature = $"{context.Type}|{normalizedQuery}";
 		byte[] bytes = Encoding.UTF8.GetBytes(signature);
 		byte[] hash = SHA256.HashData(bytes);
 		return Convert.ToBase64String(hash)[..16];
@@ -216,7 +270,8 @@ internal sealed class QueryTuner : IDisposable
 			IList<QueryExecutionStatistics> persisted = await _storage.LoadRecentAsync(MaxStoredExecutions);
 			foreach (QueryExecutionStatistics stat in persisted)
 			{
-				_recentExecutions.Enqueue(stat);
+				_partitions[stat.Type].Enqueue(stat);
+				Interlocked.Increment(ref _totalCount);
 			}
 		}
 		catch (System.Exception ex)
