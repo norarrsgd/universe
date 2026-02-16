@@ -35,6 +35,77 @@ public sealed class QueryTunerTests
 			"Simple records should provide data-driven recommendations");
 	}
 
+	[Fact]
+	public void GetRecommendations_OnlyConsidersEntriesOfRequestedType()
+	{
+		using var tuner = new QueryTuner();
+
+		// Record 200 Simple, 200 Aggregation, 100 VectorSearch
+		for (int i = 0; i < 200; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.Simple, queryHash: $"simple-{i}"));
+		for (int i = 0; i < 200; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.Aggregation, queryHash: $"agg-{i}"));
+		for (int i = 0; i < 100; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.VectorSearch, queryHash: $"vec-{i}"));
+
+		var simpleRec = tuner.GetRecommendations(QueryType.Simple);
+		var aggRec = tuner.GetRecommendations(QueryType.Aggregation);
+		var vecRec = tuner.GetRecommendations(QueryType.VectorSearch);
+		var joinRec = tuner.GetRecommendations(QueryType.Join);
+
+		Assert.True(simpleRec.IsDataDriven);
+		Assert.Equal(200, simpleRec.SampleSize);
+
+		Assert.True(aggRec.IsDataDriven);
+		Assert.Equal(200, aggRec.SampleSize);
+
+		Assert.True(vecRec.IsDataDriven);
+		Assert.Equal(100, vecRec.SampleSize);
+
+		// Join has no entries — should be rule-based
+		Assert.False(joinRec.IsDataDriven);
+	}
+
+	[Fact]
+	public void RecordExecution_GlobalCapAppliesAcrossAllTypes()
+	{
+		using var tuner = new QueryTuner();
+
+		// Record 500 Simple (oldest), then 500 Aggregation, then 100 VectorSearch
+		for (int i = 0; i < 500; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.Simple, queryHash: $"simple-{i}",
+				timestamp: DateTime.UtcNow.AddMinutes(-1000 + i)));
+		for (int i = 0; i < 500; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.Aggregation, queryHash: $"agg-{i}",
+				timestamp: DateTime.UtcNow.AddMinutes(-500 + i)));
+		for (int i = 0; i < 100; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.VectorSearch, queryHash: $"vec-{i}",
+				timestamp: DateTime.UtcNow.AddMinutes(-i)));
+
+		// Total inserted: 1100 → 100 oldest (Simple) should be evicted
+		var simpleRec = tuner.GetRecommendations(QueryType.Simple);
+		var aggRec = tuner.GetRecommendations(QueryType.Aggregation);
+		var vecRec = tuner.GetRecommendations(QueryType.VectorSearch);
+
+		// Simple should have lost 100 entries (evicted as oldest)
+		Assert.True(simpleRec.IsDataDriven);
+		Assert.Equal(400, simpleRec.SampleSize);
+
+		// Aggregation should be untouched
+		Assert.True(aggRec.IsDataDriven);
+		Assert.Equal(500, aggRec.SampleSize);
+
+		// VectorSearch should be untouched
+		Assert.True(vecRec.IsDataDriven);
+		Assert.Equal(100, vecRec.SampleSize);
+	}
+
 	#endregion
 
 	#region Recommendations: rule-based vs data-driven

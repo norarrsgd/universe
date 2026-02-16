@@ -101,6 +101,45 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 
 	[Fact]
 	[Trait("Category", "Performance")]
+	public void GetRecommendations_MixedTypes_UnrelatedTypeIsNotAffected()
+	{
+		using var tuner = new QueryTuner();
+
+		// Load 950 Simple entries and 50 Aggregation entries
+		for (int i = 0; i < 950; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.Simple, queryHash: $"simple-{i}",
+				timestamp: DateTime.UtcNow));
+		for (int i = 0; i < 50; i++)
+			tuner.RecordExecution(TestStatisticsFactory.Create(
+				type: QueryType.Aggregation, queryHash: $"agg-{i}",
+				timestamp: DateTime.UtcNow));
+
+		// Measure 1000 calls for Simple (950-item partition)
+		var sw = Stopwatch.StartNew();
+		for (int i = 0; i < 1000; i++)
+			tuner.GetRecommendations(QueryType.Simple);
+		sw.Stop();
+		var simpleTime = sw.Elapsed;
+
+		// Measure 1000 calls for Aggregation (50-item partition)
+		sw.Restart();
+		for (int i = 0; i < 1000; i++)
+			tuner.GetRecommendations(QueryType.Aggregation);
+		sw.Stop();
+		var aggTime = sw.Elapsed;
+
+		_output.WriteLine($"Simple (950 items): {simpleTime.TotalMilliseconds:F2}ms for 1000 calls");
+		_output.WriteLine($"Aggregation (50 items): {aggTime.TotalMilliseconds:F2}ms for 1000 calls");
+		_output.WriteLine($"Ratio: {simpleTime.TotalMilliseconds / Math.Max(aggTime.TotalMilliseconds, 0.001):F2}x");
+
+		// Aggregation with 50 items should be faster than Simple with 950 items
+		Assert.True(aggTime < simpleTime,
+			$"Expected Aggregation ({aggTime.TotalMilliseconds:F2}ms) < Simple ({simpleTime.TotalMilliseconds:F2}ms)");
+	}
+
+	[Fact]
+	[Trait("Category", "Performance")]
 	public void ComputeQueryHash_10000Calls_Performance()
 	{
 		var context = new QueryContext(QueryType.Simple);
