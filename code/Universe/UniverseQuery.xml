@@ -590,7 +590,7 @@
             <summary>
             Create a new file-based statistics storage
             </summary>
-            <param name="filePath">Optional custom file path. If null, uses default location in the current working directory</param>
+            <param name="filePath">Optional custom file path. Must be within the application directory. If null, uses default location.</param>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>
@@ -680,16 +680,17 @@
             - Non-blocking fire-and-forget writes
             - Batched inserts for efficiency
             - Auto-cleanup of old data
+            - Schema versioning for safe upgrades
             </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.#ctor(System.String,System.Int32,System.Int32,System.Int32)">
             <summary>
             Creates a new SQLite statistics storage
             </summary>
-            <param name="dbPath">Path to the SQLite database file. If null, uses default location.</param>
-            <param name="retentionDays">Number of days to retain statistics. Older records are auto-cleaned.</param>
-            <param name="batchSize">Number of records to batch before flushing to database.</param>
-            <param name="flushIntervalSeconds">Interval in seconds between automatic flushes.</param>
+            <param name="dbPath">Path to the SQLite database file. Must be within the application directory. If null, uses default location.</param>
+            <param name="retentionDays">Number of days to retain statistics (minimum 1). Older records are auto-cleaned.</param>
+            <param name="batchSize">Number of records to batch before flushing to database (minimum 1).</param>
+            <param name="flushIntervalSeconds">Interval in seconds between automatic flushes (minimum 1).</param>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>

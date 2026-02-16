@@ -65,7 +65,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.Conflict)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -125,7 +125,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.Conflict)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -144,7 +144,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -202,7 +202,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -236,7 +236,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -256,7 +256,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -273,7 +273,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 
@@ -290,7 +290,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 		}
 		catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
 		{
-			throw;
+			throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
 		}
 	}
 }

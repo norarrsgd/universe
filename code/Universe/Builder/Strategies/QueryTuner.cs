@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Universe.Builder.Strategies.Storage;
 
 namespace Universe.Builder.Strategies;
@@ -84,7 +85,11 @@ internal sealed class QueryTuner : IDisposable
 	/// </summary>
 	public static string ComputeQueryHash(QueryContext context, string queryText)
 	{
-		string signature = $"{context.Type}|{queryText}";
+		// Normalize parameter names to produce consistent hashes for structurally identical queries.
+		// Parameter names contain dynamic CatalystIds (GUIDs) that vary per instance,
+		// so identical logical queries would otherwise get different hashes.
+		string normalizedQuery = Regex.Replace(queryText, @"@\w+", "@p");
+		string signature = $"{context.Type}|{normalizedQuery}";
 		byte[] bytes = Encoding.UTF8.GetBytes(signature);
 		byte[] hash = SHA256.HashData(bytes);
 		return Convert.ToBase64String(hash)[..16];

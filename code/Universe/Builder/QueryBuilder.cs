@@ -3,17 +3,26 @@ using Universe.Builder.Strategies;
 
 namespace Universe.Builder;
 
-internal class UniverseBuilder(bool recordQueries) : IDisposable
+internal class UniverseBuilder : IDisposable
 {
-	private readonly QueryTuner _queryTuner = new();
-	private readonly QueryStrategySelector _strategySelector = new(new());
+	private readonly bool _recordQueries;
+	private readonly QueryTuner _queryTuner;
+	private readonly QueryStrategySelector _strategySelector;
 
 	public UniverseBuilder() : this(false)
 	{
 	}
 
-	public UniverseBuilder(bool recordQueries, QueryTuner queryTuner) : this(recordQueries)
+	public UniverseBuilder(bool recordQueries)
 	{
+		_recordQueries = recordQueries;
+		_queryTuner = new();
+		_strategySelector = new(_queryTuner);
+	}
+
+	public UniverseBuilder(bool recordQueries, QueryTuner queryTuner)
+	{
+		_recordQueries = recordQueries;
 		_queryTuner = queryTuner;
 		_strategySelector = new(_queryTuner);
 	}
@@ -478,7 +487,7 @@ internal class UniverseBuilder(bool recordQueries) : IDisposable
 		QueryContext singleContext = context.Value with { MaxItemCount = 1 };
 
 		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, singleContext);
-		(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, recordQueries, _queryTuner);
+		(Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, _recordQueries, _queryTuner);
 		T result = results.Count != 0 ? results.First() : default(T);
 		return (gravity, result);
 	}
@@ -487,7 +496,7 @@ internal class UniverseBuilder(bool recordQueries) : IDisposable
 	{
 		context ??= InferQueryContext(query);
 		IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context.Value);
-		return await strategy.ExecuteAsync<T>(container, query, context.Value, recordQueries, _queryTuner);
+		return await strategy.ExecuteAsync<T>(container, query, context.Value, _recordQueries, _queryTuner);
 	}
 
 	internal QueryTuningRecommendations GetQueryRecommendations(QueryType queryType) => _queryTuner.GetRecommendations(queryType);
