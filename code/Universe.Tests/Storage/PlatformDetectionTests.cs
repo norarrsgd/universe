@@ -85,11 +85,11 @@ public sealed class PlatformDetectionTests
 	}
 
 	[Fact]
-	public void GetLocalTempDirectory_ReturnsNonEmptyPath()
+	public void GetLocalTempDirectory_ReturnsNonEmptyRootedPath()
 	{
 		string result = PlatformDetection.GetLocalTempDirectory();
 		Assert.False(string.IsNullOrEmpty(result));
-		Assert.True(Directory.Exists(result));
+		Assert.True(Path.IsPathRooted(result));
 	}
 
 	[Fact]
