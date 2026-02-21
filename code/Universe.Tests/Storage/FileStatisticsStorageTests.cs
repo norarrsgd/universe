@@ -109,12 +109,17 @@ public sealed class FileStatisticsStorageTests : IDisposable
 	}
 
 	[Fact]
-	public void CustomPath_OutsideAppDirectory_IsAllowed()
+	public void CustomPath_IsAllowed()
 	{
-		string tempPath = Path.Combine(Path.GetTempPath(), $"universe-test-{Guid.NewGuid()}.json");
-		using var storage = new FileStatisticsStorage(tempPath);
+		string customPath = Path.Combine(AppContext.BaseDirectory, "custom-dir", $"universe-test-{Guid.NewGuid()}.json");
+		using var storage = new FileStatisticsStorage(customPath);
 		storage.Dispose();
-		try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+		try
+		{
+			if (File.Exists(customPath)) File.Delete(customPath);
+			string dir = Path.GetDirectoryName(customPath)!;
+			if (Directory.Exists(dir)) Directory.Delete(dir);
+		}
 		catch { /* best effort cleanup */ }
 	}
 

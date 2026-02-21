@@ -39,4 +39,30 @@ internal static class PlatformDetection
 		Environment.GetEnvironmentVariable("TMP")
 		?? Environment.GetEnvironmentVariable("TEMP")
 		?? Path.GetTempPath();
+
+	/// <summary>
+	/// Validates and normalizes a storage file path.
+	/// Resolves the path via <see cref="Path.GetFullPath(string)"/>, ensures the result
+	/// is rooted (absolute), and rejects paths containing null bytes.
+	/// </summary>
+	/// <param name="path">The raw file path to validate.</param>
+	/// <returns>The fully-qualified, validated path.</returns>
+	/// <exception cref="Universe.Exception.UniverseException">
+	/// Thrown when the path is empty, contains null bytes, or cannot be resolved to a rooted path.
+	/// </exception>
+	internal static string ValidateStoragePath(string path)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+			throw new Universe.Exception.UniverseException("Storage path must not be empty.");
+
+		if (path.Contains('\0'))
+			throw new Universe.Exception.UniverseException("Storage path contains invalid characters.");
+
+		string fullPath = Path.GetFullPath(path);
+
+		if (!Path.IsPathRooted(fullPath))
+			throw new Universe.Exception.UniverseException($"Storage path must resolve to an absolute path. Got: '{fullPath}'");
+
+		return fullPath;
+	}
 }

@@ -91,4 +91,27 @@ public sealed class PlatformDetectionTests
 		Assert.False(string.IsNullOrEmpty(result));
 		Assert.True(Directory.Exists(result));
 	}
+
+	[Fact]
+	public void ValidateStoragePath_ValidAbsolutePath_ReturnsNormalized()
+	{
+		string path = Path.Combine(AppContext.BaseDirectory, "test.db");
+		string result = PlatformDetection.ValidateStoragePath(path);
+		Assert.Equal(Path.GetFullPath(path), result);
+		Assert.True(Path.IsPathRooted(result));
+	}
+
+	[Fact]
+	public void ValidateStoragePath_EmptyPath_Throws()
+	{
+		Assert.Throws<Universe.Exception.UniverseException>(
+			() => PlatformDetection.ValidateStoragePath(""));
+	}
+
+	[Fact]
+	public void ValidateStoragePath_NullByteInPath_Throws()
+	{
+		Assert.Throws<Universe.Exception.UniverseException>(
+			() => PlatformDetection.ValidateStoragePath("/tmp/test\0.db"));
+	}
 }

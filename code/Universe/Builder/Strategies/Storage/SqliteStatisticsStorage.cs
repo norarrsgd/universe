@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
@@ -49,8 +48,6 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <param name="retentionDays">Number of days to retain statistics (minimum 1). Older records are auto-cleaned.</param>
 	/// <param name="batchSize">Number of records to batch before flushing to database (minimum 1).</param>
 	/// <param name="flushIntervalSeconds">Interval in seconds between automatic flushes (minimum 1).</param>
-	[SuppressMessage("CodeQuality", "cs/path-injection",
-		Justification = "Path is caller-supplied by design; callers are responsible for not passing untrusted user input.")]
 	public SqliteStatisticsStorage(
 		string dbPath = null,
 		int retentionDays = 7,
@@ -61,7 +58,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
 		ArgumentOutOfRangeException.ThrowIfLessThan(flushIntervalSeconds, 1);
 
-		_dbPath = Path.GetFullPath(dbPath ?? ResolveDefaultPath());
+		_dbPath = PlatformDetection.ValidateStoragePath(dbPath ?? ResolveDefaultPath());
 		_retentionDays = retentionDays;
 		_batchSize = batchSize;
 		_flushInterval = TimeSpan.FromSeconds(flushIntervalSeconds);

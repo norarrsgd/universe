@@ -234,12 +234,18 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 	#region Validation
 
 	[Fact]
-	public void CustomPath_OutsideAppDirectory_IsAllowed()
+	public void CustomPath_IsAllowed()
 	{
-		string tempPath = Path.Combine(Path.GetTempPath(), $"universe-test-{Guid.NewGuid()}.db");
-		using var storage = new SqliteStatisticsStorage(tempPath, batchSize: 1, flushIntervalSeconds: 60);
+		string customPath = Path.Combine(AppContext.BaseDirectory, "custom-dir", $"universe-test-{Guid.NewGuid()}.db");
+		using var storage = new SqliteStatisticsStorage(customPath, batchSize: 1, flushIntervalSeconds: 60);
 		storage.Dispose();
-		TryDeleteFiles(tempPath);
+		TryDeleteFiles(customPath);
+		try
+		{
+			string dir = Path.GetDirectoryName(customPath)!;
+			if (Directory.Exists(dir)) Directory.Delete(dir);
+		}
+		catch { /* best effort */ }
 	}
 
 	[Fact]
