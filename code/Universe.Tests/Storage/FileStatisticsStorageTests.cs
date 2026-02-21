@@ -109,10 +109,13 @@ public sealed class FileStatisticsStorageTests : IDisposable
 	}
 
 	[Fact]
-	public void InvalidPath_OutsideAppDirectory_Throws()
+	public void CustomPath_OutsideAppDirectory_IsAllowed()
 	{
-		Assert.Throws<Universe.Exception.UniverseException>(() =>
-			new FileStatisticsStorage("/tmp/outside-app-dir.json"));
+		string tempPath = Path.Combine(Path.GetTempPath(), $"universe-test-{Guid.NewGuid()}.json");
+		using var storage = new FileStatisticsStorage(tempPath);
+		storage.Dispose();
+		try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+		catch { /* best effort cleanup */ }
 	}
 
 	[Fact]
