@@ -104,27 +104,20 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// Resolves the default database path based on the runtime environment.
 	/// On Azure (Functions / App Service), uses local temp storage to avoid
 	/// SMB-mounted paths where SQLite WAL mode is unsupported.
+	/// <para>
+	/// <b>Azure caveat:</b> Temp directories are local to the VM instance and are cleared on
+	/// cold starts, scale events, or platform updates. The tuner starts fresh in these cases.
+	/// For durable persistence across restarts, provide an explicit <c>dbPath</c> pointing to
+	/// a writable local disk.
+	/// </para>
 	/// </summary>
 	internal static string ResolveDefaultPath()
 	{
-		if (IsAzureEnvironment())
-		{
-			string localTemp = Environment.GetEnvironmentVariable("TMP")
-				?? Environment.GetEnvironmentVariable("TEMP")
-				?? Path.GetTempPath();
-
-			return Path.Combine(localTemp, "universe-stats.db");
-		}
+		if (PlatformDetection.IsAzureEnvironment())
+			return Path.Combine(PlatformDetection.GetLocalTempDirectory(), "universe-stats.db");
 
 		return Path.Combine(AppContext.BaseDirectory, "universe-stats.db");
 	}
-
-	/// <summary>
-	/// Detects Azure App Service or Azure Functions by checking well-known environment variables.
-	/// </summary>
-	internal static bool IsAzureEnvironment() =>
-		!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"))
-		|| !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME"));
 
 	private void ExecutePragmas()
 	{

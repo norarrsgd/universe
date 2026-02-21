@@ -266,14 +266,41 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 	[Fact]
 	public void ResolveDefaultPath_NonAzure_UsesAppBaseDirectory()
 	{
-		string expected = Path.Combine(AppContext.BaseDirectory, "universe-stats.db");
-		string actual = SqliteStatisticsStorage.ResolveDefaultPath();
+		string original1 = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
+		string original2 = Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME");
 
-		// When not running on Azure, should default to app directory
-		if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"))
-			&& string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME")))
+		try
 		{
-			Assert.Equal(expected, actual);
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", null);
+			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+
+			string expected = Path.Combine(AppContext.BaseDirectory, "universe-stats.db");
+			Assert.Equal(expected, SqliteStatisticsStorage.ResolveDefaultPath());
+		}
+		finally
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", original1);
+			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", original2);
+		}
+	}
+
+	[Fact]
+	public void ResolveDefaultPath_Azure_UsesTempDirectory()
+	{
+		string original = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
+
+		try
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", "test-instance");
+
+			string result = SqliteStatisticsStorage.ResolveDefaultPath();
+
+			Assert.EndsWith("universe-stats.db", result);
+			Assert.DoesNotContain("wwwroot", result);
+		}
+		finally
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", original);
 		}
 	}
 

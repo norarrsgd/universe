@@ -119,6 +119,27 @@ public sealed class FileStatisticsStorageTests : IDisposable
 	}
 
 	[Fact]
+	public void ResolveDefaultPath_NonAzure_UsesAppBaseDirectory()
+	{
+		string original1 = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
+		string original2 = Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME");
+
+		try
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", null);
+			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+
+			string expected = Path.Combine(AppContext.BaseDirectory, "query-statistics.json");
+			Assert.Equal(expected, FileStatisticsStorage.ResolveDefaultPath());
+		}
+		finally
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", original1);
+			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", original2);
+		}
+	}
+
+	[Fact]
 	[Trait("Category", "Performance")]
 	public async Task SaveAsync_PerformanceAtDifferentScales()
 	{

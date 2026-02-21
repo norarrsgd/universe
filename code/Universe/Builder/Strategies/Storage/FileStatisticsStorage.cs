@@ -30,17 +30,17 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 	/// Resolves the default file path based on the runtime environment.
 	/// On Azure (Functions / App Service), uses local temp storage to avoid
 	/// SMB-mounted paths where file locking can be unreliable.
+	/// <para>
+	/// <b>Azure caveat:</b> Temp directories are local to the VM instance and are cleared on
+	/// cold starts, scale events, or platform updates. The tuner starts fresh in these cases.
+	/// For durable persistence across restarts, provide an explicit <c>filePath</c> pointing to
+	/// a writable local disk.
+	/// </para>
 	/// </summary>
 	internal static string ResolveDefaultPath()
 	{
-		if (SqliteStatisticsStorage.IsAzureEnvironment())
-		{
-			string localTemp = Environment.GetEnvironmentVariable("TMP")
-				?? Environment.GetEnvironmentVariable("TEMP")
-				?? Path.GetTempPath();
-
-			return Path.Combine(localTemp, "query-statistics.json");
-		}
+		if (PlatformDetection.IsAzureEnvironment())
+			return Path.Combine(PlatformDetection.GetLocalTempDirectory(), "query-statistics.json");
 
 		return Path.Combine(AppContext.BaseDirectory, "query-statistics.json");
 	}
