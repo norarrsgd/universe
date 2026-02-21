@@ -234,10 +234,12 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 	#region Validation
 
 	[Fact]
-	public void InvalidPath_OutsideAppDirectory_Throws()
+	public void CustomPath_OutsideAppDirectory_IsAllowed()
 	{
-		Assert.Throws<Universe.Exception.UniverseException>(() =>
-			new SqliteStatisticsStorage("/tmp/outside-app-dir.db"));
+		string tempPath = Path.Combine(Path.GetTempPath(), $"universe-test-{Guid.NewGuid()}.db");
+		using var storage = new SqliteStatisticsStorage(tempPath, batchSize: 1, flushIntervalSeconds: 60);
+		storage.Dispose();
+		TryDeleteFiles(tempPath);
 	}
 
 	[Fact]
@@ -259,6 +261,20 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 	{
 		Assert.Throws<ArgumentOutOfRangeException>(() =>
 			new SqliteStatisticsStorage(flushIntervalSeconds: 0));
+	}
+
+	[Fact]
+	public void ResolveDefaultPath_NonAzure_UsesAppBaseDirectory()
+	{
+		string expected = Path.Combine(AppContext.BaseDirectory, "universe-stats.db");
+		string actual = SqliteStatisticsStorage.ResolveDefaultPath();
+
+		// When not running on Azure, should default to app directory
+		if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"))
+			&& string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME")))
+		{
+			Assert.Equal(expected, actual);
+		}
 	}
 
 	#endregion

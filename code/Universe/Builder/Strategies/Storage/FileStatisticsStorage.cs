@@ -14,13 +14,11 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 	/// <summary>
 	/// Create a new file-based statistics storage
 	/// </summary>
-	/// <param name="filePath">Optional custom file path. Must be within the application directory. If null, uses default location.</param>
+	/// <param name="filePath">Optional custom file path. If null, uses a platform-aware default
+	/// (temp directory on Azure, application directory otherwise).</param>
 	public FileStatisticsStorage(string filePath = null)
 	{
-		_filePath = ValidateStoragePath(filePath ?? Path.Combine(
-			AppContext.BaseDirectory,
-			"query-statistics.json"
-		));
+		_filePath = Path.GetFullPath(filePath ?? ResolveDefaultPath());
 
 		// Ensure directory exists
 		string directory = Path.GetDirectoryName(_filePath)!;
@@ -28,18 +26,23 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 			Directory.CreateDirectory(directory);
 	}
 
-	private static string ValidateStoragePath(string path)
+	/// <summary>
+	/// Resolves the default file path based on the runtime environment.
+	/// On Azure (Functions / App Service), uses local temp storage to avoid
+	/// SMB-mounted paths where file locking can be unreliable.
+	/// </summary>
+	internal static string ResolveDefaultPath()
 	{
-		string fullPath = Path.GetFullPath(path);
-		string allowedRoot = Path.GetFullPath(AppContext.BaseDirectory);
+		if (SqliteStatisticsStorage.IsAzureEnvironment())
+		{
+			string localTemp = Environment.GetEnvironmentVariable("TMP")
+				?? Environment.GetEnvironmentVariable("TEMP")
+				?? Path.GetTempPath();
 
-		if (!allowedRoot.EndsWith(Path.DirectorySeparatorChar))
-			allowedRoot += Path.DirectorySeparatorChar;
+			return Path.Combine(localTemp, "query-statistics.json");
+		}
 
-		if (!fullPath.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase))
-			throw new UniverseException($"Storage path must be within the application directory '{allowedRoot}'.");
-
-		return fullPath;
+		return Path.Combine(AppContext.BaseDirectory, "query-statistics.json");
 	}
 
 	/// <summary>

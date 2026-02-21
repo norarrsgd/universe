@@ -41,7 +41,8 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// <summary>
 	/// Creates a new SQLite statistics storage
 	/// </summary>
-	/// <param name="dbPath">Path to the SQLite database file. Must be within the application directory. If null, uses default location.</param>
+	/// <param name="dbPath">Path to the SQLite database file. If null, uses a platform-aware default
+	/// (temp directory on Azure, application directory otherwise).</param>
 	/// <param name="retentionDays">Number of days to retain statistics (minimum 1). Older records are auto-cleaned.</param>
 	/// <param name="batchSize">Number of records to batch before flushing to database (minimum 1).</param>
 	/// <param name="flushIntervalSeconds">Interval in seconds between automatic flushes (minimum 1).</param>
@@ -55,7 +56,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 		ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
 		ArgumentOutOfRangeException.ThrowIfLessThan(flushIntervalSeconds, 1);
 
-		_dbPath = ValidateStoragePath(dbPath ?? Path.Combine(AppContext.BaseDirectory, "universe-stats.db"));
+		_dbPath = Path.GetFullPath(dbPath ?? ResolveDefaultPath());
 		_retentionDays = retentionDays;
 		_batchSize = batchSize;
 		_flushInterval = TimeSpan.FromSeconds(flushIntervalSeconds);
@@ -99,19 +100,31 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 			_flushInterval);
 	}
 
-	internal static string ValidateStoragePath(string path)
+	/// <summary>
+	/// Resolves the default database path based on the runtime environment.
+	/// On Azure (Functions / App Service), uses local temp storage to avoid
+	/// SMB-mounted paths where SQLite WAL mode is unsupported.
+	/// </summary>
+	internal static string ResolveDefaultPath()
 	{
-		string fullPath = Path.GetFullPath(path);
-		string allowedRoot = Path.GetFullPath(AppContext.BaseDirectory);
+		if (IsAzureEnvironment())
+		{
+			string localTemp = Environment.GetEnvironmentVariable("TMP")
+				?? Environment.GetEnvironmentVariable("TEMP")
+				?? Path.GetTempPath();
 
-		if (!allowedRoot.EndsWith(Path.DirectorySeparatorChar))
-			allowedRoot += Path.DirectorySeparatorChar;
+			return Path.Combine(localTemp, "universe-stats.db");
+		}
 
-		if (!fullPath.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase))
-			throw new UniverseException($"Storage path must be within the application directory '{allowedRoot}'.");
-
-		return fullPath;
+		return Path.Combine(AppContext.BaseDirectory, "universe-stats.db");
 	}
+
+	/// <summary>
+	/// Detects Azure App Service or Azure Functions by checking well-known environment variables.
+	/// </summary>
+	internal static bool IsAzureEnvironment() =>
+		!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"))
+		|| !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME"));
 
 	private void ExecutePragmas()
 	{
