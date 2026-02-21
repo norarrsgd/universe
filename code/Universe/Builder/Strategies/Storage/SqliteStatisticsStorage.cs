@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
@@ -42,10 +43,14 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 	/// Creates a new SQLite statistics storage
 	/// </summary>
 	/// <param name="dbPath">Path to the SQLite database file. If null, uses a platform-aware default
-	/// (temp directory on Azure, application directory otherwise).</param>
+	/// (temp directory on Azure, application directory otherwise).
+	/// <b>Warning:</b> do not pass a value derived from untrusted user input; the path is used
+	/// directly for file and directory creation after normalization via <see cref="Path.GetFullPath(string)"/>.</param>
 	/// <param name="retentionDays">Number of days to retain statistics (minimum 1). Older records are auto-cleaned.</param>
 	/// <param name="batchSize">Number of records to batch before flushing to database (minimum 1).</param>
 	/// <param name="flushIntervalSeconds">Interval in seconds between automatic flushes (minimum 1).</param>
+	[SuppressMessage("CodeQuality", "cs/path-injection",
+		Justification = "Path is caller-supplied by design; callers are responsible for not passing untrusted user input.")]
 	public SqliteStatisticsStorage(
 		string dbPath = null,
 		int retentionDays = 7,

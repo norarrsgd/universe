@@ -10,11 +10,25 @@ internal static class PlatformDetection
 {
 	/// <summary>
 	/// Detects Azure App Service or Azure Functions by checking well-known environment variables.
-	/// Returns <c>true</c> when <c>WEBSITE_INSTANCE_ID</c> or <c>FUNCTIONS_WORKER_RUNTIME</c> is set.
+	/// Returns <c>true</c> when <c>WEBSITE_INSTANCE_ID</c> is set (App Service / Functions on Azure),
+	/// or when <c>FUNCTIONS_WORKER_RUNTIME</c> is set and <c>AZURE_FUNCTIONS_ENVIRONMENT</c> is not
+	/// <c>"Development"</c> (to avoid treating local Functions development as Azure).
 	/// </summary>
-	internal static bool IsAzureEnvironment() =>
-		!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"))
-		|| !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME"));
+	internal static bool IsAzureEnvironment()
+	{
+		if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID")))
+			return true;
+
+		// FUNCTIONS_WORKER_RUNTIME is set in local.settings.json during local dev.
+		// Exclude local development by checking AZURE_FUNCTIONS_ENVIRONMENT.
+		if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME")))
+		{
+			string env = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
+			return !string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase);
+		}
+
+		return false;
+	}
 
 	/// <summary>
 	/// Resolves a platform-aware local temp directory.

@@ -22,21 +22,46 @@ public sealed class PlatformDetectionTests
 	}
 
 	[Fact]
-	public void IsAzureEnvironment_FunctionsWorkerRuntime_ReturnsTrue()
+	public void IsAzureEnvironment_FunctionsWorkerRuntime_NonDev_ReturnsTrue()
 	{
 		string original1 = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
 		string original2 = Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME");
+		string original3 = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
 
 		try
 		{
 			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", null);
 			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
+			Environment.SetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT", "Production");
 			Assert.True(PlatformDetection.IsAzureEnvironment());
 		}
 		finally
 		{
 			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", original1);
 			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", original2);
+			Environment.SetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT", original3);
+		}
+	}
+
+	[Fact]
+	public void IsAzureEnvironment_FunctionsLocalDev_ReturnsFalse()
+	{
+		string original1 = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
+		string original2 = Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME");
+		string original3 = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
+
+		try
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", null);
+			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
+			Environment.SetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+			Assert.False(PlatformDetection.IsAzureEnvironment());
+		}
+		finally
+		{
+			Environment.SetEnvironmentVariable("WEBSITE_INSTANCE_ID", original1);
+			Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", original2);
+			Environment.SetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT", original3);
 		}
 	}
 

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace Universe.Builder.Strategies.Storage;
@@ -15,7 +16,11 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 	/// Create a new file-based statistics storage
 	/// </summary>
 	/// <param name="filePath">Optional custom file path. If null, uses a platform-aware default
-	/// (temp directory on Azure, application directory otherwise).</param>
+	/// (temp directory on Azure, application directory otherwise).
+	/// <b>Warning:</b> do not pass a value derived from untrusted user input; the path is used
+	/// directly for file and directory creation after normalization via <see cref="Path.GetFullPath(string)"/>.</param>
+	[SuppressMessage("CodeQuality", "cs/path-injection",
+		Justification = "Path is caller-supplied by design; callers are responsible for not passing untrusted user input.")]
 	public FileStatisticsStorage(string filePath = null)
 	{
 		_filePath = Path.GetFullPath(filePath ?? ResolveDefaultPath());
