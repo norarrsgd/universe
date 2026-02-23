@@ -1,0 +1,10 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="DarkMatter/DarkMatter.csproj" />
+  <Project Path="Universe.Tests/Universe.Tests.csproj" />
+  <Project Path="Universe/UniverseQuery.csproj" />
+</Solution>
