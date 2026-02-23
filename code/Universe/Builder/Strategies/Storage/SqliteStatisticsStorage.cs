@@ -420,7 +420,10 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
                 _insertCommand.Parameters.AddWithValue("@time", (long)stat.ExecutionTime.TotalMilliseconds);
                 _insertCommand.Parameters.AddWithValue("@count", stat.ResultCount);
                 _insertCommand.Parameters.AddWithValue("@success", stat.Success ? 1 : 0);
-                _insertCommand.Parameters.AddWithValue("@timestamp", new DateTimeOffset(stat.Timestamp).ToUnixTimeSeconds());
+                DateTime utcTimestamp = stat.Timestamp.Kind == DateTimeKind.Utc
+                    ? stat.Timestamp
+                    : stat.Timestamp.ToUniversalTime();
+                _insertCommand.Parameters.AddWithValue("@timestamp", new DateTimeOffset(utcTimestamp).ToUnixTimeSeconds());
                 _insertCommand.Parameters.AddWithValue("@strategy", stat.StrategyUsed ?? (object)DBNull.Value);
                 _insertCommand.Parameters.AddWithValue("@hints",
                     stat.HintsUsed != null ? JsonSerializer.Serialize(stat.HintsUsed, _jsonOptions) : DBNull.Value);

@@ -8,6 +8,12 @@ namespace Universe.Builder.Strategies.Storage;
 /// </summary>
 public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        IncludeFields = true
+    };
+
     private readonly string _filePath;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
@@ -63,11 +69,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
                 .OrderByDescending(s => s.Timestamp)
                 .Take(1000)];
 
-            string json = JsonSerializer.Serialize(toSave, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                IncludeFields = true
-            });
+            string json = JsonSerializer.Serialize(toSave, JsonOptions);
 
             await File.WriteAllTextAsync(_filePath, json);
         }
@@ -132,10 +134,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
             List<QueryExecutionStatistics> existing = await LoadAllAsync();
             List<QueryExecutionStatistics> toKeep = [.. existing.Where(s => s.Timestamp >= cutoff)];
 
-            string json = JsonSerializer.Serialize(toKeep, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            string json = JsonSerializer.Serialize(toKeep, JsonOptions);
 
             await File.WriteAllTextAsync(_filePath, json);
         }

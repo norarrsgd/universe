@@ -169,11 +169,11 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
         Console.WriteLine("6. SQLite Persistence Configuration Examples:");
         Console.WriteLine();
 
-        // Option 1: Default path (app directory)
-        Console.WriteLine("   Option 1 - Default path:");
+        // Option 1: Default path (platform-aware)
+        Console.WriteLine("   Option 1 - Default path (platform-aware):");
         Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence();");
         UniverseOptions defaultOptions = UniverseOptions.WithSqlitePersistence();
-        Console.WriteLine($"   Creates: universe-stats.db in app directory");
+        Console.WriteLine($"   Creates: universe-stats.db in app directory (locally) or temp directory (on Azure)");
         Console.WriteLine();
 
         // Option 2: Custom path

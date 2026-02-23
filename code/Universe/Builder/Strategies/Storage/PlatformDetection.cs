@@ -5,7 +5,7 @@ namespace Universe.Builder.Strategies.Storage;
 /// Azure App Service and Azure Functions mount the application directory on Azure Files (SMB),
 /// which does not support the POSIX locking semantics required by SQLite WAL mode and can
 /// cause unreliable file locking for JSON persistence.
-/// </summary>s
+/// </summary>
 internal static class PlatformDetection
 {
     /// <summary>

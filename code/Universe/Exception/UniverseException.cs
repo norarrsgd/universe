@@ -2,7 +2,7 @@
 
 /// <summary></summary>
 [Serializable]
-public sealed class UniverseException : SystemException
+public sealed class UniverseException : System.Exception
 {
     private const string HelpUrl = "https://github.com/kuromukira/simple-cosmos/issues";
 
@@ -15,6 +15,6 @@ public sealed class UniverseException : SystemException
         => HelpLink = HelpUrl;
 
     /// <summary>Custom exception</summary>
-    public UniverseException(string message, SystemException innerException) : base(message, innerException)
+    public UniverseException(string message, System.Exception innerException) : base(message, innerException)
         => HelpLink = HelpUrl;
 }

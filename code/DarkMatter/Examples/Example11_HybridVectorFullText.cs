@@ -220,13 +220,16 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
         (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
             clusters:
             [
-                new(Catalysts:
+				// Hybrid ranking cluster (Vector + Full-Text)
+				new(Catalysts:
                 [
-					// Category filter first
-					new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
-					// Then hybrid search
-					new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance, Where: Q.Where.And),
-                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "laptop", "computer", "gaming" }, Operator: Q.Operator.FTScore, Where: Q.Where.And)
+					new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
+                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "laptop", "computer", "gaming" }, Operator: Q.Operator.FTScore)
+                ]),
+				// Traditional filter cluster
+				new(Where: Q.Where.And, Catalysts:
+                [
+					new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq)
                 ])
             ],
             columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Category).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 8)

@@ -60,9 +60,14 @@ public static class CosmicEntityExtensions
         PartitionKeyBuilder builder = new();
 
         // Reflect on this type to find the PartitionKey properties
-        IEnumerable<PropertyInfo> partitionKeyProperties = entityType.GetProperties()
-            .Where(p => p.GetCustomAttributes(typeof(PartitionKeyAttribute), false).Any())
-            .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1);
+        List<PropertyInfo> partitionKeyProperties = [.. entityType.GetProperties()
+            .Where(p => p.GetCustomAttributes(typeof(PartitionKeyAttribute), false).Any())];
+
+        if (partitionKeyProperties.Count == 0)
+            throw new UniverseException($"No PartitionKey properties found in {entityType.Name}. Please add a PartitionKeyAttribute to the ICosmicEntity object.");
+
+        if (partitionKeyProperties.Count > MaxPartitionKeyLevels)
+            throw new UniverseException($"Only up to {MaxPartitionKeyLevels} PartitionKey properties are allowed in {entityType.Name}.");
 
         // Validate for duplicate sequences
         List<int> sequences = [.. partitionKeyProperties.Select(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1)];
@@ -75,10 +80,14 @@ public static class CosmicEntityExtensions
         if (duplicateSequences.Any())
             throw new UniverseException($"Duplicate PartitionKey Sequence values found in {entityType.Name}: {string.Join(", ", duplicateSequences)}. Each PartitionKey property must have a unique Sequence value.");
 
-        foreach (PropertyInfo property in partitionKeyProperties)
+        IOrderedEnumerable<PropertyInfo> orderedProperties = partitionKeyProperties
+            .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1);
+
+        foreach (PropertyInfo property in orderedProperties)
         {
             object value = property.GetValue(entity) ?? throw new UniverseException($"PartitionKey property '{property.Name}' cannot be null in {entityType.Name}.");
-            builder.Add(value.ToString());
+            string stringValue = value.ToString() ?? throw new UniverseException($"PartitionKey property '{property.Name}' in {entityType.Name} returned a null string representation.");
+            builder.Add(stringValue);
         }
 
         return builder.Build();
@@ -92,15 +101,34 @@ public static class CosmicEntityExtensions
 
         Type entityType = entity.GetType();
 
+        List<PropertyInfo> partitionKeyProperties = [.. entityType.GetProperties()
+            .Where(p => p.GetCustomAttributes(typeof(PartitionKeyAttribute), false).Any())];
+
+        if (partitionKeyProperties.Count == 0)
+            throw new UniverseException($"No PartitionKey properties found in {entityType.Name}. Please add a PartitionKeyAttribute to the ICosmicEntity object.");
+
+        if (partitionKeyProperties.Count > MaxPartitionKeyLevels)
+            throw new UniverseException($"Only up to {MaxPartitionKeyLevels} PartitionKey properties are allowed in {entityType.Name}.");
+
+        // Validate for duplicate sequences
+        List<int> sequences = [.. partitionKeyProperties.Select(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1)];
+
+        IEnumerable<int> duplicateSequences = sequences
+            .GroupBy(s => s)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key);
+
+        if (duplicateSequences.Any())
+            throw new UniverseException($"Duplicate PartitionKey Sequence values found in {entityType.Name}: {string.Join(", ", duplicateSequences)}. Each PartitionKey property must have a unique Sequence value.");
+
         return
         [
-            .. entityType.GetProperties()
-                .Where(p => p.GetCustomAttributes(typeof(PartitionKeyAttribute), false).Any())
+            .. partitionKeyProperties
                 .OrderBy(p => p.GetCustomAttribute<PartitionKeyAttribute>()?.Sequence ?? 1)
                 .Select(p =>
                 {
                     object value = p.GetValue(entity) ?? throw new UniverseException($"PartitionKey property '{p.Name}' cannot be null in {entityType.Name}.");
-                    return value.ToString();
+                    return value.ToString() ?? throw new UniverseException($"PartitionKey property '{p.Name}' in {entityType.Name} returned a null string representation.");
                 })
         ];
     }

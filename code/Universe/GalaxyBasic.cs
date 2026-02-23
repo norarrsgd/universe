@@ -38,6 +38,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         UniverseOptions options,
         bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries)
     {
+        ArgumentNullException.ThrowIfNull(options);
         QueryTuner queryTuner = new(options.StatisticsStorage);
         QBuilder = new(_recordQuery, queryTuner);
     }
@@ -160,7 +161,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 throw new UniverseException("Payload size exceeds the maximum allowed size of 2MB.");
 
             if (models.Count > 100)
-                throw new UniverseException("Bulk create can only handle up to 100 items at a time.");
+                throw new UniverseException("Bulk modify can only handle up to 100 items at a time.");
 
             List<Task<double>> tasks = new(models.Count);
 
@@ -208,11 +209,14 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
     private static PartitionKey BuildPartitionKey(string[] partitionKey)
     {
+        if (partitionKey is null || partitionKey.Length == 0)
+            throw new UniverseException("Partition key cannot be null or empty.");
+
         PartitionKeyBuilder partitionKeyBuilder = new();
         foreach (string key in partitionKey)
         {
             if (string.IsNullOrWhiteSpace(key))
-                throw new UniverseException("Partition key cannot be null or empty.");
+                throw new UniverseException("Partition key value cannot be null or empty.");
 
             partitionKeyBuilder.Add(key);
         }

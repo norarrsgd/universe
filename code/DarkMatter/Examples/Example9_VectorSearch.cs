@@ -307,7 +307,13 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
             Console.WriteLine($"    Name: {item.Name}");
             Console.WriteLine($"    Category: {item.Category}");
             Console.WriteLine($"    Price: ${item.Price:F2}");
-            Console.WriteLine($"    Description: {item.Description?[..Math.Min(item.Description.Length, 60)]}...");
+            if (!string.IsNullOrWhiteSpace(item.Description))
+            {
+                string desc = item.Description.Length > 60
+                    ? $"{item.Description[..60]}..."
+                    : item.Description;
+                Console.WriteLine($"    Description: {desc}");
+            }
 
             // show the scores
             if (item.TitleEmbeddingScore != 0.0f)

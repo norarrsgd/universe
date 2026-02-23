@@ -286,8 +286,6 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("8. Hybrid Search: Full-Text + Traditional Filters");
         Console.WriteLine("Full-text search for 'machine learning' with price filter and category filter...\n");
 
-        DateTime thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
-
         (Gravity gravity, IList<MyObject> results) = await galaxy.List(
             clusters:
             [
