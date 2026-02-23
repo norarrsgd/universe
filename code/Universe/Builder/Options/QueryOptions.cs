@@ -3,173 +3,173 @@
 /// <summary>Query Options</summary>
 public struct Q
 {
-	/// <summary>Query Limits</summary>
-	public struct Limits
-	{
-		/// <summary>Maximum number of items return for vector search queries</summary>
-		public const int MaxVectorItems = 50;
-		
-		/// <summary>Maximum number of items to return</summary>
-		public const int MaxItems = 1000;
+    /// <summary>Query Limits</summary>
+    public struct Limits
+    {
+        /// <summary>Maximum number of items return for vector search queries</summary>
+        public const int MaxVectorItems = 50;
 
-		/// <summary>Maximum number of RU per query</summary>
-		public const int MaxRU = 1000;
-	}
+        /// <summary>Maximum number of items to return</summary>
+        public const int MaxItems = 1000;
 
-	/// <summary>Page definition for paginated queries</summary>
-	public record struct Page(int Size, string ContinuationToken = null);
+        /// <summary>Maximum number of RU per query</summary>
+        public const int MaxRU = 1000;
+    }
 
-	/// <summary>AND / OR where clause operators</summary>
-	public enum Where
-	{
-		/// <summary></summary>
-		And,
+    /// <summary>Page definition for paginated queries</summary>
+    public record struct Page(int Size, string ContinuationToken = null);
 
-		/// <summary></summary>
-		Or
-	}
+    /// <summary>AND / OR where clause operators</summary>
+    public enum Where
+    {
+        /// <summary></summary>
+        And,
 
-	/// <summary>Equality operator</summary>
-	public enum Operator
-	{
-		/// <summary>Equal</summary>
-		Eq,
+        /// <summary></summary>
+        Or
+    }
 
-		/// <summary>Not Equal</summary>
-		NotEq,
+    /// <summary>Equality operator</summary>
+    public enum Operator
+    {
+        /// <summary>Equal</summary>
+        Eq,
 
-		/// <summary>Greater Than</summary>
-		Gt,
+        /// <summary>Not Equal</summary>
+        NotEq,
 
-		/// <summary>Greater Than Or Equal</summary>
-		Gte,
+        /// <summary>Greater Than</summary>
+        Gt,
 
-		/// <summary>Lower Than</summary>
-		Lt,
+        /// <summary>Greater Than Or Equal</summary>
+        Gte,
 
-		/// <summary>Lower Than Or Equal</summary>
-		Lte,
+        /// <summary>Lower Than</summary>
+        Lt,
 
-		/// <summary>In</summary>
-		In,
+        /// <summary>Lower Than Or Equal</summary>
+        Lte,
 
-		/// <summary>Not In</summary>
-		NotIn,
+        /// <summary>In</summary>
+        In,
 
-		/// <summary>Array Length</summary>
-		Len,
+        /// <summary>Not In</summary>
+        NotIn,
 
-		/// <summary>Like</summary>
-		Like,
+        /// <summary>Array Length</summary>
+        Len,
 
-		/// <summary>Not Like</summary>
-		NotLike,
+        /// <summary>Like</summary>
+        Like,
 
-		/// <summary>IS_DEFINED</summary>
-		Defined,
+        /// <summary>Not Like</summary>
+        NotLike,
 
-		/// <summary>NOT IS_DEFINED</summary>
-		NotDefined,
+        /// <summary>IS_DEFINED</summary>
+        Defined,
 
-		/// <summary>VectorDistance</summary>
-		VectorDistance,
+        /// <summary>NOT IS_DEFINED</summary>
+        NotDefined,
 
-		/// <summary>FullTextContains</summary>
-		FTContains,
+        /// <summary>VectorDistance</summary>
+        VectorDistance,
 
-		/// <summary>NOT FullTextContains</summary>
-		NotFTContains,
+        /// <summary>FullTextContains</summary>
+        FTContains,
 
-		/// <summary>FullTextContainsAll</summary>
-		FTContainsAll,
+        /// <summary>NOT FullTextContains</summary>
+        NotFTContains,
 
-		/// <summary>NOT FullTextContainsAll</summary>
-		NotFTContainsAll,
+        /// <summary>FullTextContainsAll</summary>
+        FTContainsAll,
 
-		/// <summary>FullTextContainsAny</summary>
-		FTContainsAny,
+        /// <summary>NOT FullTextContainsAll</summary>
+        NotFTContainsAll,
 
-		/// <summary>NOT FullTextContainsAny</summary>
-		NotFTContainsAny,
+        /// <summary>FullTextContainsAny</summary>
+        FTContainsAny,
 
-		/// <summary>FullTextScore</summary>
-		FTScore
-	}
+        /// <summary>NOT FullTextContainsAny</summary>
+        NotFTContainsAny,
 
-	/// <summary>Aggregation functions</summary>
-	public enum Aggregate
-	{
-		/// <summary>Count</summary>
-		Count,
+        /// <summary>FullTextScore</summary>
+        FTScore
+    }
 
-		/// <summary>Sum</summary>
-		Sum,
+    /// <summary>Aggregation functions</summary>
+    public enum Aggregate
+    {
+        /// <summary>Count</summary>
+        Count,
 
-		/// <summary>Min</summary>
-		Min,
+        /// <summary>Sum</summary>
+        Sum,
 
-		/// <summary>Max</summary>
-		Max,
+        /// <summary>Min</summary>
+        Min,
 
-		/// <summary>Avg</summary>
-		Avg
-	}
+        /// <summary>Max</summary>
+        Max,
+
+        /// <summary>Avg</summary>
+        Avg
+    }
 }
 
 /// <summary></summary>
 public static class WhereExtension
 {
-	/// <summary></summary>
-	public static string Value(this Q.Where where) => where switch
-	{
-		Q.Where.And => "AND",
-		Q.Where.Or => "OR",
-		_ => throw new UniverseException("Unrecognized WHERE keyword")
-	};
+    /// <summary></summary>
+    public static string Value(this Q.Where where) => where switch
+    {
+        Q.Where.And => "AND",
+        Q.Where.Or => "OR",
+        _ => throw new UniverseException("Unrecognized WHERE keyword")
+    };
 }
 
 /// <summary></summary>
 public static class OperatorExtension
 {
-	/// <summary></summary>
-	public static string Value(this Q.Operator opr) => opr switch
-	{
-		Q.Operator.Eq => "=",
-		Q.Operator.NotEq => "!=",
-		Q.Operator.Gt => ">",
-		Q.Operator.Gte => ">=",
-		Q.Operator.Lt => "<",
-		Q.Operator.Lte => "<=",
-		Q.Operator.In => "ARRAY_CONTAINS",
-		Q.Operator.Len => "ARRAY_LENGTH",
-		Q.Operator.NotIn => "NOT ARRAY_CONTAINS",
-		Q.Operator.Like => "LIKE",
-		Q.Operator.NotLike => "NOT LIKE",
-		Q.Operator.Defined => "IS_DEFINED",
-		Q.Operator.NotDefined => "NOT IS_DEFINED",
-		Q.Operator.VectorDistance => "VectorDistance",
-		Q.Operator.FTContains => "FullTextContains",
-		Q.Operator.NotFTContains => "NOT FullTextContains",
-		Q.Operator.FTContainsAll => "FullTextContainsAll",
-		Q.Operator.NotFTContainsAll => "NOT FullTextContainsAll",
-		Q.Operator.FTContainsAny => "FullTextContainsAny",
-		Q.Operator.NotFTContainsAny => "NOT FullTextContainsAny",
-		Q.Operator.FTScore => "FullTextScore",
-		_ => throw new UniverseException("Unrecognized OPERATOR keyword")
-	};
+    /// <summary></summary>
+    public static string Value(this Q.Operator opr) => opr switch
+    {
+        Q.Operator.Eq => "=",
+        Q.Operator.NotEq => "!=",
+        Q.Operator.Gt => ">",
+        Q.Operator.Gte => ">=",
+        Q.Operator.Lt => "<",
+        Q.Operator.Lte => "<=",
+        Q.Operator.In => "ARRAY_CONTAINS",
+        Q.Operator.Len => "ARRAY_LENGTH",
+        Q.Operator.NotIn => "NOT ARRAY_CONTAINS",
+        Q.Operator.Like => "LIKE",
+        Q.Operator.NotLike => "NOT LIKE",
+        Q.Operator.Defined => "IS_DEFINED",
+        Q.Operator.NotDefined => "NOT IS_DEFINED",
+        Q.Operator.VectorDistance => "VectorDistance",
+        Q.Operator.FTContains => "FullTextContains",
+        Q.Operator.NotFTContains => "NOT FullTextContains",
+        Q.Operator.FTContainsAll => "FullTextContainsAll",
+        Q.Operator.NotFTContainsAll => "NOT FullTextContainsAll",
+        Q.Operator.FTContainsAny => "FullTextContainsAny",
+        Q.Operator.NotFTContainsAny => "NOT FullTextContainsAny",
+        Q.Operator.FTScore => "FullTextScore",
+        _ => throw new UniverseException("Unrecognized OPERATOR keyword")
+    };
 }
 
 /// <summary></summary>
 public static class AggregateExtension
 {
-	/// <summary></summary>
-	public static string Value(this Q.Aggregate aggregate) => aggregate switch
-	{
-		Q.Aggregate.Count => $"COUNT(1) AS {nameof(ICosmicEntity.CountAggregate)}",
-		Q.Aggregate.Sum => "SUM({0}) AS {1}_Sum",
-		Q.Aggregate.Min => "MIN({0}) AS {1}_Min",
-		Q.Aggregate.Max => "MAX({0}) AS {1}_Max",
-		Q.Aggregate.Avg => "AVG({0}) AS {1}_Avg",
-		_ => throw new UniverseException("Unrecognized AGGREGATE keyword")
-	};
+    /// <summary></summary>
+    public static string Value(this Q.Aggregate aggregate) => aggregate switch
+    {
+        Q.Aggregate.Count => $"COUNT(1) AS {nameof(ICosmicEntity.CountAggregate)}",
+        Q.Aggregate.Sum => "SUM({0}) AS {1}_Sum",
+        Q.Aggregate.Min => "MIN({0}) AS {1}_Min",
+        Q.Aggregate.Max => "MAX({0}) AS {1}_Max",
+        Q.Aggregate.Avg => "AVG({0}) AS {1}_Avg",
+        _ => throw new UniverseException("Unrecognized AGGREGATE keyword")
+    };
 }

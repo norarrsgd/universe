@@ -8,7 +8,7 @@ namespace Universe.Builder.Options;
 /// <param name="Columns">The columns to include in the join.</param>
 /// <param name="Aggregates">The aggregation options for the join.</param>
 public record JoinOptions(
-	string Alias,
-	string ArrayPath,
-	IReadOnlyList<string> Columns,
-	IReadOnlyList<AggregationOption> Aggregates = null);
+    string Alias,
+    string ArrayPath,
+    IReadOnlyList<string> Columns,
+    IReadOnlyList<AggregationOption> Aggregates = null);
