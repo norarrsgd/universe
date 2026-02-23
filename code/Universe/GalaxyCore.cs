@@ -5,55 +5,55 @@ namespace Universe;
 /// </summary>
 public abstract class GalaxyCore : IDisposable
 {
-	internal readonly Container _container;
+    internal readonly Container _container;
 
-	internal readonly bool _recordQuery;
-	internal readonly bool _allowBulk;
+    internal readonly bool _recordQuery;
+    internal readonly bool _allowBulk;
 
-	/// <summary></summary>
-	protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
-	{
-		if (string.IsNullOrWhiteSpace(container))
-			throw new UniverseException("Container name is required");
+    /// <summary></summary>
+    protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
+    {
+        if (string.IsNullOrWhiteSpace(container))
+            throw new UniverseException("Container name is required");
 
-		if (string.IsNullOrWhiteSpace(database))
-			throw new UniverseException("Database name is required");
+        if (string.IsNullOrWhiteSpace(database))
+            throw new UniverseException("Database name is required");
 
-		client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
+        client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
 
-		ContainerProperties containerProps = new(container, partitionKey);
+        ContainerProperties containerProps = new(container, partitionKey);
 
-		_recordQuery = recordQueries;
-		if (client.ClientOptions is not null)
-			_allowBulk = client.ClientOptions.AllowBulkExecution;
-		_container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(containerProps).GetAwaiter().GetResult();
-	}
+        _recordQuery = recordQueries;
+        if (client.ClientOptions is not null)
+            _allowBulk = client.ClientOptions.AllowBulkExecution;
+        _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(containerProps).GetAwaiter().GetResult();
+    }
 
-	#region Dispose Pattern
+    #region Dispose Pattern
 
-	private bool _disposedValue;
+    private bool _disposedValue;
 
-	/// <summary></summary>
-	protected virtual void Dispose(bool disposing)
-	{
-		if (_disposedValue)
-			return;
-		if (disposing)
-		{
-		}
+    /// <summary></summary>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposedValue)
+            return;
+        if (disposing)
+        {
+        }
 
-		_disposedValue = true;
-	}
+        _disposedValue = true;
+    }
 
-	/// <summary></summary>
-	~GalaxyCore() => Dispose(disposing: false);
+    /// <summary></summary>
+    ~GalaxyCore() => Dispose(disposing: false);
 
-	/// <summary></summary>
-	public void Dispose()
-	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
-	}
+    /// <summary></summary>
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
 
-	#endregion
+    #endregion
 }

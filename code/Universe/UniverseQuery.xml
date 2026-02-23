@@ -601,7 +601,23 @@
             <summary>
             Create a new file-based statistics storage
             </summary>
-            <param name="filePath">Optional custom file path. Must be within the application directory. If null, uses default location.</param>
+            <param name="filePath">Optional custom file path. If null, uses a platform-aware default
+            (temp directory on Azure, application directory otherwise).
+            <b>Warning:</b> do not pass a value derived from untrusted user input; the path is used
+            directly for file and directory creation after normalization via <see cref="M:System.IO.Path.GetFullPath(System.String)"/>.</param>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.ResolveDefaultPath">
+            <summary>
+            Resolves the default file path based on the runtime environment.
+            On Azure (Functions / App Service), uses local temp storage to avoid
+            SMB-mounted paths where file locking can be unreliable.
+            <para>
+            <b>Azure caveat:</b> Temp directories are local to the VM instance and are cleared on
+            cold starts, scale events, or platform updates. The tuner starts fresh in these cases.
+            For durable persistence across restarts, provide an explicit <c>filePath</c> pointing to
+            a writable local disk.
+            </para>
+            </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>
@@ -684,6 +700,41 @@
             Clear old statistics (older than specified timespan)
             </summary>
         </member>
+        <member name="T:Universe.Builder.Strategies.Storage.PlatformDetection">
+            <summary>
+            Detects the runtime platform to determine safe default storage paths.
+            Azure App Service and Azure Functions mount the application directory on Azure Files (SMB),
+            which does not support the POSIX locking semantics required by SQLite WAL mode and can
+            cause unreliable file locking for JSON persistence.
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.PlatformDetection.IsAzureEnvironment">
+            <summary>
+            Detects Azure App Service or Azure Functions by checking well-known environment variables.
+            Returns <c>true</c> when <c>WEBSITE_INSTANCE_ID</c> is set (App Service / Functions on Azure),
+            or when <c>FUNCTIONS_WORKER_RUNTIME</c> is set and <c>AZURE_FUNCTIONS_ENVIRONMENT</c> is not
+            <c>"Development"</c> (to avoid treating local Functions development as Azure).
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.PlatformDetection.GetLocalTempDirectory">
+            <summary>
+            Resolves a platform-aware local temp directory.
+            Prefers <c>TMP</c> / <c>TEMP</c> environment variables (which on Azure point to
+            SSD-backed local storage), falling back to <see cref="M:System.IO.Path.GetTempPath"/>.
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.PlatformDetection.ValidateStoragePath(System.String)">
+            <summary>
+            Validates and normalizes a storage file path.
+            Resolves the path via <see cref="M:System.IO.Path.GetFullPath(System.String)"/>, ensures the result
+            is rooted (absolute), and rejects paths containing null bytes.
+            </summary>
+            <param name="path">The raw file path to validate.</param>
+            <returns>The fully-qualified, validated path.</returns>
+            <exception cref="T:Universe.Exception.UniverseException">
+            Thrown when the path is empty, contains null bytes, or cannot be resolved to a rooted path.
+            </exception>
+        </member>
         <member name="T:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage">
             <summary>
             SQLite-based storage for query statistics with high-performance features:
@@ -698,10 +749,26 @@
             <summary>
             Creates a new SQLite statistics storage
             </summary>
-            <param name="dbPath">Path to the SQLite database file. Must be within the application directory. If null, uses default location.</param>
+            <param name="dbPath">Path to the SQLite database file. If null, uses a platform-aware default
+            (temp directory on Azure, application directory otherwise).
+            <b>Warning:</b> do not pass a value derived from untrusted user input; the path is used
+            directly for file and directory creation after normalization via <see cref="M:System.IO.Path.GetFullPath(System.String)"/>.</param>
             <param name="retentionDays">Number of days to retain statistics (minimum 1). Older records are auto-cleaned.</param>
             <param name="batchSize">Number of records to batch before flushing to database (minimum 1).</param>
             <param name="flushIntervalSeconds">Interval in seconds between automatic flushes (minimum 1).</param>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.ResolveDefaultPath">
+            <summary>
+            Resolves the default database path based on the runtime environment.
+            On Azure (Functions / App Service), uses local temp storage to avoid
+            SMB-mounted paths where SQLite WAL mode is unsupported.
+            <para>
+            <b>Azure caveat:</b> Temp directories are local to the VM instance and are cleared on
+            cold starts, scale events, or platform updates. The tuner starts fresh in these cases.
+            For durable persistence across restarts, provide an explicit <c>dbPath</c> pointing to
+            a writable local disk.
+            </para>
+            </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>

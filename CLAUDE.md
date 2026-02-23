@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 code/
-├── UniverseQuery.sln          # Main solution file
+├── UniverseQuery.slnx         # Main solution file (XML format)
 ├── Universe/                  # Main library (UniverseQuery package)
 │   ├── Galaxy.cs              # Advanced query operations (List, Paged, with Clusters)
 │   ├── GalaxyBasic.cs         # Basic CRUD operations (Get by ID, Create, Modify, Remove)
