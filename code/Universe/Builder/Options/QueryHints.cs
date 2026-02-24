@@ -5,14 +5,14 @@ namespace Universe.Builder.Options;
 /// </summary>
 public enum QueryExecutionStrategy
 {
-	/// <summary>Direct execution strategy for simple queries</summary>
-	Direct,
+    /// <summary>Direct execution strategy for simple queries</summary>
+    Direct,
 
-	/// <summary>Gateway mode strategy for complex queries and fallbacks</summary>
-	Gateway,
+    /// <summary>Gateway mode strategy for complex queries and fallbacks</summary>
+    Gateway,
 
-	/// <summary>Specialized strategy for vector search queries</summary>
-	VectorSearch
+    /// <summary>Specialized strategy for vector search queries</summary>
+    VectorSearch
 }
 
 /// <summary>
@@ -20,49 +20,49 @@ public enum QueryExecutionStrategy
 /// </summary>
 public static class QueryExecutionStrategyExtensions
 {
-	/// <summary>
-	/// Get the strategy name as used internally
-	/// </summary>
-	public static string ToStrategyName(this QueryExecutionStrategy strategy) => strategy switch
-	{
-		QueryExecutionStrategy.Direct => "Direct",
-		QueryExecutionStrategy.Gateway => "Gateway",
-		QueryExecutionStrategy.VectorSearch => "VectorSearch",
-		_ => throw new ArgumentOutOfRangeException(nameof(strategy))
-	};
+    /// <summary>
+    /// Get the strategy name as used internally
+    /// </summary>
+    public static string ToStrategyName(this QueryExecutionStrategy strategy) => strategy switch
+    {
+        QueryExecutionStrategy.Direct => "Direct",
+        QueryExecutionStrategy.Gateway => "Gateway",
+        QueryExecutionStrategy.VectorSearch => "VectorSearch",
+        _ => throw new ArgumentOutOfRangeException(nameof(strategy))
+    };
 }
 
 /// <summary>
 /// Query hints for optimization
 /// </summary>
 public readonly record struct QueryHints(
-	QueryExecutionStrategy? ForceStrategy = null,
-	int? MaxItemCount = null,
-	int? MaxBufferedItemCount = null,
-	int? MaxConcurrency = null,
-	bool? EnableOptimisticDirectExecution = null,
-	int? ResponseContinuationTokenLimitInKb = null)
+    QueryExecutionStrategy? ForceStrategy = null,
+    int? MaxItemCount = null,
+    int? MaxBufferedItemCount = null,
+    int? MaxConcurrency = null,
+    bool? EnableOptimisticDirectExecution = null,
+    int? ResponseContinuationTokenLimitInKb = null)
 {
-	/// <summary>
-	/// Convert to context hints dictionary
-	/// </summary>
-	public IReadOnlyDictionary<string, object> ToContextHints()
-	{
-		Dictionary<string, object> hints = [];
+    /// <summary>
+    /// Convert to context hints dictionary
+    /// </summary>
+    public IReadOnlyDictionary<string, object> ToContextHints()
+    {
+        Dictionary<string, object> hints = [];
 
-		if (MaxItemCount.HasValue)
-			hints[nameof(MaxItemCount)] = MaxItemCount.Value;
-		if (MaxBufferedItemCount.HasValue)
-			hints[nameof(MaxBufferedItemCount)] = MaxBufferedItemCount.Value;
-		if (MaxConcurrency.HasValue)
-			hints[nameof(MaxConcurrency)] = MaxConcurrency.Value;
-		if (ForceStrategy.HasValue)
-			hints[nameof(ForceStrategy)] = ForceStrategy.Value.ToStrategyName();
-		if (EnableOptimisticDirectExecution.HasValue)
-			hints[nameof(EnableOptimisticDirectExecution)] = EnableOptimisticDirectExecution.Value;
-		if (ResponseContinuationTokenLimitInKb.HasValue)
-			hints[nameof(ResponseContinuationTokenLimitInKb)] = ResponseContinuationTokenLimitInKb.Value;
+        if (MaxItemCount.HasValue)
+            hints[nameof(MaxItemCount)] = MaxItemCount.Value;
+        if (MaxBufferedItemCount.HasValue)
+            hints[nameof(MaxBufferedItemCount)] = MaxBufferedItemCount.Value;
+        if (MaxConcurrency.HasValue)
+            hints[nameof(MaxConcurrency)] = MaxConcurrency.Value;
+        if (ForceStrategy.HasValue)
+            hints[nameof(ForceStrategy)] = ForceStrategy.Value.ToStrategyName();
+        if (EnableOptimisticDirectExecution.HasValue)
+            hints[nameof(EnableOptimisticDirectExecution)] = EnableOptimisticDirectExecution.Value;
+        if (ResponseContinuationTokenLimitInKb.HasValue)
+            hints[nameof(ResponseContinuationTokenLimitInKb)] = ResponseContinuationTokenLimitInKb.Value;
 
-		return hints;
-	}
+        return hints;
+    }
 }
