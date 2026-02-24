@@ -21,7 +21,7 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>kuromukira</Authors>
 		<Product>Universe</Product>
-		<Version>3.2.0-preview6</Version>
+		<Version>3.2.0</Version>
 		<PackageReleaseNotes>
 			View release on
 			https://github.com/kuromukira/universe/releases/tag/untagged-cdcf4202c2656450c07b

@@ -45,6 +45,15 @@ public readonly record struct Catalyst(
                 violations.Add("Value should contain a wildcard (%) for Like and NotLike operators");
         }
 
+        // Contains/NotContains operators require a collection value (not string)
+        if (Operator is Q.Operator.Contains or Q.Operator.NotContains)
+        {
+            if (Value is null)
+                violations.Add("Value is required for Contains and NotContains operators");
+            else if (Value is not System.Collections.IEnumerable || Value is string)
+                violations.Add("Value must be an array or collection (not a string) for Contains and NotContains operators");
+        }
+
         // VectorDistance operator requires a value
         if (Operator is Q.Operator.VectorDistance && Value is null)
             violations.Add("Value is required when using the VectorDistance operator");

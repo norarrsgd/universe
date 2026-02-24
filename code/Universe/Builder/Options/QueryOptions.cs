@@ -32,67 +32,73 @@ public struct Q
     /// <summary>Equality operator</summary>
     public enum Operator
     {
-        /// <summary>Equal</summary>
+        /// <summary>Equality check. Generates: c.[Column] = @param. Value: scalar to compare against.</summary>
         Eq,
 
-        /// <summary>Not Equal</summary>
+        /// <summary>Inequality check. Generates: c.[Column] != @param. Value: scalar to compare against.</summary>
         NotEq,
 
-        /// <summary>Greater Than</summary>
+        /// <summary>Greater than comparison. Generates: c.[Column] &gt; @param. Value: scalar to compare against.</summary>
         Gt,
 
-        /// <summary>Greater Than Or Equal</summary>
+        /// <summary>Greater than or equal comparison. Generates: c.[Column] &gt;= @param. Value: scalar to compare against.</summary>
         Gte,
 
-        /// <summary>Lower Than</summary>
+        /// <summary>Less than comparison. Generates: c.[Column] &lt; @param. Value: scalar to compare against.</summary>
         Lt,
 
-        /// <summary>Lower Than Or Equal</summary>
+        /// <summary>Less than or equal comparison. Generates: c.[Column] &lt;= @param. Value: scalar to compare against.</summary>
         Lte,
 
-        /// <summary>In</summary>
+        /// <summary>Checks if a document's array field contains a scalar value. Generates: ARRAY_CONTAINS(c.[Column], @param). Value: the scalar to search for.</summary>
         In,
 
-        /// <summary>Not In</summary>
+        /// <summary>Checks if a document's array field does NOT contain a scalar value. Generates: NOT ARRAY_CONTAINS(c.[Column], @param). Value: the scalar to search for.</summary>
         NotIn,
 
-        /// <summary>Array Length</summary>
+        /// <summary>Checks if a user-provided collection contains the document's scalar field value (SQL IN equivalent). Generates: ARRAY_CONTAINS(@param, c.[Column]). Value: an IEnumerable collection (not string) of values to match against.</summary>
+        Contains,
+
+        /// <summary>Checks if a user-provided collection does NOT contain the document's scalar field value (SQL NOT IN equivalent). Generates: NOT ARRAY_CONTAINS(@param, c.[Column]). Value: an IEnumerable collection (not string) of values to match against.</summary>
+        NotContains,
+
+        /// <summary>Checks the length of a document's array field. Generates: ARRAY_LENGTH(c.[Column]) = @param. Value: integer length to compare against.</summary>
         Len,
 
-        /// <summary>Like</summary>
+        /// <summary>Pattern matching with wildcards. Generates: c.[Column] LIKE @param. Value: string pattern with '%' wildcard(s).</summary>
         Like,
 
-        /// <summary>Not Like</summary>
+        /// <summary>Negated pattern matching with wildcards. Generates: c.[Column] NOT LIKE @param. Value: string pattern with '%' wildcard(s).</summary>
         NotLike,
 
-        /// <summary>IS_DEFINED</summary>
+        /// <summary>Checks if a property is defined on the document. Generates: IS_DEFINED(c.[Column]). Value: not required (must be null).</summary>
         Defined,
 
-        /// <summary>NOT IS_DEFINED</summary>
+        /// <summary>Checks if a property is NOT defined on the document. Generates: NOT IS_DEFINED(c.[Column]). Value: not required (must be null).</summary>
         NotDefined,
 
-        /// <summary>VectorDistance</summary>
+        /// <summary>Vector similarity search. Generates: VectorDistance(c.[Column], @param) in SELECT and ORDER BY. Value: float[] representing the query vector.</summary>
         VectorDistance,
 
-        /// <summary>FullTextContains</summary>
+        /// <summary>Full-text contains check for a single keyword. Generates: FullTextContains(c.[Column], @param). Value: string keyword to search for.</summary>
         FTContains,
 
-        /// <summary>NOT FullTextContains</summary>
+        /// <summary>Negated full-text contains check. Generates: NOT FullTextContains(c.[Column], @param). Value: string keyword to search for.</summary>
         NotFTContains,
 
-        /// <summary>FullTextContainsAll</summary>
+        /// <summary>Full-text check that ALL keywords are present. Generates: FullTextContainsAll(c.[Column], @param). Value: string[] of keywords that must all be present.</summary>
         FTContainsAll,
 
-        /// <summary>NOT FullTextContainsAll</summary>
+        /// <summary>Negated full-text check for all keywords. Generates: NOT FullTextContainsAll(c.[Column], @param). Value: string[] of keywords.</summary>
         NotFTContainsAll,
 
-        /// <summary>FullTextContainsAny</summary>
+        /// <summary>Full-text check that ANY keyword is present. Generates: FullTextContainsAny(c.[Column], @param). Value: string[] of keywords where at least one must be present.</summary>
         FTContainsAny,
 
-        /// <summary>NOT FullTextContainsAny</summary>
+        /// <summary>Negated full-text check for any keyword. Generates: NOT FullTextContainsAny(c.[Column], @param). Value: string[] of keywords.</summary>
         NotFTContainsAny,
 
-        /// <summary>FullTextScore</summary>
+        /// <summary>Full-text relevance scoring for ORDER BY RANK. Generates: FullTextScore(c.[Column], @param) in ORDER BY. Value: string[] of search terms. Requires ColumnOptions.Top.</summary>
         FTScore
     }
 
@@ -143,6 +149,8 @@ public static class OperatorExtension
         Q.Operator.In => "ARRAY_CONTAINS",
         Q.Operator.Len => "ARRAY_LENGTH",
         Q.Operator.NotIn => "NOT ARRAY_CONTAINS",
+        Q.Operator.Contains => "ARRAY_CONTAINS",
+        Q.Operator.NotContains => "NOT ARRAY_CONTAINS",
         Q.Operator.Like => "LIKE",
         Q.Operator.NotLike => "NOT LIKE",
         Q.Operator.Defined => "IS_DEFINED",

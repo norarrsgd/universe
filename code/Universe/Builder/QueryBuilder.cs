@@ -451,6 +451,8 @@ internal class UniverseBuilder : IDisposable
         {
             Q.Operator.In or
                 Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
+            Q.Operator.Contains or
+                Q.Operator.NotContains => $"{catalyst.Operator.Value()}(@{catalyst.ParameterName()}, {formattedProperty})",
             Q.Operator.Len => $"{catalyst.Operator.Value()}({formattedProperty}) = @{catalyst.ParameterName()}",
             Q.Operator.Defined or
                 Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({formattedProperty})",

@@ -243,67 +243,73 @@
             <summary>Equality operator</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Eq">
-            <summary>Equal</summary>
+            <summary>Equality check. Generates: c.[Column] = @param. Value: scalar to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotEq">
-            <summary>Not Equal</summary>
+            <summary>Inequality check. Generates: c.[Column] != @param. Value: scalar to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Gt">
-            <summary>Greater Than</summary>
+            <summary>Greater than comparison. Generates: c.[Column] &gt; @param. Value: scalar to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Gte">
-            <summary>Greater Than Or Equal</summary>
+            <summary>Greater than or equal comparison. Generates: c.[Column] &gt;= @param. Value: scalar to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Lt">
-            <summary>Lower Than</summary>
+            <summary>Less than comparison. Generates: c.[Column] &lt; @param. Value: scalar to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Lte">
-            <summary>Lower Than Or Equal</summary>
+            <summary>Less than or equal comparison. Generates: c.[Column] &lt;= @param. Value: scalar to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.In">
-            <summary>In</summary>
+            <summary>Checks if a document's array field contains a scalar value. Generates: ARRAY_CONTAINS(c.[Column], @param). Value: the scalar to search for.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotIn">
-            <summary>Not In</summary>
+            <summary>Checks if a document's array field does NOT contain a scalar value. Generates: NOT ARRAY_CONTAINS(c.[Column], @param). Value: the scalar to search for.</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.Contains">
+            <summary>Checks if a user-provided collection contains the document's scalar field value (SQL IN equivalent). Generates: ARRAY_CONTAINS(@param, c.[Column]). Value: an IEnumerable collection (not string) of values to match against.</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.NotContains">
+            <summary>Checks if a user-provided collection does NOT contain the document's scalar field value (SQL NOT IN equivalent). Generates: NOT ARRAY_CONTAINS(@param, c.[Column]). Value: an IEnumerable collection (not string) of values to match against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Len">
-            <summary>Array Length</summary>
+            <summary>Checks the length of a document's array field. Generates: ARRAY_LENGTH(c.[Column]) = @param. Value: integer length to compare against.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Like">
-            <summary>Like</summary>
+            <summary>Pattern matching with wildcards. Generates: c.[Column] LIKE @param. Value: string pattern with '%' wildcard(s).</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotLike">
-            <summary>Not Like</summary>
+            <summary>Negated pattern matching with wildcards. Generates: c.[Column] NOT LIKE @param. Value: string pattern with '%' wildcard(s).</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.Defined">
-            <summary>IS_DEFINED</summary>
+            <summary>Checks if a property is defined on the document. Generates: IS_DEFINED(c.[Column]). Value: not required (must be null).</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotDefined">
-            <summary>NOT IS_DEFINED</summary>
+            <summary>Checks if a property is NOT defined on the document. Generates: NOT IS_DEFINED(c.[Column]). Value: not required (must be null).</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.VectorDistance">
-            <summary>VectorDistance</summary>
+            <summary>Vector similarity search. Generates: VectorDistance(c.[Column], @param) in SELECT and ORDER BY. Value: float[] representing the query vector.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.FTContains">
-            <summary>FullTextContains</summary>
+            <summary>Full-text contains check for a single keyword. Generates: FullTextContains(c.[Column], @param). Value: string keyword to search for.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotFTContains">
-            <summary>NOT FullTextContains</summary>
+            <summary>Negated full-text contains check. Generates: NOT FullTextContains(c.[Column], @param). Value: string keyword to search for.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.FTContainsAll">
-            <summary>FullTextContainsAll</summary>
+            <summary>Full-text check that ALL keywords are present. Generates: FullTextContainsAll(c.[Column], @param). Value: string[] of keywords that must all be present.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotFTContainsAll">
-            <summary>NOT FullTextContainsAll</summary>
+            <summary>Negated full-text check for all keywords. Generates: NOT FullTextContainsAll(c.[Column], @param). Value: string[] of keywords.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.FTContainsAny">
-            <summary>FullTextContainsAny</summary>
+            <summary>Full-text check that ANY keyword is present. Generates: FullTextContainsAny(c.[Column], @param). Value: string[] of keywords where at least one must be present.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.NotFTContainsAny">
-            <summary>NOT FullTextContainsAny</summary>
+            <summary>Negated full-text check for any keyword. Generates: NOT FullTextContainsAny(c.[Column], @param). Value: string[] of keywords.</summary>
         </member>
         <member name="F:Universe.Builder.Options.Q.Operator.FTScore">
-            <summary>FullTextScore</summary>
+            <summary>Full-text relevance scoring for ORDER BY RANK. Generates: FullTextScore(c.[Column], @param) in ORDER BY. Value: string[] of search terms. Requires ColumnOptions.Top.</summary>
         </member>
         <member name="T:Universe.Builder.Options.Q.Aggregate">
             <summary>Aggregation functions</summary>
