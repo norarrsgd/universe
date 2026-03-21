@@ -153,11 +153,14 @@ Currently (v3.1.x), optimization is rule-based. Full adaptive learning is planne
 - **Security**: Semgrep scans on PRs and commits
 
 ## Documentation
-- `README.md`: Comprehensive usage examples and API reference
+- `README.md`: Project overview, setup, and API reference
+- `docs/FLUENT_QUERY_BUILDER.md`: Fluent query builder (Orbit) complete API reference
+- `docs/DECLARATIVE_QUERY_SYNTAX.md`: Declarative Cluster/Catalyst query syntax reference
 - `docs/VECTORDISTANCE_USAGE.md`: Vector search feature guide
 - `docs/FULLTEXT_USAGE.md`: Full-text search feature guide
-- `docs/ADAPTIVE_QUERY_OPTIMIZATION_DESIGN.md`: Query optimization design (planned features)
 - `docs/QUERY_EXECUTION_STRATEGIES.md`: Strategy pattern documentation
+- `docs/SQLITE_STATISTICS_STORAGE.md`: SQLite statistics storage configuration
+- `docs/ADAPTIVE_QUERY_OPTIMIZATION_DESIGN.md`: Query optimization design (planned features)
 - `code/DarkMatter/Examples/`: 14 runnable examples covering all features
 
 ## Testing

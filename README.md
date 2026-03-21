@@ -14,7 +14,7 @@ public class MyCosmosEntity : CosmicEntity
 {
   [PartitionKey]
   public string FirstName { get; set; }
-  
+
   public string LastName { get; set; }
 }
 ```
@@ -94,7 +94,7 @@ if (gravity.Query.HasValue)
 {
     string queryText = gravity.Query.Value.Text;
     IEnumerable<(string, object)> parameters = gravity.Query.Value.Parameters;
-    
+
     Console.WriteLine($"Query: {queryText}");
     foreach ((string name, object value) in parameters)
     {
@@ -107,24 +107,13 @@ if (gravity.Query.HasValue)
 This section provides examples of how to use the `Galaxy` repository for basic and advanced operations with Cosmos DB.
 _[Here](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples)._
 
-## Basic Operations
+## Basic CRUD Operations
 
-### Simple Query Operations
+### Get a Document
 
 ```csharp
 // Get a single document by id and partition key
 (Gravity gravity, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
-
-// Basic query with a single filter condition
-(Gravity gravity, MyModel model) = await galaxy.Get(
-    clusters: new List<Cluster>() 
-    {
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.PropertyName), "value")
-        })
-    }
-);
 ```
 
 ```csharp
@@ -136,8 +125,8 @@ _[Here](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples
 
 ```csharp
 // Create a single document
-MyModel model = new MyModel 
-{ 
+MyModel model = new MyModel
+{
     PropertyName = "value",
     // Set other properties
 };
@@ -179,213 +168,18 @@ Gravity gravity = await galaxy.Remove("document-id", "partition-key-value");
 Gravity gravity = await galaxy.Remove("document-id", "partition-key-value1", "partition-key-value2");
 ```
 
-## Advanced Query Examples
+## Querying Documents
 
-### Complex Queries with Multiple Conditions
+Universe provides two equivalent ways to build queries. Both produce identical Cosmos DB SQL — choose whichever style you prefer.
 
-```csharp
-// Query with multiple conditions in a single cluster
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>()
-    {
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.PropertyName), "value"),
-            new Catalyst(nameof(MyModel.NumberProperty), 123, Where: Q.Where.And)
-        })
-    }
-);
+### Fluent Query Builder (Orbit)
 
-// Query with multiple clusters (combining conditions with AND/OR)
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>()
-    {
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.PropertyName), "value"),
-            new Catalyst(nameof(MyModel.AnotherProperty), 123, Where: Q.Where.Or)
-        }, Where: Q.Where.And),
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.Status), "Active")
-        })
-    }
-);
-```
-
-### Special Operators
+The `Orbit<T>` fluent query builder provides a chainable, readable API for constructing queries. Call `.Query()` on any `IGalaxy<T>` instance to start building.
 
 ```csharp
-// Using In operator for array properties
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>()
-    {
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.Tags), "tag1", Operator: Q.Operator.In)
-        })
-    }
-);
+using Universe.Extensions; // Provides the .Query() extension method
 
-// Check if a property is defined
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>()
-    {
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.OptionalProperty), Operator: Q.Operator.Defined)
-        })
-    }
-);
-
-// Comparison operators
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>()
-    {
-        new Cluster(Catalysts: new List<Catalyst>
-        {
-            new Catalyst(nameof(MyModel.NumberProperty), 100, Operator: Q.Operator.Gt)
-        })
-    }
-);
-```
-
-### Sorting and Column Selection
-
-```csharp
-// Query with sorting
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    sorting: new List<Sorting.Option>
-    {
-        new Sorting.Option(nameof(MyModel.PropertyName), Sorting.Direction.DESC)
-    }
-);
-
-// Query with column selection
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    columnOptions: new ColumnOptions(
-        Names: new List<string>
-        {
-            nameof(MyModel.id),
-            nameof(MyModel.PropertyName),
-            nameof(MyModel.AnotherProperty)
-        }
-    )
-);
-
-// Using TOP to limit results
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    columnOptions: new ColumnOptions(
-        Names: new List<string>
-        {
-            nameof(MyModel.id),
-            nameof(MyModel.PropertyName)
-        },
-        Top: 10
-    )
-);
-
-// Using DISTINCT
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    columnOptions: new ColumnOptions(
-        Names: new List<string>
-        {
-            nameof(MyModel.PropertyName)
-        },
-        IsDistinct: true
-    )
-);
-```
-
-_See [example 1](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs), [example 3](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example3_TopAndDistinct.cs)._
-
-### Pagination
-
-```csharp
-// First page
-(Gravity gravity, IList<MyModel> items) = await galaxy.Paged(
-    page: new Q.Page(25), // 25 items per page
-    clusters: new List<Cluster>() { /* query conditions */ }
-);
-
-// Access continuation token from the gravity object
-string continuationToken = gravity.ContinuationToken;
-
-// Next page using continuation token
-(Gravity nextGravity, IList<MyModel> nextItems) = await galaxy.Paged(
-    page: new Q.Page(25, continuationToken),
-    clusters: new List<Cluster>() { /* same query conditions */ }
-);
-```
-
-_See [example 1](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs)._
-
-### Aggregation and Group By Queries
-
-```csharp
-// Group by a property
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    group: new List<string> { nameof(MyModel.Category) }
-);
-
-// Using aggregation functions with ColumnOptions.Aggregates
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    columnOptions: new ColumnOptions(
-        Names: new List<string> { nameof(MyModel.Category) },
-        Aggregates: [
-            new AggregationOption(nameof(MyModel.Price), Q.Aggregate.Sum),
-            new AggregationOption(nameof(MyModel.Quantity), Q.Aggregate.Count)
-        ]
-    )
-);
-
-// Multiple aggregation functions in one query
-(Gravity gravity, IList<MyModel> results) = await galaxy.List(
-    clusters: new List<Cluster>() { /* query conditions */ },
-    columnOptions: new ColumnOptions(
-        Names: new List<string> { nameof(MyModel.Category) },
-        Aggregates: [
-            new AggregationOption(nameof(MyModel.Price), Q.Aggregate.Sum),
-            new AggregationOption(nameof(MyModel.Price), Q.Aggregate.Avg),
-            new AggregationOption(nameof(MyModel.Quantity), Q.Aggregate.Max)
-        ]
-    )
-);
-```
-
-The `Aggregates` parameter in `ColumnOptions` takes an array of `AggregationOption` structs, each specifying a column name and an aggregate function to apply. It supports the following aggregate functions:
-
-- `Q.Aggregate.Count`: Counts the number of items
-- `Q.Aggregate.Sum`: Calculates the sum of the specified column
-- `Q.Aggregate.Min`: Finds the minimum value of the specified column
-- `Q.Aggregate.Max`: Finds the maximum value of the specified column
-- `Q.Aggregate.Avg`: Calculates the average of the specified column
-
-When using aggregates, the query will automatically be grouped by the columns specified in the `Names` parameter. The output column names will be suffixed with the aggregate function name (e.g., `Price_Sum`, `Price_Avg`, `Quantity_Max`).
-
-_See [example 2](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example2_AggregatesWithGroupBy.cs), [example 7](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example7_AdvancedAggregation.cs), [example 8](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example8_SalesAnalysis.cs)._
-
-## Vector Distance Search
-The Universe library supports vector similarity search through the `Q.Operator.VectorDistance` operator, which leverages Azure Cosmos DB's built-in vector search capabilities.
-
-See the [VECTORDISTANCE_USAGE.md](https://github.com/kuromukira/universe/blob/dev/VECTORDISTANCE_USAGE.md)
-
-## Full-Text Search
-The Universe library provides a simple way to perform full-text search queries using the `Q.Operator.FT*` operators. This allows you to search for documents containing specific text in designated fields.
-
-See the [FULLTEXT_USAGE.md](https://github.com/kuromukira/universe/blob/dev/FULLTEXT_USAGE.md)
-
-## Fluent Query Builder (Orbit)
-The Universe library provides a fluent query builder called `Orbit<T>` as an alternative to the declarative `Cluster`/`Catalyst` syntax. Both approaches produce identical queries — use whichever style you prefer.
-
-```csharp
-// Fluent approach
+// Filter + sort
 var (g, results) = await galaxy.Query()
     .Select("id", "name", "price")
     .Top(20)
@@ -396,7 +190,71 @@ var (g, results) = await galaxy.Query()
     .ToListAsync();
 ```
 
-See the [FLUENT_QUERY_BUILDER.md](https://github.com/kuromukira/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) for the complete API reference covering all operators, pagination, aggregation, vector search, full-text search, and more.
+```csharp
+// Pagination
+var (g1, page1) = await galaxy.Query()
+    .Select("id", "name", "price")
+    .Paged(25)
+    .Cluster(c => c.Eq("status", "active"))
+    .OrderByDescending("addedOn")
+    .ToListAsync();
+
+// Next page
+var (g2, page2) = await galaxy.Query()
+    .Select("id", "name", "price")
+    .Paged(25, g1.ContinuationToken)
+    .Cluster(c => c.Eq("status", "active"))
+    .OrderByDescending("addedOn")
+    .ToListAsync();
+```
+
+```csharp
+// Aggregation
+var (g, results) = await galaxy.Query()
+    .Select("category")
+    .Aggregate("price", Q.Aggregate.Sum)
+    .Aggregate("price", Q.Aggregate.Avg)
+    .Aggregate("id", Q.Aggregate.Count)
+    .GroupBy("category")
+    .Cluster(c => c.Gte("addedOn", DateTime.Now.AddMonths(-3)))
+    .ToListAsync();
+```
+
+See the [Fluent Query Builder (Orbit) Reference](https://github.com/kuromukira/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) for the complete API covering all operators, vector search, full-text search, joins, query hints, and more.
+
+### Declarative Syntax (Cluster / Catalyst)
+
+The declarative syntax uses `Cluster` and `Catalyst` structs to compose filter conditions as data structures.
+
+```csharp
+(Gravity gravity, IList<MyModel> results) = await galaxy.List(
+    clusters: new List<Cluster>()
+    {
+        new Cluster(Catalysts: new List<Catalyst>
+        {
+            new Catalyst(nameof(MyModel.PropertyName), "value"),
+            new Catalyst(nameof(MyModel.NumberProperty), 123, Where: Q.Where.And)
+        })
+    }
+);
+```
+
+See the [Declarative Query Syntax Reference](https://github.com/kuromukira/universe/blob/dev/docs/DECLARATIVE_QUERY_SYNTAX.md) for complex queries, special operators, sorting, pagination, aggregation, and more.
+
+## Vector Distance Search
+The Universe library supports vector similarity search through the `Q.Operator.VectorDistance` operator, which leverages Azure Cosmos DB's built-in vector search capabilities.
+
+See the [VECTORDISTANCE_USAGE.md](https://github.com/kuromukira/universe/blob/dev/docs/VECTORDISTANCE_USAGE.md)
+
+## Full-Text Search
+The Universe library provides a simple way to perform full-text search queries using the `Q.Operator.FT*` operators. This allows you to search for documents containing specific text in designated fields.
+
+See the [FULLTEXT_USAGE.md](https://github.com/kuromukira/universe/blob/dev/docs/FULLTEXT_USAGE.md)
+
+## Query Execution Strategies
+The library uses a strategy pattern for query execution, automatically selecting the optimal strategy based on query characteristics. Strategies include Direct (standard queries), Gateway (cross-partition), and VectorSearch (vector similarity). You can also provide `QueryHints` to fine-tune execution behavior.
+
+See the [QUERY_EXECUTION_STRATEGIES.md](https://github.com/kuromukira/universe/blob/dev/docs/QUERY_EXECUTION_STRATEGIES.md)
 
 ## Stored Procedures
 
@@ -474,3 +332,15 @@ catch (Exception ex)
 - **Column Selection**: Select only the columns you need to reduce data transfer.
 - **Debug Mode**: The debug mode (enabled by passing `true` to the Galaxy constructor) provides query details but adds overhead.
 - **Partition Key**: Always consider your partition strategy for best performance.
+
+## Documentation
+
+| # | Document | Description |
+|---|----------|-------------|
+| 1 | [Fluent Query Builder (Orbit)](https://github.com/kuromukira/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) | Complete Orbit API reference — operators, pagination, aggregation, vector search, full-text search, joins |
+| 2 | [Declarative Query Syntax](https://github.com/kuromukira/universe/blob/dev/docs/DECLARATIVE_QUERY_SYNTAX.md) | Cluster/Catalyst query syntax — complex queries, sorting, pagination, aggregation |
+| 3 | [Vector Distance Search](https://github.com/kuromukira/universe/blob/dev/docs/VECTORDISTANCE_USAGE.md) | Vector similarity search with VECTOR_DISTANCE, RRF, hybrid search |
+| 4 | [Full-Text Search](https://github.com/kuromukira/universe/blob/dev/docs/FULLTEXT_USAGE.md) | Full-text search operators — FTContains, FTScore, hybrid search |
+| 5 | [Query Execution Strategies](https://github.com/kuromukira/universe/blob/dev/docs/QUERY_EXECUTION_STRATEGIES.md) | Strategy pattern, query hints, and performance tuning |
+| 6 | [SQLite Statistics Storage](https://github.com/kuromukira/universe/blob/dev/docs/SQLITE_STATISTICS_STORAGE.md) | SQLite-based query statistics persistence and configuration |
+| 7 | [Adaptive Query Optimization](https://github.com/kuromukira/universe/blob/dev/docs/ADAPTIVE_QUERY_OPTIMIZATION_DESIGN.md) | Design document for adaptive learning (v3.2.0+) |
