@@ -16,15 +16,15 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
     public void GetRecommendations_EmptyQueueVsLoadedQueue_ShowsOverhead()
     {
         // Baseline: empty queue
-        using var emptyTuner = new QueryTuner();
-        var sw = Stopwatch.StartNew();
+        using QueryTuner emptyTuner = new QueryTuner();
+        Stopwatch sw = Stopwatch.StartNew();
         for (int i = 0; i < 1000; i++)
             emptyTuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
-        var emptyTime = sw.Elapsed;
+        TimeSpan emptyTime = sw.Elapsed;
 
         // Loaded: 1000-item queue
-        using var loadedTuner = new QueryTuner();
+        using QueryTuner loadedTuner = new QueryTuner();
         for (int i = 0; i < 1000; i++)
             loadedTuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.Simple,
@@ -34,7 +34,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
         for (int i = 0; i < 1000; i++)
             loadedTuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
-        var loadedTime = sw.Elapsed;
+        TimeSpan loadedTime = sw.Elapsed;
 
         _output.WriteLine($"Empty queue: {emptyTime.TotalMilliseconds:F2}ms for 1000 calls");
         _output.WriteLine($"Loaded queue (1000 items): {loadedTime.TotalMilliseconds:F2}ms for 1000 calls");
@@ -52,9 +52,9 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
     public void GetRecommendations_LinearScaling_TimingsIncreaseWithQueueSize()
     {
         int[] sizes = [0, 100, 250, 500, 750, 1000];
-        var timings = new Dictionary<int, double>();
+        Dictionary<int, double> timings = new Dictionary<int, double>();
 
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         int currentSize = 0;
 
         foreach (int targetSize in sizes)
@@ -67,7 +67,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
                 currentSize++;
             }
 
-            var sw = Stopwatch.StartNew();
+            Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < 100; i++)
                 tuner.GetRecommendations(QueryType.Simple);
             sw.Stop();
@@ -86,13 +86,13 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
     [Trait("Category", "Performance")]
     public void GetRecommendations_CumulativeOverhead_WithFullQueue()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         for (int i = 0; i < 1000; i++)
             tuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.Simple,
                 timestamp: DateTime.UtcNow));
 
-        var sw = Stopwatch.StartNew();
+        Stopwatch sw = Stopwatch.StartNew();
         for (int i = 0; i < 1000; i++)
             tuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
@@ -106,7 +106,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
     [Trait("Category", "Performance")]
     public void GetRecommendations_MixedTypes_UnrelatedTypeIsNotAffected()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
 
         // Load 950 Simple entries and 50 Aggregation entries
         for (int i = 0; i < 950; i++)
@@ -119,18 +119,18 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
                 timestamp: DateTime.UtcNow));
 
         // Measure 1000 calls for Simple (950-item partition)
-        var sw = Stopwatch.StartNew();
+        Stopwatch sw = Stopwatch.StartNew();
         for (int i = 0; i < 1000; i++)
             tuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
-        var simpleTime = sw.Elapsed;
+        TimeSpan simpleTime = sw.Elapsed;
 
         // Measure 1000 calls for Aggregation (50-item partition)
         sw.Restart();
         for (int i = 0; i < 1000; i++)
             tuner.GetRecommendations(QueryType.Aggregation);
         sw.Stop();
-        var aggTime = sw.Elapsed;
+        TimeSpan aggTime = sw.Elapsed;
 
         _output.WriteLine($"Simple (950 items): {simpleTime.TotalMilliseconds:F2}ms for 1000 calls");
         _output.WriteLine($"Aggregation (50 items): {aggTime.TotalMilliseconds:F2}ms for 1000 calls");
@@ -147,10 +147,10 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
     [Trait("Category", "Performance")]
     public void ComputeQueryHash_10000Calls_Performance()
     {
-        var context = new QueryContext(QueryType.Simple);
+        QueryContext context = new QueryContext(QueryType.Simple);
         string queryText = "SELECT * FROM c WHERE c.id = @p1 AND c.name = @p2 AND c.status = @p3";
 
-        var sw = Stopwatch.StartNew();
+        Stopwatch sw = Stopwatch.StartNew();
         for (int i = 0; i < 10000; i++)
             QueryTuner.ComputeQueryHash(context, queryText);
         sw.Stop();
@@ -165,10 +165,10 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"perf-record-{Guid.NewGuid()}.db");
 
-        using (var storage = new SqliteStatisticsStorage(dbPath, batchSize: 10, flushIntervalSeconds: 60))
-        using (var tuner = new QueryTuner(storage))
+        using (SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 10, flushIntervalSeconds: 60))
+        using (QueryTuner tuner = new QueryTuner(storage))
         {
-            var sw = Stopwatch.StartNew();
+            Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < 100; i++)
                 tuner.RecordExecution(TestStatisticsFactory.Create(queryHash: $"perf-{i}"));
             sw.Stop();
@@ -191,7 +191,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"perf-startup-{Guid.NewGuid()}.db");
 
         // Pre-seed SQLite with 1000 records
-        using (var seedStorage = new SqliteStatisticsStorage(dbPath, batchSize: 50, flushIntervalSeconds: 60))
+        using (SqliteStatisticsStorage seedStorage = new SqliteStatisticsStorage(dbPath, batchSize: 50, flushIntervalSeconds: 60))
         {
             for (int i = 0; i < 1000; i++)
                 await seedStorage.SaveAsync(TestStatisticsFactory.Create(
@@ -204,18 +204,18 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
         }
 
         // Measure InMemory startup
-        var sw = Stopwatch.StartNew();
-        using var inMemoryTuner = new QueryTuner();
+        Stopwatch sw = Stopwatch.StartNew();
+        using QueryTuner inMemoryTuner = new QueryTuner();
         await Task.Delay(100); // Give async loading a chance
-        var inMemoryRec = inMemoryTuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations inMemoryRec = inMemoryTuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
-        var inMemoryTime = sw.Elapsed;
+        TimeSpan inMemoryTime = sw.Elapsed;
 
         // Measure SQLite startup (loading 1000 records into queue)
         QueryTuningRecommendations sqliteRec;
         TimeSpan sqliteTime;
-        using (var sqliteStorage = new SqliteStatisticsStorage(dbPath, batchSize: 50, flushIntervalSeconds: 60))
-        using (var sqliteTuner = new QueryTuner(sqliteStorage))
+        using (SqliteStatisticsStorage sqliteStorage = new SqliteStatisticsStorage(dbPath, batchSize: 50, flushIntervalSeconds: 60))
+        using (QueryTuner sqliteTuner = new QueryTuner(sqliteStorage))
         {
             sw.Restart();
 

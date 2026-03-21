@@ -5,9 +5,9 @@
 		<Nullable>disable</Nullable>
 		<LangVersion>14.0</LangVersion>
 		<Description>A simpler way of querying a CosmosDb Namespace</Description>
-		<Copyright>kuromukira 2023</Copyright>
-		<Owners>kuromukira</Owners>
-		<PackageReleaseNotes>View release on https://github.com/kuromukira/universe/releases</PackageReleaseNotes>
+		<Copyright>norarrsgd 2023</Copyright>
+		<Owners>norarrsgd</Owners>
+		<PackageReleaseNotes>View release on https://github.com/norarrsgd/universe/releases</PackageReleaseNotes>
 		<RootNamespace>Universe</RootNamespace>
 		<Configurations>Release;Debug</Configurations>
 	</PropertyGroup>
@@ -15,19 +15,19 @@
 	<PropertyGroup>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<Description>A simpler way of querying a CosmosDb Namespace</Description>
-		<Copyright>kuromukira 2023</Copyright>
-		<RepositoryUrl>https://github.com/kuromukira/universe</RepositoryUrl>
+		<Copyright>norarrsgd 2023</Copyright>
+		<RepositoryUrl>https://github.com/norarrsgd/universe</RepositoryUrl>
 		<PackageTags>nosql cosmos cosmosdb wrapper azure simple query vector nosql ai</PackageTags>
 		<RepositoryType>Git</RepositoryType>
-		<Authors>kuromukira</Authors>
+		<Authors>norarrsgd</Authors>
 		<Product>Universe</Product>
-		<Version>3.2.0</Version>
+		<Version>3.3.0</Version>
 		<PackageReleaseNotes>
 			View release on
-			https://github.com/kuromukira/universe/releases/tag/untagged-cdcf4202c2656450c07b
+			https://github.com/norarrsgd/universe/releases/tag/untagged-cdcf4202c2656450c07b
 		</PackageReleaseNotes>
-		<AssemblyVersion>3.2.0.0</AssemblyVersion>
-		<FileVersion>3.2.0.0</FileVersion>
+		<AssemblyVersion>3.3.0.0</AssemblyVersion>
+		<FileVersion>3.3.0.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -44,8 +44,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.57.0" />
-		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
+		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.58.0" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 	</ItemGroup>
 

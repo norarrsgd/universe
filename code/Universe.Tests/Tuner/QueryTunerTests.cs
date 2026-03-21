@@ -12,7 +12,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void RecordExecution_CapsAt1000Entries()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
 
         // Record 200 Aggregation entries first
         for (int i = 0; i < 200; i++)
@@ -25,12 +25,12 @@ public sealed class QueryTunerTests
                 type: QueryType.Simple, queryHash: $"simple-{i}"));
 
         // Aggregation entries should be fully evicted
-        var aggRec = tuner.GetRecommendations(QueryType.Aggregation);
+        QueryTuningRecommendations aggRec = tuner.GetRecommendations(QueryType.Aggregation);
         Assert.False(aggRec.IsDataDriven,
             "Aggregation records should have been evicted by queue cap");
 
         // Simple entries have enough data for data-driven
-        var simpleRec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations simpleRec = tuner.GetRecommendations(QueryType.Simple);
         Assert.True(simpleRec.IsDataDriven,
             "Simple records should provide data-driven recommendations");
     }
@@ -38,7 +38,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_OnlyConsidersEntriesOfRequestedType()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
 
         // Record 200 Simple, 200 Aggregation, 100 VectorSearch
         for (int i = 0; i < 200; i++)
@@ -51,10 +51,10 @@ public sealed class QueryTunerTests
             tuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.VectorSearch, queryHash: $"vec-{i}"));
 
-        var simpleRec = tuner.GetRecommendations(QueryType.Simple);
-        var aggRec = tuner.GetRecommendations(QueryType.Aggregation);
-        var vecRec = tuner.GetRecommendations(QueryType.VectorSearch);
-        var joinRec = tuner.GetRecommendations(QueryType.Join);
+        QueryTuningRecommendations simpleRec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations aggRec = tuner.GetRecommendations(QueryType.Aggregation);
+        QueryTuningRecommendations vecRec = tuner.GetRecommendations(QueryType.VectorSearch);
+        QueryTuningRecommendations joinRec = tuner.GetRecommendations(QueryType.Join);
 
         Assert.True(simpleRec.IsDataDriven);
         Assert.Equal(200, simpleRec.SampleSize);
@@ -72,7 +72,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void RecordExecution_GlobalCapAppliesAcrossAllTypes()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
 
         // Record 500 Simple (oldest), then 500 Aggregation, then 100 VectorSearch
         for (int i = 0; i < 500; i++)
@@ -89,9 +89,9 @@ public sealed class QueryTunerTests
                 timestamp: DateTime.UtcNow.AddMinutes(-i)));
 
         // Total inserted: 1100 → 100 oldest (Simple) should be evicted
-        var simpleRec = tuner.GetRecommendations(QueryType.Simple);
-        var aggRec = tuner.GetRecommendations(QueryType.Aggregation);
-        var vecRec = tuner.GetRecommendations(QueryType.VectorSearch);
+        QueryTuningRecommendations simpleRec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations aggRec = tuner.GetRecommendations(QueryType.Aggregation);
+        QueryTuningRecommendations vecRec = tuner.GetRecommendations(QueryType.VectorSearch);
 
         // Simple should have lost 100 entries (evicted as oldest)
         Assert.True(simpleRec.IsDataDriven);
@@ -113,11 +113,11 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_LessThan10Samples_ReturnsRuleBased()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         for (int i = 0; i < 9; i++)
             tuner.RecordExecution(TestStatisticsFactory.Create(type: QueryType.Simple));
 
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
 
         Assert.False(rec.IsDataDriven);
         Assert.Equal(0, rec.SampleSize);
@@ -126,7 +126,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_AtLeast10Samples_ReturnsDataDriven()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         for (int i = 0; i < 15; i++)
             tuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.Simple,
@@ -134,7 +134,7 @@ public sealed class QueryTunerTests
                 executionTime: TimeSpan.FromMilliseconds(100 + i * 10),
                 success: i < 12));
 
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
 
         Assert.True(rec.IsDataDriven);
         Assert.Equal(15, rec.SampleSize);
@@ -150,7 +150,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_OnlyConsidersLast24Hours()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
 
         // Add 15 records older than 24 hours
         for (int i = 0; i < 15; i++)
@@ -158,7 +158,7 @@ public sealed class QueryTunerTests
                 type: QueryType.Simple,
                 timestamp: DateTime.UtcNow.AddHours(-25)));
 
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
         Assert.False(rec.IsDataDriven);
     }
 
@@ -169,13 +169,13 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_CorrectAverageRU()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         double[] rus = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0];
         for (int i = 0; i < rus.Length; i++)
             tuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.Simple, ru: rus[i]));
 
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
 
         Assert.True(rec.IsDataDriven);
         Assert.Equal(55.0, rec.AverageRU);
@@ -184,12 +184,12 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_CorrectSuccessRate()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         for (int i = 0; i < 10; i++)
             tuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.Simple, success: i < 7));
 
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
 
         Assert.True(rec.IsDataDriven);
         Assert.Equal(0.7, rec.SuccessRate);
@@ -198,13 +198,13 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRecommendations_CorrectAverageExecutionTime()
     {
-        using var tuner = new QueryTuner();
+        using QueryTuner tuner = new QueryTuner();
         for (int i = 0; i < 10; i++)
             tuner.RecordExecution(TestStatisticsFactory.Create(
                 type: QueryType.Simple,
                 executionTime: TimeSpan.FromMilliseconds(100 * (i + 1))));
 
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
 
         Assert.True(rec.IsDataDriven);
         // Average of 100, 200, ..., 1000 = 550ms
@@ -218,8 +218,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRuleBasedRecommendations_VectorSearch_HasCorrectHints()
     {
-        using var tuner = new QueryTuner();
-        var rec = tuner.GetRecommendations(QueryType.VectorSearch);
+        using QueryTuner tuner = new QueryTuner();
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.VectorSearch);
 
         Assert.False(rec.IsDataDriven);
         Assert.NotNull(rec.SuggestedHints);
@@ -230,8 +230,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRuleBasedRecommendations_FullTextSearch_HasCorrectHints()
     {
-        using var tuner = new QueryTuner();
-        var rec = tuner.GetRecommendations(QueryType.FullTextSearch);
+        using QueryTuner tuner = new QueryTuner();
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.FullTextSearch);
 
         Assert.False(rec.IsDataDriven);
         Assert.NotNull(rec.SuggestedHints);
@@ -241,8 +241,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRuleBasedRecommendations_Aggregation_HasCorrectHints()
     {
-        using var tuner = new QueryTuner();
-        var rec = tuner.GetRecommendations(QueryType.Aggregation);
+        using QueryTuner tuner = new QueryTuner();
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Aggregation);
 
         Assert.False(rec.IsDataDriven);
         Assert.NotNull(rec.SuggestedHints);
@@ -253,8 +253,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRuleBasedRecommendations_Complex_HasCorrectHints()
     {
-        using var tuner = new QueryTuner();
-        var rec = tuner.GetRecommendations(QueryType.Complex);
+        using QueryTuner tuner = new QueryTuner();
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Complex);
 
         Assert.False(rec.IsDataDriven);
         Assert.NotNull(rec.SuggestedHints);
@@ -265,8 +265,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void GetRuleBasedRecommendations_Simple_EmptyHints()
     {
-        using var tuner = new QueryTuner();
-        var rec = tuner.GetRecommendations(QueryType.Simple);
+        using QueryTuner tuner = new QueryTuner();
+        QueryTuningRecommendations rec = tuner.GetRecommendations(QueryType.Simple);
 
         Assert.False(rec.IsDataDriven);
         Assert.NotNull(rec.SuggestedHints);
@@ -280,7 +280,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void ComputeQueryHash_Deterministic()
     {
-        var context = new QueryContext(QueryType.Simple);
+        QueryContext context = new QueryContext(QueryType.Simple);
         string query = "SELECT * FROM c WHERE c.id = @p1";
 
         string hash1 = QueryTuner.ComputeQueryHash(context, query);
@@ -292,7 +292,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void ComputeQueryHash_NormalizesParameterNames()
     {
-        var context = new QueryContext(QueryType.Simple);
+        QueryContext context = new QueryContext(QueryType.Simple);
         string query1 = "SELECT * FROM c WHERE c.id = @param_abc123";
         string query2 = "SELECT * FROM c WHERE c.id = @param_xyz789";
 
@@ -305,7 +305,7 @@ public sealed class QueryTunerTests
     [Fact]
     public void ComputeQueryHash_DifferentQueries_DifferentHashes()
     {
-        var context = new QueryContext(QueryType.Simple);
+        QueryContext context = new QueryContext(QueryType.Simple);
         string query1 = "SELECT * FROM c WHERE c.id = @p1";
         string query2 = "SELECT * FROM c WHERE c.name = @p1";
 
@@ -318,8 +318,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void ComputeQueryHash_DifferentQueryTypes_DifferentHashes()
     {
-        var context1 = new QueryContext(QueryType.Simple);
-        var context2 = new QueryContext(QueryType.Aggregation);
+        QueryContext context1 = new QueryContext(QueryType.Simple);
+        QueryContext context2 = new QueryContext(QueryType.Aggregation);
         string query = "SELECT * FROM c WHERE c.id = @p1";
 
         string hash1 = QueryTuner.ComputeQueryHash(context1, query);
@@ -338,7 +338,7 @@ public sealed class QueryTunerTests
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-startup-{Guid.NewGuid()}.db");
 
         // Pre-seed SQLite with 15 Simple records
-        using (var seedStorage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60))
+        using (SqliteStatisticsStorage seedStorage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60))
         {
             for (int i = 0; i < 15; i++)
                 await seedStorage.SaveAsync(TestStatisticsFactory.Create(
@@ -351,8 +351,8 @@ public sealed class QueryTunerTests
         }
 
         // Create new QueryTuner with fresh SQLite storage
-        using var storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
-        using var tuner = new QueryTuner(storage);
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
+        using QueryTuner tuner = new QueryTuner(storage);
 
         // Wait for async loading (poll until data-driven or timeout)
         QueryTuningRecommendations rec = default;
@@ -377,8 +377,8 @@ public sealed class QueryTunerTests
     [Fact]
     public void Dispose_DisposesUnderlyingStorage()
     {
-        var trackable = new TrackingDisposableStorage();
-        var tuner = new QueryTuner(trackable);
+        TrackingDisposableStorage trackable = new TrackingDisposableStorage();
+        QueryTuner tuner = new QueryTuner(trackable);
 
         tuner.Dispose();
 
