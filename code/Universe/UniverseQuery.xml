@@ -31,6 +31,90 @@
             <param name="sequence">The partition key sequence number (1-3).</param>
             <param name="keyName">The name of the partition key.</param>
         </member>
+        <member name="T:Universe.Builder.ClusterBuilder">
+            <summary>
+            Builder for constructing a single cluster of Catalyst conditions.
+            Used inside Orbit.Cluster(c => ...) lambdas.
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Catalyst(System.String,System.Object,Universe.Builder.Options.Q.Operator,System.String)">
+            <summary>Add a filter condition to this cluster.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.And">
+            <summary>The next condition will be joined with AND.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Or">
+            <summary>The next condition will be joined with OR.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Eq(System.String,System.Object,System.String)">
+            <summary>Equality: column = value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotEq(System.String,System.Object,System.String)">
+            <summary>Inequality: column != value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Gt(System.String,System.Object,System.String)">
+            <summary>Greater than: column > value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Gte(System.String,System.Object,System.String)">
+            <summary>Greater than or equal: column >= value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Lt(System.String,System.Object,System.String)">
+            <summary>Less than: column &lt; value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Lte(System.String,System.Object,System.String)">
+            <summary>Less than or equal: column &lt;= value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Like(System.String,System.String,System.String)">
+            <summary>LIKE pattern matching</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotLike(System.String,System.String,System.String)">
+            <summary>NOT LIKE pattern matching</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Defined(System.String,System.String)">
+            <summary>Check if property is defined on the document</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotDefined(System.String,System.String)">
+            <summary>Check if property is NOT defined on the document</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.In(System.String,System.Object,System.String)">
+            <summary>Check if document's array field contains a scalar value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotIn(System.String,System.Object,System.String)">
+            <summary>Check if document's array field does NOT contain a scalar value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Contains(System.String,System.Collections.Generic.IEnumerable{System.Object},System.String)">
+            <summary>Check if a collection contains the document's scalar field value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotContains(System.String,System.Collections.Generic.IEnumerable{System.Object},System.String)">
+            <summary>Check if a collection does NOT contain the document's scalar field value</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Len(System.String,System.Int32,System.String)">
+            <summary>Array length check</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.VectorDistance(System.String,System.Single[],System.String)">
+            <summary>Vector distance search</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.FTContains(System.String,System.String,System.String)">
+            <summary>Full-text contains single keyword</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotFTContains(System.String,System.String,System.String)">
+            <summary>Negated full-text contains</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.FTContainsAll(System.String,System.String[],System.String)">
+            <summary>Full-text contains ALL keywords</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotFTContainsAll(System.String,System.String[],System.String)">
+            <summary>Negated full-text contains all</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.FTContainsAny(System.String,System.String[],System.String)">
+            <summary>Full-text contains ANY keyword</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.NotFTContainsAny(System.String,System.String[],System.String)">
+            <summary>Negated full-text contains any</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.FTScore(System.String,System.String[],System.String)">
+            <summary>Full-text relevance scoring</summary>
+        </member>
         <member name="T:Universe.Builder.Options.AggregationOption">
             <summary>
             Represents a column aggregation.
@@ -405,6 +489,68 @@
         </member>
         <member name="P:Universe.Builder.Options.Cluster.Where">
             <summary>Where operator (eg AND / OR)</summary>
+        </member>
+        <member name="T:Universe.Builder.Orbit`1">
+            <summary>
+            Fluent query builder for Galaxy queries. Create via galaxy.Query() extension method.
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Cluster(System.Action{Universe.Builder.ClusterBuilder})">
+            <summary>Add a cluster of filter conditions using a builder lambda.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Or">
+            <summary>The next cluster will be joined with OR.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.And">
+            <summary>The next cluster will be joined with AND.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Select(System.String[])">
+            <summary>Specify which columns to select.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Distinct">
+            <summary>Return only distinct results.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Top(System.Int32)">
+            <summary>Limit the number of results returned.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.OrderBy(System.String,Universe.Builder.Options.Sorting.Direction,System.String)">
+            <summary>Add a sort order.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.OrderByDescending(System.String,System.String)">
+            <summary>Add descending sort order on a column.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.WithWeights(System.String)">
+            <summary>Add weighted sorting for RRF ranking.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Aggregate(System.String,Universe.Builder.Options.Q.Aggregate)">
+            <summary>Add an aggregation function.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.GroupBy(System.String[])">
+            <summary>Add GROUP BY columns.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Paged(System.Int32,System.String)">
+            <summary>Enable pagination with specified page size.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.Join(System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.AggregationOption})">
+            <summary>Configure a JOIN on a sub-collection array.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.WithHints(Universe.Builder.Options.QueryHints)">
+            <summary>Provide query optimization hints.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.ToListAsync">
+            <summary>Execute the query and return a list of results.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.ToListAsync``1">
+            <summary>Execute the query and return a list of results projected to a different type.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.GetAsync">
+            <summary>Execute the query and return the first matching result.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.GetAsync``1">
+            <summary>Execute the query and return the first matching result projected to a different type.</summary>
+        </member>
+        <member name="M:Universe.Builder.Orbit`1.GenerateQuery">
+            <summary>Generate the SQL query without executing it.</summary>
         </member>
         <member name="T:Universe.Builder.Strategies.DirectQueryStrategy">
             <summary>
@@ -840,6 +986,14 @@
             <summary>
             Converts an object to bool, handling both JsonElement (from deserialized JSON) and primitive types
             </summary>
+        </member>
+        <member name="T:Universe.Extensions.OrbitExtensions">
+            <summary>
+            Extension methods for creating fluent query builders on Galaxy instances.
+            </summary>
+        </member>
+        <member name="M:Universe.Extensions.OrbitExtensions.Query``1(Universe.Interfaces.IGalaxy{``0})">
+            <summary>Create a fluent query builder for this Galaxy repository.</summary>
         </member>
         <member name="T:Universe.Extensions.CosmicEntityExtensions">
             <summary> Extensions for ICosmicEntity </summary>
