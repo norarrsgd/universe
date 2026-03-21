@@ -404,6 +404,8 @@ public sealed class OrbitQueryTests : IDisposable
                 new("addedOn", "2025-01-01", Operator: Q.Operator.Gte, Where: Q.Where.And),
                 new("price", 50.0, Operator: Q.Operator.Lte, Where: Q.Where.And)
             ], Where: Q.Where.And),
+            // Note: The first catalyst's Where value (Q.Where.Or) is ignored by QueryBuilder —
+            // only subsequent catalysts' Where values are used as connectors within the cluster.
             new(Catalysts: [
                 new("code", "SPECIAL", Where: Q.Where.Or),
                 new("category", "Premium", Where: Q.Where.And)

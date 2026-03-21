@@ -158,6 +158,10 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	}
 
 	/// <summary>Execute the query and return the first matching result.</summary>
+	/// <remarks>
+	/// Only filter conditions (clusters) and column selection (Select) are applied.
+	/// Top, Distinct, Aggregate, GroupBy, and sorting options are ignored. Use ToListAsync for those features.
+	/// </remarks>
 	public async Task<(Gravity g, T T)> GetAsync()
 	{
 		ValidateQueryConstraints();
@@ -167,6 +171,10 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	}
 
 	/// <summary>Execute the query and return the first matching result projected to a different type.</summary>
+	/// <remarks>
+	/// Only filter conditions (clusters) and column selection (Select) are applied.
+	/// Top, Distinct, Aggregate, GroupBy, and sorting options are ignored. Use ToListAsync for those features.
+	/// </remarks>
 	public async Task<(Gravity g, TS S)> GetAsync<TS>() where TS : ICosmicEntity
 	{
 		ValidateQueryConstraints();

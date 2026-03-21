@@ -9,5 +9,5 @@ public static class OrbitExtensions
 {
     /// <summary>Create a fluent query builder for this Galaxy repository.</summary>
     public static Orbit<T> Query<T>(this IGalaxy<T> galaxy) where T : class, ICosmicEntity
-        => new(galaxy);
+        => new(galaxy ?? throw new UniverseException("Cannot create query builder without a Galaxy instance."));
 }
