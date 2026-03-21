@@ -30,8 +30,8 @@ public sealed class FileStatisticsStorageTests : IDisposable
     [Fact]
     public async Task SaveAndLoad_RoundTrip_AllFieldsPreserved()
     {
-        var hints = new Dictionary<string, object> { ["MaxItemCount"] = 50 };
-        var stat = TestStatisticsFactory.Create(
+        Dictionary<string, object> hints = new Dictionary<string, object> { ["MaxItemCount"] = 50 };
+        QueryExecutionStatistics stat = TestStatisticsFactory.Create(
             queryHash: "file-abc",
             type: QueryType.Aggregation,
             ru: 33.3,
@@ -43,10 +43,10 @@ public sealed class FileStatisticsStorageTests : IDisposable
             hintsUsed: hints);
 
         await _storage.SaveAsync(stat);
-        var loaded = await _storage.LoadRecentAsync(10);
+        IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(10);
 
         Assert.Single(loaded);
-        var result = loaded[0];
+        QueryExecutionStatistics result = loaded[0];
         Assert.Equal("file-abc", result.QueryHash);
         Assert.Equal(QueryType.Aggregation, result.Type);
         Assert.Equal(33.3, result.RU);
@@ -66,7 +66,7 @@ public sealed class FileStatisticsStorageTests : IDisposable
                 timestamp: DateTime.UtcNow.AddMinutes(-i)));
         }
 
-        var loaded = await _storage.LoadRecentAsync(5);
+        IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(5);
 
         Assert.Equal(5, loaded.Count);
         // Most recent first
@@ -84,7 +84,7 @@ public sealed class FileStatisticsStorageTests : IDisposable
                 timestamp: DateTime.UtcNow.AddSeconds(-i)));
         }
 
-        var loaded = await _storage.LoadRecentAsync(2000);
+        IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(2000);
 
         Assert.Equal(1000, loaded.Count);
         // Should keep the most recent 1000
@@ -98,12 +98,12 @@ public sealed class FileStatisticsStorageTests : IDisposable
         await File.WriteAllTextAsync(_filePath, "{ this is not valid json [[[");
 
         // LoadRecentAsync should return empty (not throw)
-        var loaded = await _storage.LoadRecentAsync(10);
+        IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(10);
         Assert.Empty(loaded);
 
         // Should be able to save new data after recovery
         await _storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "recovered"));
-        var loadedAfter = await _storage.LoadRecentAsync(10);
+        IList<QueryExecutionStatistics> loadedAfter = await _storage.LoadRecentAsync(10);
         Assert.Single(loadedAfter);
         Assert.Equal("recovered", loadedAfter[0].QueryHash);
     }
@@ -112,7 +112,7 @@ public sealed class FileStatisticsStorageTests : IDisposable
     public void CustomPath_IsAllowed()
     {
         string customPath = Path.Combine(AppContext.BaseDirectory, "custom-dir", $"universe-test-{Guid.NewGuid()}.json");
-        using var storage = new FileStatisticsStorage(customPath);
+        using FileStatisticsStorage storage = new FileStatisticsStorage(customPath);
         storage.Dispose();
         try
         {
@@ -153,9 +153,9 @@ public sealed class FileStatisticsStorageTests : IDisposable
         foreach (int scale in scales)
         {
             string filePath = Path.Combine(AppContext.BaseDirectory, $"perf-file-{scale}-{Guid.NewGuid()}.json");
-            using var storage = new FileStatisticsStorage(filePath);
+            using FileStatisticsStorage storage = new FileStatisticsStorage(filePath);
 
-            var sw = Stopwatch.StartNew();
+            Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < scale; i++)
             {
                 await storage.SaveAsync(TestStatisticsFactory.Create(

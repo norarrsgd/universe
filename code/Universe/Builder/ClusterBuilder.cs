@@ -126,6 +126,6 @@ public sealed class ClusterBuilder
     public ClusterBuilder FTScore(string column, string[] terms, string alias = "c")
         => Catalyst(column, terms, Q.Operator.FTScore, alias);
 
-    internal Options.Cluster Build(Q.Where where)
+    internal Cluster Build(Q.Where where)
         => new(_catalysts, where);
 }

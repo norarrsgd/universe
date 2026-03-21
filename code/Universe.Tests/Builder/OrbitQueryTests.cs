@@ -27,13 +27,13 @@ public sealed class OrbitQueryTests : IDisposable
     {
         // Declarative
         List<Cluster> declarative = [new([new("name", "test")])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
         // Fluent
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("name", "test"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -45,12 +45,12 @@ public sealed class OrbitQueryTests : IDisposable
             new("name", "test"),
             new("price", 50.0, Operator: Q.Operator.Gt)
         ])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("name", "test").And().Gt("price", 50.0));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -63,12 +63,12 @@ public sealed class OrbitQueryTests : IDisposable
             new("code", "ABC", Where: Q.Where.Or),
             new("price", 10.0, Operator: Q.Operator.Gte)
         ])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("name", "test").Or().Eq("code", "ABC").And().Gte("price", 10.0));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -84,14 +84,14 @@ public sealed class OrbitQueryTests : IDisposable
             new([new("name", "test")]),
             new([new("code", "ABC")], Where: Q.Where.And)
         ];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("name", "test"))
              .And()
              .Cluster(c => c.Eq("code", "ABC"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -103,14 +103,14 @@ public sealed class OrbitQueryTests : IDisposable
             new([new("name", "test")]),
             new([new("code", "ABC")], Where: Q.Where.Or)
         ];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("name", "test"))
              .Or()
              .Cluster(c => c.Eq("code", "ABC"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -124,13 +124,13 @@ public sealed class OrbitQueryTests : IDisposable
     {
         List<Cluster> declarative = [new([new("name", "test")])];
         ColumnOptions colOpts = new(Names: ["id", "name", "price"], Top: 10);
-        var expected = _builder.CreateQuery(declarative, colOpts).QueryText;
+        string expected = _builder.CreateQuery(declarative, colOpts).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Select("id", "name", "price").Top(10)
              .Cluster(c => c.Eq("name", "test"));
-        var (clusters, fluentColOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? fluentColOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -140,13 +140,13 @@ public sealed class OrbitQueryTests : IDisposable
     {
         List<Cluster> declarative = [new([new("category", "Electronics")])];
         ColumnOptions colOpts = new(Names: ["category"], IsDistinct: true);
-        var expected = _builder.CreateQuery(declarative, colOpts).QueryText;
+        string expected = _builder.CreateQuery(declarative, colOpts).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Select("category").Distinct()
              .Cluster(c => c.Eq("category", "Electronics"));
-        var (clusters, fluentColOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? fluentColOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -160,12 +160,12 @@ public sealed class OrbitQueryTests : IDisposable
     {
         List<Cluster> declarative = [new([new("name", "test")])];
         List<Sorting.Option> sort = [new("price", Sorting.Direction.DESC)];
-        var expected = _builder.CreateQuery(declarative, sorting: sort).QueryText;
+        string expected = _builder.CreateQuery(declarative, sorting: sort).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("name", "test")).OrderByDescending("price");
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -178,12 +178,12 @@ public sealed class OrbitQueryTests : IDisposable
     public void LikeOperator()
     {
         List<Cluster> declarative = [new([new("name", "%Test%", Operator: Q.Operator.Like)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Like("name", "%Test%"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -195,12 +195,12 @@ public sealed class OrbitQueryTests : IDisposable
             new("name", Operator: Q.Operator.Defined),
             new("description", Operator: Q.Operator.NotDefined)
         ])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Defined("name").And().NotDefined("description"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -210,12 +210,12 @@ public sealed class OrbitQueryTests : IDisposable
     {
         string[] values = ["Electronics", "Books"];
         List<Cluster> declarative = [new([new("category", values, Operator: Q.Operator.Contains)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Contains("category", values));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -225,12 +225,12 @@ public sealed class OrbitQueryTests : IDisposable
     {
         string[] values = ["Blocked1", "Blocked2"];
         List<Cluster> declarative = [new([new("code", values, Operator: Q.Operator.NotContains)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.NotContains("code", values));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -239,12 +239,12 @@ public sealed class OrbitQueryTests : IDisposable
     public void InOperator()
     {
         List<Cluster> declarative = [new([new("links", "someValue", Operator: Q.Operator.In)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.In("links", "someValue"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -253,12 +253,12 @@ public sealed class OrbitQueryTests : IDisposable
     public void NotInOperator()
     {
         List<Cluster> declarative = [new([new("tags", "removed", Operator: Q.Operator.NotIn)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.NotIn("tags", "removed"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -267,12 +267,12 @@ public sealed class OrbitQueryTests : IDisposable
     public void LenOperator()
     {
         List<Cluster> declarative = [new([new("items", 5, Operator: Q.Operator.Len)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Len("items", 5));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -281,12 +281,12 @@ public sealed class OrbitQueryTests : IDisposable
     public void NotLikeOperator()
     {
         List<Cluster> declarative = [new([new("name", "%skip%", Operator: Q.Operator.NotLike)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.NotLike("name", "%skip%"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -306,16 +306,16 @@ public sealed class OrbitQueryTests : IDisposable
                 new("id", Q.Aggregate.Count)
             ]);
         List<string> group = ["category"];
-        var expected = _builder.CreateQuery(declarative, colOpts, groups: group).QueryText;
+        string expected = _builder.CreateQuery(declarative, colOpts, groups: group).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Select("category")
              .Aggregate("price", Q.Aggregate.Sum)
              .Aggregate("id", Q.Aggregate.Count)
              .GroupBy("category")
              .Cluster(c => c.Eq("status", "active"));
-        var (clusters, fluentColOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? fluentColOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -327,11 +327,11 @@ public sealed class OrbitQueryTests : IDisposable
     [Fact]
     public void NoClusters_SelectAll()
     {
-        var expected = _builder.CreateQuery(null).QueryText;
+        string expected = _builder.CreateQuery(null).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -346,13 +346,13 @@ public sealed class OrbitQueryTests : IDisposable
         float[] vector = [0.1f, 0.2f, 0.3f];
         List<Cluster> declarative = [new([new("embedding", vector, Operator: Q.Operator.VectorDistance)])];
         ColumnOptions colOpts = new(Names: ["name", "description"], Top: 5);
-        var expected = _builder.CreateQuery(declarative, colOpts).QueryText;
+        string expected = _builder.CreateQuery(declarative, colOpts).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Select("name", "description").Top(5)
              .Cluster(c => c.VectorDistance("embedding", vector));
-        var (clusters, fluentColOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? fluentColOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -365,12 +365,12 @@ public sealed class OrbitQueryTests : IDisposable
     public void FTContains()
     {
         List<Cluster> declarative = [new([new("description", "machine", Operator: Q.Operator.FTContains)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.FTContains("description", "machine"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -380,12 +380,12 @@ public sealed class OrbitQueryTests : IDisposable
     {
         string[] keywords = ["machine", "learning"];
         List<Cluster> declarative = [new([new("description", keywords, Operator: Q.Operator.FTContainsAll)])];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.FTContainsAll("description", keywords));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -411,9 +411,9 @@ public sealed class OrbitQueryTests : IDisposable
         ];
         ColumnOptions colOpts = new(Names: ["id", "name", "price", "category"], Top: 20);
         List<Sorting.Option> sort = [new("price", Sorting.Direction.DESC)];
-        var expected = _builder.CreateQuery(declarative, colOpts, sort).QueryText;
+        string expected = _builder.CreateQuery(declarative, colOpts, sort).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Select("id", "name", "price", "category")
              .Top(20)
              .Cluster(c => c
@@ -424,8 +424,8 @@ public sealed class OrbitQueryTests : IDisposable
                  .Eq("code", "SPECIAL")
                  .And().Eq("category", "Premium"))
              .OrderByDescending("price");
-        var (clusters, fluentColOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? fluentColOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, fluentColOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }
@@ -438,16 +438,16 @@ public sealed class OrbitQueryTests : IDisposable
             new([new("priority", 1, Operator: Q.Operator.Gte)], Where: Q.Where.And),
             new([new("archived", Operator: Q.Operator.NotDefined)], Where: Q.Where.Or)
         ];
-        var expected = _builder.CreateQuery(declarative).QueryText;
+        string expected = _builder.CreateQuery(declarative).QueryText;
 
-        var orbit = new Orbit<TestEntity>(null);
+        Orbit<TestEntity> orbit = new Orbit<TestEntity>(null);
         orbit.Cluster(c => c.Eq("status", "active"))
              .And()
              .Cluster(c => c.Gte("priority", 1))
              .Or()
              .Cluster(c => c.NotDefined("archived"));
-        var (clusters, colOpts, sorting, groups) = orbit.Build();
-        var actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
+        (IReadOnlyList<Cluster> clusters, ColumnOptions? colOpts, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = orbit.Build();
+        string actual = _builder.CreateQuery(clusters, colOpts, sorting, groups).QueryText;
 
         Assert.Equal(Normalize(expected), Normalize(actual));
     }

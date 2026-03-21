@@ -61,7 +61,7 @@ internal sealed partial class QueryTuner : IDisposable
     private int CountActual()
     {
         int count = 0;
-        foreach (var kvp in _partitions)
+        foreach (KeyValuePair<QueryType, ConcurrentQueue<QueryExecutionStatistics>> kvp in _partitions)
             count += kvp.Value.Count;
         return count;
     }
@@ -71,9 +71,9 @@ internal sealed partial class QueryTuner : IDisposable
         QueryType? oldestType = null;
         DateTime oldestTimestamp = DateTime.MaxValue;
 
-        foreach (var kvp in _partitions)
+        foreach (KeyValuePair<QueryType, ConcurrentQueue<QueryExecutionStatistics>> kvp in _partitions)
         {
-            if (kvp.Value.TryPeek(out var front) && front.Timestamp < oldestTimestamp)
+            if (kvp.Value.TryPeek(out QueryExecutionStatistics front) && front.Timestamp < oldestTimestamp)
             {
                 oldestTimestamp = front.Timestamp;
                 oldestType = kvp.Key;
@@ -180,7 +180,7 @@ internal sealed partial class QueryTuner : IDisposable
         if (hintPerformance != null)
         {
             Dictionary<string, object> hints = [];
-            foreach (var hint in hintPerformance.Hints)
+            foreach (KeyValuePair<string, object> hint in hintPerformance.Hints)
             {
                 hints[hint.Key] = hint.Value;
             }
@@ -217,7 +217,7 @@ internal sealed partial class QueryTuner : IDisposable
     /// </summary>
     private static string GetHintsSignature(IReadOnlyDictionary<string, object> hints)
     {
-        var sorted = hints.OrderBy(kvp => kvp.Key);
+        IOrderedEnumerable<KeyValuePair<string, object>> sorted = hints.OrderBy(kvp => kvp.Key);
         return string.Join("|", sorted.Select(kvp => $"{kvp.Key}:{kvp.Value}"));
     }
 
