@@ -27,6 +27,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// <summary>Add a cluster of filter conditions using a builder lambda.</summary>
 	public Orbit<T> Cluster(Action<ClusterBuilder> configure)
 	{
+		ArgumentNullException.ThrowIfNull(configure);
 		_clusterConfigs.Add((configure, _nextClusterWhere));
 		_nextClusterWhere = Q.Where.And;
 		return this;
@@ -49,6 +50,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// <summary>Specify which columns to select.</summary>
 	public Orbit<T> Select(params string[] columns)
 	{
+		ArgumentNullException.ThrowIfNull(columns);
 		_columns.AddRange(columns);
 		return this;
 	}
@@ -98,6 +100,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// <summary>Add GROUP BY columns.</summary>
 	public Orbit<T> GroupBy(params string[] columns)
 	{
+		ArgumentNullException.ThrowIfNull(columns);
 		_groupByColumns.AddRange(columns);
 		return this;
 	}
