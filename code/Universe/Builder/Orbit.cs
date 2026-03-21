@@ -65,6 +65,8 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// <summary>Limit the number of results returned.</summary>
 	public Orbit<T> Top(int count)
 	{
+		if (count < 0)
+			throw new UniverseException("Top count must be a non-negative value.");
 		_top = count;
 		return this;
 	}
@@ -163,7 +165,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// <summary>Execute the query and return the first matching result.</summary>
 	/// <remarks>
 	/// Only filter conditions (clusters) and column selection (Select) are applied.
-	/// Top, Distinct, Aggregate, GroupBy, and sorting options are ignored. Use ToListAsync for those features.
+	/// Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
 	/// </remarks>
 	public async Task<(Gravity g, T T)> GetAsync()
 	{
@@ -176,7 +178,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// <summary>Execute the query and return the first matching result projected to a different type.</summary>
 	/// <remarks>
 	/// Only filter conditions (clusters) and column selection (Select) are applied.
-	/// Top, Distinct, Aggregate, GroupBy, and sorting options are ignored. Use ToListAsync for those features.
+	/// Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
 	/// </remarks>
 	public async Task<(Gravity g, TS S)> GetAsync<TS>() where TS : ICosmicEntity
 	{

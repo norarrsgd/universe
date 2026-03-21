@@ -547,14 +547,14 @@
             <summary>Execute the query and return the first matching result.</summary>
             <remarks>
             Only filter conditions (clusters) and column selection (Select) are applied.
-            Top, Distinct, Aggregate, GroupBy, and sorting options are ignored. Use ToListAsync for those features.
+            Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
             </remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.GetAsync``1">
             <summary>Execute the query and return the first matching result projected to a different type.</summary>
             <remarks>
             Only filter conditions (clusters) and column selection (Select) are applied.
-            Top, Distinct, Aggregate, GroupBy, and sorting options are ignored. Use ToListAsync for those features.
+            Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
             </remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.GenerateQuery">
