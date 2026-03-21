@@ -152,6 +152,9 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 
     private void ValidateQueryConstraints()
     {
+        if (_galaxy is null)
+            throw new UniverseException("Cannot execute query without a Galaxy instance. Create Orbit via galaxy.Query() extension.");
+
         if (_page.HasValue && _hints.HasValue)
             throw new UniverseException("QueryHints are not supported with paginated queries. Use either Paged() or WithHints(), not both.");
     }
@@ -159,6 +162,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
     /// <summary>Execute the query and return the first matching result.</summary>
     public async Task<(Gravity g, T T)> GetAsync()
     {
+        ValidateQueryConstraints();
         var (clusters, _, _, _) = Build();
         IReadOnlyList<string> columns = _columns.Count > 0 ? _columns : null;
         return await _galaxy.Get(clusters, columns);
@@ -167,6 +171,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
     /// <summary>Execute the query and return the first matching result projected to a different type.</summary>
     public async Task<(Gravity g, TS S)> GetAsync<TS>() where TS : ICosmicEntity
     {
+        ValidateQueryConstraints();
         var (clusters, _, _, _) = Build();
         IReadOnlyList<string> columns = _columns.Count > 0 ? _columns : null;
         return await _galaxy.Get<TS>(clusters, columns);
@@ -175,6 +180,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
     /// <summary>Generate the SQL query without executing it.</summary>
     public Gravity GenerateQuery()
     {
+        ValidateQueryConstraints();
         var (clusters, columnOptions, sorting, groups) = Build();
         return _galaxy.GenerateQuery(clusters, columnOptions, sorting, groups);
     }
