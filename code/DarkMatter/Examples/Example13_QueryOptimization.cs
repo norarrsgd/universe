@@ -121,7 +121,7 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
         if (recommendations.SuggestedHints != null && recommendations.SuggestedHints.Any())
         {
             Console.WriteLine("Suggested Hints:");
-            foreach (var hint in recommendations.SuggestedHints)
+            foreach (KeyValuePair<string, object> hint in recommendations.SuggestedHints)
             {
                 Console.WriteLine($"  {hint.Key} = {hint.Value}");
             }

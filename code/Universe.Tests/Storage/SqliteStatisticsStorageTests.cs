@@ -36,8 +36,8 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     [Fact]
     public async Task SaveAndLoad_RoundTrip_AllFieldsPreserved()
     {
-        var hints = new Dictionary<string, object> { ["MaxItemCount"] = 50 };
-        var stat = TestStatisticsFactory.Create(
+        Dictionary<string, object> hints = new Dictionary<string, object> { ["MaxItemCount"] = 50 };
+        QueryExecutionStatistics stat = TestStatisticsFactory.Create(
             queryHash: "abc123",
             type: QueryType.VectorSearch,
             ru: 42.5,
@@ -52,7 +52,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(10);
 
         Assert.Single(loaded);
-        var result = loaded[0];
+        QueryExecutionStatistics result = loaded[0];
         Assert.Equal("abc123", result.QueryHash);
         Assert.Equal(QueryType.VectorSearch, result.Type);
         Assert.Equal(42.5, result.RU);
@@ -66,9 +66,9 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     [Fact]
     public async Task SaveAndLoad_NullHintsAndStrategy_Preserved()
     {
-        var stat = TestStatisticsFactory.Create(strategyUsed: null, hintsUsed: null);
+        QueryExecutionStatistics stat = TestStatisticsFactory.Create(strategyUsed: null, hintsUsed: null);
         await _storage.SaveAsync(stat);
-        var loaded = await _storage.LoadRecentAsync(10);
+        IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(10);
 
         Assert.Single(loaded);
         Assert.Null(loaded[0].StrategyUsed);
@@ -89,7 +89,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
                 timestamp: DateTime.UtcNow.AddMinutes(-i)));
         }
 
-        var loaded = await _storage.LoadRecentAsync(3);
+        IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(3);
 
         Assert.Equal(3, loaded.Count);
         // Most recent first
@@ -106,7 +106,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
             queryHash: "target",
             timestamp: DateTime.UtcNow.AddDays(-10))); // outside window
 
-        var results = await _storage.GetByQueryHashAsync("target", TimeSpan.FromHours(1));
+        IList<QueryExecutionStatistics> results = await _storage.GetByQueryHashAsync("target", TimeSpan.FromHours(1));
 
         Assert.Single(results);
         Assert.Equal("target", results[0].QueryHash);
@@ -124,12 +124,12 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         await _storage.SaveAsync(TestStatisticsFactory.Create(
             queryHash: "recent", timestamp: DateTime.UtcNow));
 
-        var allBefore = await _storage.LoadRecentAsync(100);
+        IList<QueryExecutionStatistics> allBefore = await _storage.LoadRecentAsync(100);
         Assert.Equal(2, allBefore.Count);
 
         await _storage.ClearOldAsync(TimeSpan.FromDays(1));
 
-        var allAfter = await _storage.LoadRecentAsync(100);
+        IList<QueryExecutionStatistics> allAfter = await _storage.LoadRecentAsync(100);
         Assert.Single(allAfter);
         Assert.Equal("recent", allAfter[0].QueryHash);
     }
@@ -148,7 +148,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public async Task BatchFlushing_DataPersistsCorrectly()
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-batch-{Guid.NewGuid()}.db");
-        using var storage = new SqliteStatisticsStorage(dbPath, batchSize: 5, flushIntervalSeconds: 300);
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 5, flushIntervalSeconds: 300);
 
         for (int i = 0; i < 5; i++)
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"batch-{i}"));
@@ -156,7 +156,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         // Allow fire-and-forget flush triggered at batchSize threshold
         await Task.Delay(500);
 
-        var loaded = await storage.LoadRecentAsync(100);
+        IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(100);
         Assert.Equal(5, loaded.Count);
 
         storage.Dispose();
@@ -167,7 +167,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public async Task TimerFlush_PersistsDataBelowBatchThreshold()
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-timer-{Guid.NewGuid()}.db");
-        using var storage = new SqliteStatisticsStorage(dbPath, batchSize: 100, flushIntervalSeconds: 1);
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 100, flushIntervalSeconds: 1);
 
         // Save below batch threshold
         for (int i = 0; i < 3; i++)
@@ -176,7 +176,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         // Wait for timer-based flush (1 second interval)
         await Task.Delay(2000);
 
-        var loaded = await storage.LoadRecentAsync(100);
+        IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(100);
         Assert.Equal(3, loaded.Count);
 
         storage.Dispose();
@@ -192,7 +192,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-dispose-{Guid.NewGuid()}.db");
         // Large batch + long interval so items stay queued until Dispose
-        var storage = new SqliteStatisticsStorage(dbPath, batchSize: 100, flushIntervalSeconds: 300);
+        SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 100, flushIntervalSeconds: 300);
 
         for (int i = 0; i < 5; i++)
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"dispose-{i}"));
@@ -200,8 +200,8 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         storage.Dispose();
 
         // Re-open and verify data was flushed during Dispose
-        using var storage2 = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
-        var loaded = await storage2.LoadRecentAsync(100);
+        using SqliteStatisticsStorage storage2 = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
+        IList<QueryExecutionStatistics> loaded = await storage2.LoadRecentAsync(100);
         Assert.Equal(5, loaded.Count);
 
         storage2.Dispose();
@@ -212,7 +212,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public void DoubleDispose_DoesNotThrow()
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-dd-{Guid.NewGuid()}.db");
-        var storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
+        SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
         storage.Dispose();
         storage.Dispose(); // should not throw
         TryDeleteFiles(dbPath);
@@ -222,7 +222,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public async Task SaveAsync_AfterDispose_IsNoOp()
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-noop-{Guid.NewGuid()}.db");
-        var storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
+        SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
         storage.Dispose();
 
         await storage.SaveAsync(TestStatisticsFactory.Create()); // should not throw
@@ -237,7 +237,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public void CustomPath_IsAllowed()
     {
         string customPath = Path.Combine(AppContext.BaseDirectory, "custom-dir", $"universe-test-{Guid.NewGuid()}.db");
-        using var storage = new SqliteStatisticsStorage(customPath, batchSize: 1, flushIntervalSeconds: 60);
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(customPath, batchSize: 1, flushIntervalSeconds: 60);
         storage.Dispose();
         TryDeleteFiles(customPath);
         try
@@ -318,9 +318,9 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public async Task ConcurrentSaves_AllRecordsPersisted()
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-conc-{Guid.NewGuid()}.db");
-        using var storage = new SqliteStatisticsStorage(dbPath, batchSize: 5, flushIntervalSeconds: 1);
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 5, flushIntervalSeconds: 1);
 
-        var tasks = Enumerable.Range(0, 10).Select(taskId =>
+        IEnumerable<Task> tasks = Enumerable.Range(0, 10).Select(taskId =>
             Task.Run(async () =>
             {
                 for (int i = 0; i < 10; i++)
@@ -332,7 +332,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 
         await Task.WhenAll(tasks);
 
-        var loaded = await storage.LoadRecentAsync(200);
+        IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(200);
         Assert.Equal(100, loaded.Count);
 
         storage.Dispose();
@@ -343,17 +343,17 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     public async Task ConcurrentSaveAndLoad_CompletesWithoutDeadlock()
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-dl-{Guid.NewGuid()}.db");
-        using var storage = new SqliteStatisticsStorage(dbPath, batchSize: 2, flushIntervalSeconds: 1);
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 2, flushIntervalSeconds: 1);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        var saveTask = Task.Run(async () =>
+        Task saveTask = Task.Run(async () =>
         {
             for (int i = 0; i < 50 && !cts.IsCancellationRequested; i++)
                 await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"dl-{i}"));
         });
 
-        var loadTask = Task.Run(async () =>
+        Task loadTask = Task.Run(async () =>
         {
             for (int i = 0; i < 10 && !cts.IsCancellationRequested; i++)
             {

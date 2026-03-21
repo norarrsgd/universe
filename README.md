@@ -381,6 +381,23 @@ The Universe library provides a simple way to perform full-text search queries u
 
 See the [FULLTEXT_USAGE.md](https://github.com/kuromukira/universe/blob/dev/FULLTEXT_USAGE.md)
 
+## Fluent Query Builder (Orbit)
+The Universe library provides a fluent query builder called `Orbit<T>` as an alternative to the declarative `Cluster`/`Catalyst` syntax. Both approaches produce identical queries — use whichever style you prefer.
+
+```csharp
+// Fluent approach
+var (g, results) = await galaxy.Query()
+    .Select("id", "name", "price")
+    .Top(20)
+    .Cluster(c => c.Like("name", "%Test%").And().Lte("price", 50.0))
+    .Or()
+    .Cluster(c => c.Eq("code", "SPECIAL"))
+    .OrderByDescending("price")
+    .ToListAsync();
+```
+
+See the [FLUENT_QUERY_BUILDER.md](https://github.com/kuromukira/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) for the complete API reference covering all operators, pagination, aggregation, vector search, full-text search, and more.
+
 ## Stored Procedures
 
 You can manage and execute Cosmos DB stored procedures using the `IGalaxyProcedure` interface. Inject your repository as `IGalaxyProcedure` and use its methods for full stored procedure lifecycle management and execution.
