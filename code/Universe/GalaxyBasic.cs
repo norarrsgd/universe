@@ -27,7 +27,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         string database,
         string container,
         IReadOnlyList<string> partitionKey,
-        bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => QBuilder = new(_recordQuery);
+        bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries) => QBuilder = new(_recordQuery, _namingPolicy);
 
     /// <summary>Create a new Galaxy with custom Universe options</summary>
     protected GalaxyBasic(
@@ -40,7 +40,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         ArgumentNullException.ThrowIfNull(options);
         QueryTuner queryTuner = new(options.StatisticsStorage);
-        QBuilder = new(_recordQuery, queryTuner);
+        QBuilder = new(_recordQuery, queryTuner, _namingPolicy);
     }
 
     async Task<(Gravity, string)> IGalaxyBasic<T>.Create(T model)
