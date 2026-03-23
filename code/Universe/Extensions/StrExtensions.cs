@@ -22,10 +22,7 @@ public static class StringExtensions
 
             string result = Regex.Replace(str, @"_([a-zA-Z])", m => m.Groups[1].Value.ToUpper());
 
-            if (Regex.IsMatch(result, @"^[A-Z0-9]+$"))
-                return char.ToLowerInvariant(result[0]) + result[1..];
-
-            return $"{char.ToLowerInvariant(result[0])}{result[1..]}";
+            return char.ToLowerInvariant(result[0]) + result[1..];
         }
     }
 }
