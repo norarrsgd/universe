@@ -129,7 +129,7 @@ internal class UniverseBuilder : IDisposable
             // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
             // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
             JoinOptions join = columnOptions.Value.Join;
-            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{ConvertName(join.ArrayPath)}");
+            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
 
             // Add join columns to the select if specified
             if (join.Columns?.Any() == true)
@@ -138,7 +138,7 @@ internal class UniverseBuilder : IDisposable
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
                 string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
                 columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{ConvertName(join.ArrayPath)}");
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
             }
 
             // Handle join aggregates
@@ -169,7 +169,7 @@ internal class UniverseBuilder : IDisposable
 
                 // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{ConvertName(join.ArrayPath)}");
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
             }
         }
 
