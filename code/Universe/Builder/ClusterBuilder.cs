@@ -10,6 +10,7 @@ public sealed class ClusterBuilder
     private Q.Where _nextWhere = Q.Where.And;
 
     /// <summary>Add a filter condition to this cluster.</summary>
+    /// <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
     public ClusterBuilder Catalyst(string column, object value = null,
         Q.Operator op = Q.Operator.Eq, string alias = "c")
     {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Universe.Response;
 using Universe.Builder.Strategies;
 
@@ -8,21 +9,24 @@ internal class UniverseBuilder : IDisposable
     private readonly bool _recordQueries;
     private readonly QueryTuner _queryTuner;
     private readonly QueryStrategySelector _strategySelector;
+    private readonly JsonNamingPolicy _namingPolicy;
 
     public UniverseBuilder() : this(false)
     {
     }
 
-    public UniverseBuilder(bool recordQueries)
+    public UniverseBuilder(bool recordQueries, JsonNamingPolicy namingPolicy = null)
     {
         _recordQueries = recordQueries;
+        _namingPolicy = namingPolicy;
         _queryTuner = new();
         _strategySelector = new(_queryTuner);
     }
 
-    public UniverseBuilder(bool recordQueries, QueryTuner queryTuner)
+    public UniverseBuilder(bool recordQueries, QueryTuner queryTuner, JsonNamingPolicy namingPolicy = null)
     {
         _recordQueries = recordQueries;
+        _namingPolicy = namingPolicy;
         _queryTuner = queryTuner;
         _strategySelector = new(_queryTuner);
     }
@@ -125,7 +129,7 @@ internal class UniverseBuilder : IDisposable
             // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
             // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
             JoinOptions join = columnOptions.Value.Join;
-            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{ConvertName(join.ArrayPath)}");
 
             // Add join columns to the select if specified
             if (join.Columns?.Any() == true)
@@ -134,7 +138,7 @@ internal class UniverseBuilder : IDisposable
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
                 string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
                 columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{ConvertName(join.ArrayPath)}");
             }
 
             // Handle join aggregates
@@ -165,7 +169,7 @@ internal class UniverseBuilder : IDisposable
 
                 // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{ConvertName(join.ArrayPath)}");
             }
         }
 
@@ -443,7 +447,9 @@ internal class UniverseBuilder : IDisposable
             throw new UniverseException($"{parameterName} contains control characters.");
     }
 
-    private static string WhereClauseBuilder(Catalyst catalyst)
+    private string ConvertName(string name) => _namingPolicy?.ConvertName(name) ?? name;
+
+    private string WhereClauseBuilder(Catalyst catalyst)
     {
         string alias = catalyst.Alias ?? "c";
         string formattedProperty = FormatProperty(alias, catalyst.Column);
@@ -466,10 +472,11 @@ internal class UniverseBuilder : IDisposable
         };
     }
 
-    private static string FormatProperty(string alias, string column)
+    private string FormatProperty(string alias, string column)
     {
         // Handle nested JSON paths by splitting on '.' and wrapping each segment
         // Example: "metadata.sku" becomes alias["metadata"]["sku"]
+        // Naming policy is applied to each segment to match serialized document field names
 
         string[] segments = column.Split('.');
         StringBuilder result = new(alias);
@@ -477,7 +484,7 @@ internal class UniverseBuilder : IDisposable
         foreach (string segment in segments)
         {
             if (!string.IsNullOrWhiteSpace(segment))
-                result.Append($"[\"{segment}\"]");
+                result.Append($"[\"{ConvertName(segment)}\"]");
         }
 
         return result.ToString();

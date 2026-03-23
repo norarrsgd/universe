@@ -8,16 +8,23 @@ public class UniverseSerializer : CosmosSerializer
 {
     private readonly JsonObjectSerializer SystemTextJsonSerializer;
 
+    /// <summary>The naming policy used for property name serialization and query column name conversion.</summary>
+    public JsonNamingPolicy NamingPolicy { get; }
+
     /// <summary></summary>
-    public UniverseSerializer(JsonNamingPolicy policy = null) => SystemTextJsonSerializer = new(new()
+    public UniverseSerializer(JsonNamingPolicy policy = null)
     {
-        PropertyNamingPolicy = policy,
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
-        IgnoreReadOnlyFields = true,
-        IgnoreReadOnlyProperties = true
-    });
+        NamingPolicy = policy;
+        SystemTextJsonSerializer = new(new()
+        {
+            PropertyNamingPolicy = policy,
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
+            IgnoreReadOnlyFields = true,
+            IgnoreReadOnlyProperties = true
+        });
+    }
 
     /// <summary></summary>
     public override T FromStream<T>(Stream stream)

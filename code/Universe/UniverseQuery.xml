@@ -39,6 +39,7 @@
         </member>
         <member name="M:Universe.Builder.ClusterBuilder.Catalyst(System.String,System.Object,Universe.Builder.Options.Q.Operator,System.String)">
             <summary>Add a filter condition to this cluster.</summary>
+            <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
         </member>
         <member name="M:Universe.Builder.ClusterBuilder.And">
             <summary>The next condition will be joined with AND.</summary>
@@ -461,6 +462,9 @@
         <member name="T:Universe.Builder.Options.UniverseSerializer">
             <summary></summary>
         </member>
+        <member name="P:Universe.Builder.Options.UniverseSerializer.NamingPolicy">
+            <summary>The naming policy used for property name serialization and query column name conversion.</summary>
+        </member>
         <member name="M:Universe.Builder.Options.UniverseSerializer.#ctor(System.Text.Json.JsonNamingPolicy)">
             <summary></summary>
         </member>
@@ -497,6 +501,7 @@
         </member>
         <member name="M:Universe.Builder.Orbit`1.Cluster(System.Action{Universe.Builder.ClusterBuilder})">
             <summary>Add a cluster of filter conditions using a builder lambda.</summary>
+            <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.Or">
             <summary>The next cluster will be joined with OR.</summary>
@@ -506,6 +511,7 @@
         </member>
         <member name="M:Universe.Builder.Orbit`1.Select(System.String[])">
             <summary>Specify which columns to select.</summary>
+            <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.Distinct">
             <summary>Return only distinct results.</summary>
@@ -515,6 +521,7 @@
         </member>
         <member name="M:Universe.Builder.Orbit`1.OrderBy(System.String,Universe.Builder.Options.Sorting.Direction,System.String)">
             <summary>Add a sort order.</summary>
+            <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.OrderByDescending(System.String,System.String)">
             <summary>Add descending sort order on a column.</summary>
@@ -527,6 +534,7 @@
         </member>
         <member name="M:Universe.Builder.Orbit`1.GroupBy(System.String[])">
             <summary>Add GROUP BY columns.</summary>
+            <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.Paged(System.Int32,System.String)">
             <summary>Enable pagination with specified page size.</summary>
@@ -1024,11 +1032,15 @@
             </summary>
         </member>
         <member name="M:Universe.Extensions.StringExtensions.ToLowerCamelCase(System.String)">
+            <inheritdoc cref="M:Universe.Extensions.StringExtensions.&lt;G&gt;$34505F560D9EACF86A87F3ED1F85E448.ToLowerCamelCase"/>
+        </member>
+        <member name="M:Universe.Extensions.StringExtensions.&lt;G&gt;$34505F560D9EACF86A87F3ED1F85E448.ToLowerCamelCase">
             <summary>
             Converts a string to lower camel case.
+            This is a general-purpose utility. For query builder column names, prefer configuring
+            a <see cref="T:System.Text.Json.JsonNamingPolicy"/> on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>
+            which automatically transforms column names in queries to match serialized document field names.
             </summary>
-            <param name="str"></param>
-            <returns></returns>
         </member>
         <member name="T:Universe.Galaxy`1">
             <summary>Inherit repositories to implement a more advanced Universe</summary>

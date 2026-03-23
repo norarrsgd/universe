@@ -1,5 +1,3 @@
-// create an extension method to convert a string to lower camel case
-
 using System.Text.RegularExpressions;
 
 namespace Universe.Extensions;
@@ -9,21 +7,25 @@ namespace Universe.Extensions;
 /// </summary>
 public static class StringExtensions
 {
-    /// <summary>
-    /// Converts a string to lower camel case.
-    /// </summary>
-    /// <param name="str"></param>
-    /// <returns></returns>
-    public static string ToLowerCamelCase(this string str)
+    extension(string str)
     {
-        if (string.IsNullOrWhiteSpace(str))
-            return str;
+        /// <summary>
+        /// Converts a string to lower camel case.
+        /// This is a general-purpose utility. For query builder column names, prefer configuring
+        /// a <see cref="System.Text.Json.JsonNamingPolicy"/> on <see cref="Builder.Options.UniverseSerializer"/>
+        /// which automatically transforms column names in queries to match serialized document field names.
+        /// </summary>
+        public string ToLowerCamelCase()
+        {
+            if (string.IsNullOrWhiteSpace(str))
+                return str;
 
-        str = Regex.Replace(str, @"_([a-zA-Z])", m => m.Groups[1].Value.ToUpper());
+            string result = Regex.Replace(str, @"_([a-zA-Z])", m => m.Groups[1].Value.ToUpper());
 
-        if (Regex.IsMatch(str, @"^[A-Z0-9]+$"))
-            return char.ToLowerInvariant(str[0]) + str[1..];
+            if (Regex.IsMatch(result, @"^[A-Z0-9]+$"))
+                return char.ToLowerInvariant(result[0]) + result[1..];
 
-        return $"{char.ToLowerInvariant(str[0])}{str[1..]}";
+            return $"{char.ToLowerInvariant(result[0])}{result[1..]}";
+        }
     }
 }

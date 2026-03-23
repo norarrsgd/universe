@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Universe;
 
 /// <summary>
@@ -9,6 +11,7 @@ public abstract class GalaxyCore : IDisposable
 
     internal readonly bool _recordQuery;
     internal readonly bool _allowBulk;
+    internal readonly JsonNamingPolicy _namingPolicy;
 
     /// <summary></summary>
     protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
@@ -25,7 +28,11 @@ public abstract class GalaxyCore : IDisposable
 
         _recordQuery = recordQueries;
         if (client.ClientOptions is not null)
+        {
             _allowBulk = client.ClientOptions.AllowBulkExecution;
+            if (client.ClientOptions.Serializer is UniverseSerializer universeSerializer)
+                _namingPolicy = universeSerializer.NamingPolicy;
+        }
         _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(containerProps).GetAwaiter().GetResult();
     }
 

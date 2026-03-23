@@ -24,6 +24,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 		=> _galaxy = galaxy;
 
 	/// <summary>Add a cluster of filter conditions using a builder lambda.</summary>
+	/// <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
 	public Orbit<T> Cluster(Action<ClusterBuilder> configure)
 	{
 		ArgumentNullException.ThrowIfNull(configure);
@@ -47,6 +48,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	}
 
 	/// <summary>Specify which columns to select.</summary>
+	/// <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
 	public Orbit<T> Select(params string[] columns)
 	{
 		ArgumentNullException.ThrowIfNull(columns);
@@ -71,6 +73,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	}
 
 	/// <summary>Add a sort order.</summary>
+	/// <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
 	public Orbit<T> OrderBy(string column, Sorting.Direction direction = Sorting.Direction.ASC, string alias = "c")
 	{
 		_sortingOptions.Add(new(column, direction, alias));
@@ -99,6 +102,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	}
 
 	/// <summary>Add GROUP BY columns.</summary>
+	/// <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
 	public Orbit<T> GroupBy(params string[] columns)
 	{
 		ArgumentNullException.ThrowIfNull(columns);
