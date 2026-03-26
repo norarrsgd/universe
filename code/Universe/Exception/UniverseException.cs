@@ -4,7 +4,7 @@
 [Serializable]
 public sealed class UniverseException : System.Exception
 {
-    private const string HelpUrl = "https://github.com/kuromukira/simple-cosmos/issues";
+    private const string HelpUrl = "https://github.com/norarrsgd/universe/issues";
 
     /// <summary>Custom exception</summary>
     public UniverseException()
