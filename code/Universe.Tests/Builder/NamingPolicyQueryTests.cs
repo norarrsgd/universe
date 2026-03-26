@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Universe.Builder;
 using Universe.Builder.Options;
-using Universe.Interfaces;
 using Xunit;
 
 namespace Universe.Tests.Builder;

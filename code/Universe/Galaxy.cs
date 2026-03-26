@@ -46,7 +46,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
     async Task<(Gravity g, IList<TS> T)> IGalaxy<T>.Paged<TS>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
         => await InternalPaged<TS>(page, clusters, columnOptions, sorting, group);
 
-    private async Task<(Gravity g, TArgType S)> InternalGet<TArgType>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns) where TArgType : ICosmicEntity
+    private async Task<(Gravity g, TArgType S)> InternalGet<TArgType>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns)
     {
         try
         {
@@ -63,7 +63,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         }
     }
 
-    private async Task<(Gravity g, IList<TArgType> T)> InternalList<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group) where TArgType : ICosmicEntity
+    private async Task<(Gravity g, IList<TArgType> T)> InternalList<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
     {
         try
         {
@@ -76,7 +76,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         }
     }
 
-    private async Task<(Gravity g, IList<TArgType> T)> InternalPaged<TArgType>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group) where TArgType : ICosmicEntity
+    private async Task<(Gravity g, IList<TArgType> T)> InternalPaged<TArgType>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
     {
         try
         {
@@ -117,7 +117,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
 
     QueryTuningRecommendations IGalaxy<T>.GetQueryRecommendations(string queryPattern, QueryType queryType) => QBuilder.GetQueryRecommendations(queryType);
 
-    private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints) where TArgType : ICosmicEntity
+    private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints)
     {
         try
         {

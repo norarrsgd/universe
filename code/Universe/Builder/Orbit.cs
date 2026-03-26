@@ -56,6 +56,18 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 		return this;
 	}
 
+	/// <summary>Specify which columns to select based on the public properties of a projection type.</summary>
+	/// <remarks>
+	/// Extracts all public instance property names from <typeparamref name="TProjection"/>, excluding properties marked with <see cref="System.Text.Json.Serialization.JsonIgnoreAttribute"/>.
+	/// When a naming policy is configured on <see cref="UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.
+	/// This method is additive — it can be combined with <see cref="Select(string[])"/> to include additional columns.
+	/// </remarks>
+	public Orbit<T> Select<TProjection>()
+	{
+		_columns.AddRange(ProjectionColumnExtractor.GetColumnNames<TProjection>());
+		return this;
+	}
+
 	/// <summary>Return only distinct results.</summary>
 	public Orbit<T> Distinct()
 	{
@@ -145,7 +157,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	}
 
 	/// <summary>Execute the query and return a list of results projected to a different type.</summary>
-	public async Task<(Gravity g, IList<TS> T)> ToListAsync<TS>() where TS : ICosmicEntity
+	public async Task<(Gravity g, IList<TS> T)> ToListAsync<TS>()
 	{
 		ValidateQueryConstraints();
 		(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups) = Build();
@@ -183,7 +195,7 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	/// Only filter conditions (clusters) and column selection (Select) are applied.
 	/// Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
 	/// </remarks>
-	public async Task<(Gravity g, TS S)> GetAsync<TS>() where TS : ICosmicEntity
+	public async Task<(Gravity g, TS S)> GetAsync<TS>()
 	{
 		ValidateQueryConstraints();
 		(IReadOnlyList<Cluster> clusters, _, _, _) = Build();

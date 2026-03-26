@@ -513,6 +513,14 @@
             <summary>Specify which columns to select.</summary>
             <remarks>Azure Cosmos DB column names are case-sensitive. When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.</remarks>
         </member>
+        <member name="M:Universe.Builder.Orbit`1.Select``1">
+            <summary>Specify which columns to select based on the public properties of a projection type.</summary>
+            <remarks>
+            Extracts all public instance property names from <typeparamref name="TProjection"/>, excluding properties marked with <see cref="T:System.Text.Json.Serialization.JsonIgnoreAttribute"/>.
+            When a naming policy is configured on <see cref="T:Universe.Builder.Options.UniverseSerializer"/>, column names are automatically transformed to match the serialized document field names.
+            This method is additive — it can be combined with <see cref="M:Universe.Builder.Orbit`1.Select(System.String[])"/> to include additional columns.
+            </remarks>
+        </member>
         <member name="M:Universe.Builder.Orbit`1.Distinct">
             <summary>Return only distinct results.</summary>
         </member>
@@ -1025,6 +1033,17 @@
         </member>
         <member name="M:Universe.Extensions.CosmicEntityExtensions.PartitionKeys(Universe.Interfaces.ICosmicEntity)">
             <summary>Builds the partition key values for the entity.</summary>
+        </member>
+        <member name="T:Universe.Extensions.ProjectionColumnExtractor">
+            <summary>
+            Extracts column names from a type's public properties for use with <see cref="M:Universe.Builder.Orbit`1.Select``1"/>.
+            Results are cached per type for performance.
+            </summary>
+        </member>
+        <member name="M:Universe.Extensions.ProjectionColumnExtractor.GetColumnNames``1">
+            <summary>
+            Returns the public instance property names for the given type, excluding properties marked with <see cref="T:System.Text.Json.Serialization.JsonIgnoreAttribute"/>.
+            </summary>
         </member>
         <member name="T:Universe.Extensions.StringExtensions">
             <summary>
