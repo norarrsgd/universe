@@ -17,7 +17,10 @@ internal static class ProjectionColumnExtractor
 	internal static IReadOnlyList<string> GetColumnNames<T>()
 		=> Cache.GetOrAdd(typeof(T), static type =>
 			type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-				.Where(p => p.CanRead && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+				.Where(p => p.CanRead
+				            && p.GetIndexParameters().Length == 0
+				            && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
 				.Select(p => p.Name)
-				.ToList());
+				.ToList()
+				.AsReadOnly());
 }
