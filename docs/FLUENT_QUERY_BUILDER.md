@@ -288,6 +288,63 @@ galaxy.Query()
     .ToListAsync();
 ```
 
+### Type-Based Projection Select
+
+Instead of listing column names as strings, use `.Select<TProjection>()` to extract columns from a type's public properties:
+
+```csharp
+// Define a projection type — no ICosmicEntity required
+record ProductSummary
+{
+    public string Name { get; init; }
+    public double Price { get; init; }
+    public string Category { get; init; }
+}
+
+// These two produce identical SQL:
+galaxy.Query().Select("Name", "Price", "Category") ...
+galaxy.Query().Select<ProductSummary>() ...
+```
+
+**How it works:**
+- Extracts all public instance properties with a getter from the projection type
+- Properties marked with `[JsonIgnore]` are excluded
+- Inherited properties are included
+- Works with any type — classes, records, structs, record structs
+- When a naming policy is configured on `UniverseSerializer`, column names are transformed automatically (same as string `Select`)
+- Results are cached per type, so reflection only runs once
+
+**Combining with string Select:**
+
+`.Select<TProjection>()` is additive — it can be combined with `.Select()` to include extra columns not in the projection type:
+
+```csharp
+galaxy.Query()
+    .Select<ProductSummary>()   // Name, Price, Category
+    .Select("Description")      // plus Description
+    .Cluster(c => c.Eq("status", "active"))
+    .ToListAsync();
+```
+
+**Excluding properties with `[JsonIgnore]`:**
+
+```csharp
+record InventoryView
+{
+    public string Code { get; init; }
+    public string Name { get; init; }
+    public int Quantity { get; init; }
+    [JsonIgnore] public bool IsLowStock => Quantity < 10; // excluded from SELECT
+}
+
+// Generates: SELECT c["Code"], c["Name"], c["Quantity"] FROM c ...
+galaxy.Query()
+    .Select<InventoryView>()
+    .ToListAsync();
+```
+
+> **Note:** `Select<TProjection>()` only determines which columns appear in the SELECT clause. To deserialize results into the projection type, pass the same type to the terminal method: `.ToListAsync<ProductSummary>()`. See [Type Projection](#type-projection) below.
+
 ### TOP and DISTINCT
 
 ```csharp
@@ -423,14 +480,23 @@ All terminal operations return the same `Gravity` response object with RU consum
 
 ### Type Projection
 
-Project results to a different type (must implement `ICosmicEntity`):
+Project results to a different type. The projection target can be any type — classes, records, structs, or record structs. No `ICosmicEntity` constraint required.
 
 ```csharp
+// String select + generic terminal method
 var (g, results) = await galaxy.Query()
-    .Select("id", "name", "price")
+    .Select("Name", "Price")
     .Cluster(c => c.Eq("category", "Electronics"))
-    .ToListAsync<MyProjectedModel>();
+    .ToListAsync<ProductSummary>();
+
+// Type-based select + generic terminal method
+var (g, results) = await galaxy.Query()
+    .Select<ProductSummary>()
+    .Cluster(c => c.Eq("category", "Electronics"))
+    .ToListAsync<ProductSummary>();
 ```
+
+`Select<TProjection>()` controls which columns appear in the SQL SELECT clause. `ToListAsync<TS>()` / `GetAsync<TS>()` controls what type the results are deserialized into. They are independent concerns that typically use the same type.
 
 ### Query Generation (Debugging)
 
