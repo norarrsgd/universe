@@ -71,11 +71,11 @@ internal class UniverseBuilder : IDisposable
                 {
                     string toAppend = aggregate.Aggregate switch
                     {
-                        Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+                        Q.Aggregate.Count => $"COUNT(1) AS {ConvertName(nameof(ICosmicEntity.CountAggregate))}",
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -102,14 +102,14 @@ internal class UniverseBuilder : IDisposable
                     columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
                     {
                         string alias = catalyst.Alias ?? "c";
-                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
+                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {ConvertName(catalyst.Column)}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
                     });
                     break;
                 case 1:
                     {
                         Catalyst catalyst = vectorDistanceCatalysts.First();
                         string alias = catalyst.Alias ?? "c";
-                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {ConvertName(catalyst.Column)}Score";
                         break;
                     }
             }
@@ -150,11 +150,11 @@ internal class UniverseBuilder : IDisposable
                 {
                     string toAppend = aggregate.Aggregate switch
                     {
-                        Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+                        Q.Aggregate.Count => $"COUNT(1) AS {ConvertName(nameof(ICosmicEntity.CountAggregate))}",
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -305,8 +305,14 @@ internal class UniverseBuilder : IDisposable
         // Group By Builder
         if (groups is not null && groups.Any())
         {
-            queryBuilder.Append($" GROUP BY {groups[0]}");
-            foreach (string group in groups.Where(g => g != groups[0]))
+            // Groups pre-formatted by the aggregate path already contain bracket notation (e.g., c["category"]).
+            // Raw groups (GROUP BY without aggregates) need FormatProperty applied.
+            IReadOnlyList<string> formattedGroups = groups[0].Contains('[')
+                ? groups
+                : [.. groups.Select(g => FormatProperty("c", g)).Distinct()];
+
+            queryBuilder.Append($" GROUP BY {formattedGroups[0]}");
+            foreach (string group in formattedGroups.Where(g => g != formattedGroups[0]))
                 queryBuilder.Append($", {group}");
         }
 
