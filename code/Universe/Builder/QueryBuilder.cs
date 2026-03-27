@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Universe.Response;
 using Universe.Builder.Strategies;
 
@@ -8,21 +9,24 @@ internal class UniverseBuilder : IDisposable
     private readonly bool _recordQueries;
     private readonly QueryTuner _queryTuner;
     private readonly QueryStrategySelector _strategySelector;
+    private readonly JsonNamingPolicy _namingPolicy;
 
     public UniverseBuilder() : this(false)
     {
     }
 
-    public UniverseBuilder(bool recordQueries)
+    public UniverseBuilder(bool recordQueries, JsonNamingPolicy namingPolicy = null)
     {
         _recordQueries = recordQueries;
+        _namingPolicy = namingPolicy;
         _queryTuner = new();
         _strategySelector = new(_queryTuner);
     }
 
-    public UniverseBuilder(bool recordQueries, QueryTuner queryTuner)
+    public UniverseBuilder(bool recordQueries, QueryTuner queryTuner, JsonNamingPolicy namingPolicy = null)
     {
         _recordQueries = recordQueries;
+        _namingPolicy = namingPolicy;
         _queryTuner = queryTuner;
         _strategySelector = new(_queryTuner);
     }
@@ -67,11 +71,11 @@ internal class UniverseBuilder : IDisposable
                 {
                     string toAppend = aggregate.Aggregate switch
                     {
-                        Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aggregate.Column),
+                        Q.Aggregate.Count => $"COUNT(1) AS {ConvertName(nameof(ICosmicEntity.CountAggregate))}",
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -98,14 +102,14 @@ internal class UniverseBuilder : IDisposable
                     columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
                     {
                         string alias = catalyst.Alias ?? "c";
-                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
+                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {ConvertName(catalyst.Column)}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
                     });
                     break;
                 case 1:
                     {
                         Catalyst catalyst = vectorDistanceCatalysts.First();
                         string alias = catalyst.Alias ?? "c";
-                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {catalyst.Column}Score";
+                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {ConvertName(catalyst.Column)}Score";
                         break;
                     }
             }
@@ -125,7 +129,7 @@ internal class UniverseBuilder : IDisposable
             // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
             // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
             JoinOptions join = columnOptions.Value.Join;
-            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
 
             // Add join columns to the select if specified
             if (join.Columns?.Any() == true)
@@ -134,7 +138,7 @@ internal class UniverseBuilder : IDisposable
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
                 string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
                 columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
             }
 
             // Handle join aggregates
@@ -146,11 +150,11 @@ internal class UniverseBuilder : IDisposable
                 {
                     string toAppend = aggregate.Aggregate switch
                     {
-                        Q.Aggregate.Count => Q.Aggregate.Count.Value(),
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aggregate.Column),
+                        Q.Aggregate.Count => $"COUNT(1) AS {ConvertName(nameof(ICosmicEntity.CountAggregate))}",
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -165,7 +169,7 @@ internal class UniverseBuilder : IDisposable
 
                 // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN c.{join.ArrayPath}");
+                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
             }
         }
 
@@ -301,8 +305,14 @@ internal class UniverseBuilder : IDisposable
         // Group By Builder
         if (groups is not null && groups.Any())
         {
-            queryBuilder.Append($" GROUP BY {groups[0]}");
-            foreach (string group in groups.Where(g => g != groups[0]))
+            // Groups pre-formatted by the aggregate path already contain bracket notation (e.g., c["category"]).
+            // Raw groups (GROUP BY without aggregates) need FormatProperty applied.
+            IReadOnlyList<string> formattedGroups = groups[0].Contains('[')
+                ? groups
+                : [.. groups.Select(g => FormatProperty("c", g)).Distinct()];
+
+            queryBuilder.Append($" GROUP BY {formattedGroups[0]}");
+            foreach (string group in formattedGroups.Where(g => g != formattedGroups[0]))
                 queryBuilder.Append($", {group}");
         }
 
@@ -443,7 +453,9 @@ internal class UniverseBuilder : IDisposable
             throw new UniverseException($"{parameterName} contains control characters.");
     }
 
-    private static string WhereClauseBuilder(Catalyst catalyst)
+    private string ConvertName(string name) => _namingPolicy?.ConvertName(name) ?? name;
+
+    private string WhereClauseBuilder(Catalyst catalyst)
     {
         string alias = catalyst.Alias ?? "c";
         string formattedProperty = FormatProperty(alias, catalyst.Column);
@@ -466,10 +478,11 @@ internal class UniverseBuilder : IDisposable
         };
     }
 
-    private static string FormatProperty(string alias, string column)
+    private string FormatProperty(string alias, string column)
     {
         // Handle nested JSON paths by splitting on '.' and wrapping each segment
         // Example: "metadata.sku" becomes alias["metadata"]["sku"]
+        // Naming policy is applied to each segment to match serialized document field names
 
         string[] segments = column.Split('.');
         StringBuilder result = new(alias);
@@ -477,7 +490,7 @@ internal class UniverseBuilder : IDisposable
         foreach (string segment in segments)
         {
             if (!string.IsNullOrWhiteSpace(segment))
-                result.Append($"[\"{segment}\"]");
+                result.Append($"[\"{ConvertName(segment)}\"]");
         }
 
         return result.ToString();

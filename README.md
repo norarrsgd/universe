@@ -105,7 +105,7 @@ if (gravity.Query.HasValue)
 
 ## Examples
 This section provides examples of how to use the `Galaxy` repository for basic and advanced operations with Cosmos DB.
-_[Here](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples)._
+_[Here](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples)._
 
 ## Basic CRUD Operations
 
@@ -220,7 +220,7 @@ var (g, results) = await galaxy.Query()
     .ToListAsync();
 ```
 
-See the [Fluent Query Builder (Orbit) Reference](https://github.com/kuromukira/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) for the complete API covering all operators, vector search, full-text search, joins, query hints, and more.
+See the [Fluent Query Builder (Orbit) Reference](https://github.com/norarrsgd/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) for the complete API covering all operators, vector search, full-text search, joins, query hints, and more.
 
 ### Declarative Syntax (Cluster / Catalyst)
 
@@ -239,22 +239,22 @@ The declarative syntax uses `Cluster` and `Catalyst` structs to compose filter c
 );
 ```
 
-See the [Declarative Query Syntax Reference](https://github.com/kuromukira/universe/blob/dev/docs/DECLARATIVE_QUERY_SYNTAX.md) for complex queries, special operators, sorting, pagination, aggregation, and more.
+See the [Declarative Query Syntax Reference](https://github.com/norarrsgd/universe/blob/dev/docs/DECLARATIVE_QUERY_SYNTAX.md) for complex queries, special operators, sorting, pagination, aggregation, and more.
 
 ## Vector Distance Search
 The Universe library supports vector similarity search through the `Q.Operator.VectorDistance` operator, which leverages Azure Cosmos DB's built-in vector search capabilities.
 
-See the [VECTORDISTANCE_USAGE.md](https://github.com/kuromukira/universe/blob/dev/docs/VECTORDISTANCE_USAGE.md)
+See the [VECTORDISTANCE_USAGE.md](https://github.com/norarrsgd/universe/blob/dev/docs/VECTORDISTANCE_USAGE.md)
 
 ## Full-Text Search
 The Universe library provides a simple way to perform full-text search queries using the `Q.Operator.FT*` operators. This allows you to search for documents containing specific text in designated fields.
 
-See the [FULLTEXT_USAGE.md](https://github.com/kuromukira/universe/blob/dev/docs/FULLTEXT_USAGE.md)
+See the [FULLTEXT_USAGE.md](https://github.com/norarrsgd/universe/blob/dev/docs/FULLTEXT_USAGE.md)
 
 ## Query Execution Strategies
 The library uses a strategy pattern for query execution, automatically selecting the optimal strategy based on query characteristics. Strategies include Direct (standard queries), Gateway (cross-partition), and VectorSearch (vector similarity). You can also provide `QueryHints` to fine-tune execution behavior.
 
-See the [QUERY_EXECUTION_STRATEGIES.md](https://github.com/kuromukira/universe/blob/dev/docs/QUERY_EXECUTION_STRATEGIES.md)
+See the [QUERY_EXECUTION_STRATEGIES.md](https://github.com/norarrsgd/universe/blob/dev/docs/QUERY_EXECUTION_STRATEGIES.md)
 
 ## Stored Procedures
 
@@ -337,10 +337,10 @@ catch (Exception ex)
 
 | # | Document | Description |
 |---|----------|-------------|
-| 1 | [Fluent Query Builder (Orbit)](https://github.com/kuromukira/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) | Complete Orbit API reference — operators, pagination, aggregation, vector search, full-text search, joins |
-| 2 | [Declarative Query Syntax](https://github.com/kuromukira/universe/blob/dev/docs/DECLARATIVE_QUERY_SYNTAX.md) | Cluster/Catalyst query syntax — complex queries, sorting, pagination, aggregation |
-| 3 | [Vector Distance Search](https://github.com/kuromukira/universe/blob/dev/docs/VECTORDISTANCE_USAGE.md) | Vector similarity search with VECTOR_DISTANCE, RRF, hybrid search |
-| 4 | [Full-Text Search](https://github.com/kuromukira/universe/blob/dev/docs/FULLTEXT_USAGE.md) | Full-text search operators — FTContains, FTScore, hybrid search |
-| 5 | [Query Execution Strategies](https://github.com/kuromukira/universe/blob/dev/docs/QUERY_EXECUTION_STRATEGIES.md) | Strategy pattern, query hints, and performance tuning |
-| 6 | [SQLite Statistics Storage](https://github.com/kuromukira/universe/blob/dev/docs/SQLITE_STATISTICS_STORAGE.md) | SQLite-based query statistics persistence and configuration |
-| 7 | [Adaptive Query Optimization](https://github.com/kuromukira/universe/blob/dev/docs/ADAPTIVE_QUERY_OPTIMIZATION_DESIGN.md) | Design document for adaptive learning (v3.2.0+) |
+| 1 | [Fluent Query Builder (Orbit)](https://github.com/norarrsgd/universe/blob/dev/docs/FLUENT_QUERY_BUILDER.md) | Complete Orbit API reference — operators, pagination, aggregation, vector search, full-text search, joins |
+| 2 | [Declarative Query Syntax](https://github.com/norarrsgd/universe/blob/dev/docs/DECLARATIVE_QUERY_SYNTAX.md) | Cluster/Catalyst query syntax — complex queries, sorting, pagination, aggregation |
+| 3 | [Vector Distance Search](https://github.com/norarrsgd/universe/blob/dev/docs/VECTORDISTANCE_USAGE.md) | Vector similarity search with VECTOR_DISTANCE, RRF, hybrid search |
+| 4 | [Full-Text Search](https://github.com/norarrsgd/universe/blob/dev/docs/FULLTEXT_USAGE.md) | Full-text search operators — FTContains, FTScore, hybrid search |
+| 5 | [Query Execution Strategies](https://github.com/norarrsgd/universe/blob/dev/docs/QUERY_EXECUTION_STRATEGIES.md) | Strategy pattern, query hints, and performance tuning |
+| 6 | [SQLite Statistics Storage](https://github.com/norarrsgd/universe/blob/dev/docs/SQLITE_STATISTICS_STORAGE.md) | SQLite-based query statistics persistence and configuration |
+| 7 | [Adaptive Query Optimization](https://github.com/norarrsgd/universe/blob/dev/docs/ADAPTIVE_QUERY_OPTIMIZATION_DESIGN.md) | Design document for adaptive learning (v3.2.0+) |

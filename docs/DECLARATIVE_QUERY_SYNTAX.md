@@ -137,7 +137,7 @@ The declarative syntax is the original query construction API in Universe. It us
 );
 ```
 
-_See [example 1](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs), [example 3](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example3_TopAndDistinct.cs)._
+_See [example 1](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs), [example 3](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example3_TopAndDistinct.cs)._
 
 ## Pagination
 
@@ -158,7 +158,7 @@ string continuationToken = gravity.ContinuationToken;
 );
 ```
 
-_See [example 1](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs)._
+_See [example 1](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs)._
 
 ## Aggregation and Group By Queries
 
@@ -205,7 +205,7 @@ The `Aggregates` parameter in `ColumnOptions` takes an array of `AggregationOpti
 
 When using aggregates, the query will automatically be grouped by the columns specified in the `Names` parameter. The output column names will be suffixed with the aggregate function name (e.g., `Price_Sum`, `Price_Avg`, `Quantity_Max`).
 
-_See [example 2](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example2_AggregatesWithGroupBy.cs), [example 7](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example7_AdvancedAggregation.cs), [example 8](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples/Example8_SalesAnalysis.cs)._
+_See [example 2](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example2_AggregatesWithGroupBy.cs), [example 7](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example7_AdvancedAggregation.cs), [example 8](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example8_SalesAnalysis.cs)._
 
 ## See Also
 
@@ -213,4 +213,4 @@ _See [example 2](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter
 - [Vector Distance Search](VECTORDISTANCE_USAGE.md) — vector similarity search
 - [Full-Text Search](FULLTEXT_USAGE.md) — full-text search operators
 - [Query Execution Strategies](QUERY_EXECUTION_STRATEGIES.md) — query optimization and strategy selection
-- [DarkMatter Examples](https://github.com/kuromukira/universe/blob/dev/code/DarkMatter/Examples) — runnable examples covering all features
+- [DarkMatter Examples](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples) — runnable examples covering all features

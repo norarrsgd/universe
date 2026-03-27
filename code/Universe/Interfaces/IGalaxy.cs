@@ -14,7 +14,7 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
     /// <summary>
     /// Get one model from the database with a different type
     /// </summary>
-    Task<(Gravity g, TS S)> Get<TS>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns = null) where TS : ICosmicEntity;
+    Task<(Gravity g, TS S)> Get<TS>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns = null);
 
     /// <summary>
     /// Get list from the database with optional query optimization hints
@@ -24,7 +24,7 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
     /// <summary>
     /// Get list from the database with a different type
     /// </summary>
-    Task<(Gravity g, IList<TS> T)> List<TS>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null, QueryHints? hints = null) where TS : ICosmicEntity;
+    Task<(Gravity g, IList<TS> T)> List<TS>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null, QueryHints? hints = null);
 
     /// <summary>
     /// Get a paginated list from the database
@@ -34,7 +34,7 @@ public interface IGalaxy<T> : IGalaxyBasic<T> where T : ICosmicEntity
     /// <summary>
     /// Get a paginated list from the database
     /// </summary>
-    Task<(Gravity g, IList<TS> T)> Paged<TS>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null) where TS : ICosmicEntity;
+    Task<(Gravity g, IList<TS> T)> Paged<TS>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> group = null);
 
     /// <summary>
     /// Generate SQL query without executing it

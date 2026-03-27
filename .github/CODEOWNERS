@@ -5,13 +5,13 @@
 # https://git-scm.com/docs/gitignore#_pattern_format
 
 # Any documentation files
-*.md        @kuromukira
-/.github/    @kuromukira
+*.md        @norarrsgd
+/.github/    @norarrsgd
 
 # API Codes General
-/functions/        @kuromukira
+/functions/        @norarrsgd
 
 # Mobile and Web Apps
-/app_portal/     @kuromukira
-/app_store/     @kuromukira
-/web_admin/     @kuromukira
+/app_portal/     @norarrsgd
+/app_store/     @norarrsgd
+/web_admin/     @norarrsgd
