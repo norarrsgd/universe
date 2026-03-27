@@ -8,77 +8,103 @@ namespace DarkMatter.Examples;
 
 public class Example16_ProjectionSelect(IGalaxy<MyObject> galaxy) : ExampleBase(galaxy)
 {
-	public override Task<double> RunAsync()
+	public override async Task<double> RunAsync()
 	{
 		Console.WriteLine("\n=== EXAMPLE 16: Type-Based Projection Select ===\n");
 
-		// ── 1. Basic projection: extract columns from a record ──────────────
-		Console.WriteLine("1. Basic Projection — Select<ProductSummary>():");
-		Console.WriteLine("   Instead of .Select(\"Name\", \"Price\", \"Category\")");
-		Console.WriteLine("   use the type's properties as the column list.\n");
+		// ── 1. Basic projection with ToListAsync<T>() ───────────────────────
+		Console.WriteLine("1. Basic Projection — Select<ProductSummary>().ToListAsync<ProductSummary>():");
+		Console.WriteLine("   Query only the Name, Price, and Category columns.\n");
 
-		Gravity q1 = galaxy.Query()
+		(Gravity g1, IList<ProductSummary> products) = await galaxy.Query()
 			.Select<ProductSummary>()
-			.Cluster(c => c.Gte("Price", 50.0))
-			.GenerateQuery();
+			.Top(5)
+			.Cluster(c => c.Defined("Name"))
+			.OrderByDescending("Price")
+			.ToListAsync<ProductSummary>();
 
-		Console.WriteLine($"   SQL: {q1.Query.Text}");
+		ruUsed += g1.RU;
+		PrintProjectionResults(g1, products);
 		Console.WriteLine();
 
 		// ── 2. Projection with [JsonIgnore] ─────────────────────────────────
-		Console.WriteLine("2. Projection with [JsonIgnore] — excluded properties:");
-		Console.WriteLine("   InventoryView has a [JsonIgnore] on IsLowStock,");
-		Console.WriteLine("   so it does NOT appear in the SELECT clause.\n");
+		Console.WriteLine("2. Projection with [JsonIgnore] — computed property excluded from query:");
+		Console.WriteLine("   InventoryView.IsLowStock is computed client-side from Quantity.\n");
 
-		Gravity q2 = galaxy.Query()
+		(Gravity g2, IList<InventoryView> inventory) = await galaxy.Query()
 			.Select<InventoryView>()
+			.Top(5)
 			.Cluster(c => c.Gt("Quantity", 0))
-			.GenerateQuery();
+			.ToListAsync<InventoryView>();
 
-		Console.WriteLine($"   SQL: {q2.Query.Text}");
+		ruUsed += g2.RU;
+		PrintProjectionResults(g2, inventory);
+		foreach (InventoryView item in inventory.Take(3))
+			Console.WriteLine($"     {item.Name}: Qty={item.Quantity}, IsLowStock={item.IsLowStock}");
 		Console.WriteLine();
 
-		// ── 3. Combining projection + extra string columns ──────────────────
-		Console.WriteLine("3. Combining Select<T>() with Select(string) — additive:");
-		Console.WriteLine("   Start with ProductSummary columns, then add Description.\n");
+		// ── 3. Combining projection + extra string column ───────────────────
+		Console.WriteLine("3. Combining Select<T>() + Select(string) — additive columns:");
+		Console.WriteLine("   ProductSummary columns + Description, deserialized as DetailedProductView.\n");
 
-		Gravity q3 = galaxy.Query()
+		(Gravity g3, IList<DetailedProductView> detailed) = await galaxy.Query()
 			.Select<ProductSummary>()
 			.Select("Description")
-			.Cluster(c => c.Like("Name", "%Widget%"))
-			.GenerateQuery();
-
-		Console.WriteLine($"   SQL: {q3.Query.Text}");
-		Console.WriteLine();
-
-		// ── 4. Projection with struct (value type) ──────────────────────────
-		Console.WriteLine("4. Projection with record struct:");
-		Console.WriteLine("   Select<T>() works with classes, records, structs, and record structs.\n");
-
-		Gravity q4 = galaxy.Query()
-			.Select<PricePoint>()
-			.Top(10)
-			.Cluster(c => c.Eq("Category", "Electronics"))
-			.OrderBy("Price")
-			.GenerateQuery();
-
-		Console.WriteLine($"   SQL: {q4.Query.Text}");
-		Console.WriteLine();
-
-		// ── 5. Projection with inherited type ───────────────────────────────
-		Console.WriteLine("5. Projection with inheritance — includes base + derived properties:");
-		Console.WriteLine("   DetailedProductView inherits from ProductSummary and adds Description.\n");
-
-		Gravity q5 = galaxy.Query()
-			.Select<DetailedProductView>()
+			.Top(3)
 			.Cluster(c => c.Defined("Description"))
-			.GenerateQuery();
+			.ToListAsync<DetailedProductView>();
 
-		Console.WriteLine($"   SQL: {q5.Query.Text}");
+		ruUsed += g3.RU;
+		PrintProjectionResults(g3, detailed);
 		Console.WriteLine();
 
-		// ── 6. Side-by-side: string Select vs projection Select ─────────────
-		Console.WriteLine("6. Side-by-side comparison — identical SQL output:");
+		// ── 4. Pagination with projection ───────────────────────────────────
+		Console.WriteLine("4. Paginated projection — first page of 3 items:");
+
+		(Gravity g4, IList<ProductSummary> page1) = await galaxy.Query()
+			.Select<ProductSummary>()
+			.Paged(3)
+			.Cluster(c => c.Defined("Name"))
+			.OrderBy("Name")
+			.ToListAsync<ProductSummary>();
+
+		ruUsed += g4.RU;
+		PrintProjectionResults(g4, page1);
+		Console.WriteLine($"   Continuation token: {(string.IsNullOrEmpty(g4.ContinuationToken) ? "(none)" : g4.ContinuationToken[..Math.Min(50, g4.ContinuationToken.Length)] + "...")}");
+
+		if (!string.IsNullOrEmpty(g4.ContinuationToken))
+		{
+			Console.WriteLine("\n   Fetching next page...");
+			(Gravity g4b, IList<ProductSummary> page2) = await galaxy.Query()
+				.Select<ProductSummary>()
+				.Paged(3, g4.ContinuationToken)
+				.Cluster(c => c.Defined("Name"))
+				.OrderBy("Name")
+				.ToListAsync<ProductSummary>();
+
+			ruUsed += g4b.RU;
+			PrintProjectionResults(g4b, page2);
+		}
+
+		Console.WriteLine();
+
+		// ── 5. Single item with GetAsync<T>() ───────────────────────────────
+		Console.WriteLine("5. Single item — Select<ProductSummary>().GetAsync<ProductSummary>():");
+
+		(Gravity g5, ProductSummary single) = await galaxy.Query()
+			.Select<ProductSummary>()
+			.Cluster(c => c.Defined("Name"))
+			.GetAsync<ProductSummary>();
+
+		ruUsed += g5.RU;
+		Console.WriteLine($"   RU: {g5.RU}");
+		if (g5.Query != default)
+			Console.WriteLine($"   Query: {g5.Query.Text}");
+		Console.WriteLine($"   Result: {single}");
+		Console.WriteLine();
+
+		// ── 6. Side-by-side SQL comparison (GenerateQuery) ──────────────────
+		Console.WriteLine("6. Side-by-side SQL — string Select vs typed Select:");
 
 		Gravity manual = galaxy.Query()
 			.Select("Name", "Price", "Category")
@@ -95,7 +121,17 @@ public class Example16_ProjectionSelect(IGalaxy<MyObject> galaxy) : ExampleBase(
 		Console.WriteLine();
 
 		Console.WriteLine("Projection select examples completed successfully!");
-		return Task.FromResult(0.0);
+		return ruUsed;
+	}
+
+	private static void PrintProjectionResults<T>(Gravity g, IList<T> results)
+	{
+		Console.WriteLine($"   RU: {g.RU}");
+		if (g.Query != default)
+			Console.WriteLine($"   Query: {g.Query.Text}");
+		Console.WriteLine($"   Count: {results.Count}");
+		foreach (T item in results.Take(3))
+			Console.WriteLine($"     {item}");
 	}
 }
 
