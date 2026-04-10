@@ -479,12 +479,15 @@ internal class UniverseBuilder : IDisposable
         }
 
         // Validate each segment is a parseable number
-        string[] segments = inner.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        string[] segments = inner.Split(',', StringSplitOptions.TrimEntries);
         if (segments.Length == 0)
             throw new UniverseException("Weight value must contain at least one numeric value.");
 
         foreach (string segment in segments)
         {
+            if (string.IsNullOrWhiteSpace(segment))
+                throw new UniverseException("Weight value contains an empty segment.");
+
             if (!double.TryParse(segment, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
                 throw new UniverseException($"Weight value '{segment}' is not a valid number.");
         }

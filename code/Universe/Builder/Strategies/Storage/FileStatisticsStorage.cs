@@ -75,6 +75,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
             string json = JsonSerializer.Serialize(toSave, JsonOptions);
 
             await File.WriteAllTextAsync(_filePath, json);
+            PlatformDetection.SetRestrictivePermissions(_filePath);
         }
         catch (JsonException ex)
         {
