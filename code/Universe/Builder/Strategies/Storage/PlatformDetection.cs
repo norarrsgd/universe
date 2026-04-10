@@ -82,7 +82,7 @@ internal static class PlatformDetection
             else if (File.Exists(path))
                 File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         }
-        catch (IOException ex)
+        catch (System.Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
             System.Diagnostics.Trace.TraceWarning($"[UniverseQuery] Failed to set file permissions: {ex.Message}");
         }
