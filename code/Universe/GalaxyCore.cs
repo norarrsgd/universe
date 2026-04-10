@@ -13,7 +13,13 @@ public abstract class GalaxyCore : IDisposable
     internal readonly bool _allowBulk;
     internal readonly JsonNamingPolicy _namingPolicy;
 
-    /// <summary></summary>
+    /// <summary>
+    /// Initialize Galaxy core with Cosmos DB connection.
+    /// </summary>
+    /// <remarks>
+    /// WARNING: Setting <paramref name="recordQueries"/> to <c>true</c> includes full query text and parameter values
+    /// in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
+    /// </remarks>
     protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
     {
         if (string.IsNullOrWhiteSpace(container))

@@ -51,6 +51,9 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
         // Test 9: Attempt to inject through FTScore value (multi-rank RRF)
         await TestFTScoreMultiRankInjection();
 
+        // Test 10: Attempt to inject through WithWeights weight value
+        await TestWeightValueInjection();
+
         Console.WriteLine($"Total RU Used: {ruUsed}\n");
         return ruUsed;
     }
@@ -293,6 +296,41 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
         catch (CosmosException)
         {
             Console.WriteLine("Query executed safely (CosmosException from server, but SQL was parameterized).\n");
+        }
+    }
+
+    private async Task TestWeightValueInjection()
+    {
+        Console.WriteLine("--- Test 10: Weight Value Injection Attempt ---");
+        Console.WriteLine("Attempting to inject SQL through weight value: \"0.7], COUNT(*) AS total --\"\n");
+
+        try
+        {
+            // Construct a sorting option with WEIGHTED direction and a malicious weight value.
+            // This simulates what Orbit.WithWeights() produces internally.
+            Sorting.Option maliciousWeight = new("0.7], COUNT(*) AS total --", Sorting.Direction.WEIGHTED);
+
+            // SanitizeInputs validates weight values before any query execution or Cosmos DB call
+            _ = await galaxy.List(
+                clusters:
+                [
+                    new(Catalysts:
+                    [
+                        new(nameof(MyObject.Name), new[] { "test" }, Operator: Q.Operator.FTScore),
+                        new(nameof(MyObject.Name), new[] { "test2" }, Operator: Q.Operator.FTScore)
+                    ])
+                ],
+                columnOptions: new(
+                    Top: 10,
+                    Names: [nameof(MyObject.Name)]
+                ),
+                sorting: [maliciousWeight]
+            );
+            Console.WriteLine("FAILED: Injection was not blocked!\n");
+        }
+        catch (UniverseException ex)
+        {
+            Console.WriteLine($"BLOCKED: {ex.Message}\n");
         }
     }
 

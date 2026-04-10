@@ -92,7 +92,7 @@ internal sealed partial class QueryTuner : IDisposable
         {
             await _storage.SaveAsync(stats);
         }
-        catch (SystemException ex)
+        catch (System.Exception ex) when (ex is IOException or InvalidOperationException)
         {
             Trace.TraceWarning($"[UniverseQuery] Failed to persist query statistics: {ex.Message}");
         }
@@ -274,7 +274,7 @@ internal sealed partial class QueryTuner : IDisposable
                 Interlocked.Increment(ref _totalCount);
             }
         }
-        catch (SystemException ex)
+        catch (System.Exception ex) when (ex is IOException or InvalidOperationException)
         {
             Trace.TraceWarning($"[UniverseQuery] Failed to load persisted statistics: {ex.Message}");
         }

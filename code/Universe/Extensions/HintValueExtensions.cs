@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Universe.Exception;
 
 namespace Universe.Extensions;
 
@@ -7,15 +8,26 @@ namespace Universe.Extensions;
 /// </summary>
 internal static class HintValueExtensions
 {
+    private const int MaxHintIntValue = 10_000;
+
     /// <summary>
-    /// Converts an object to int, handling both JsonElement (from deserialized JSON) and primitive types
+    /// Converts an object to int, handling both JsonElement (from deserialized JSON) and primitive types.
+    /// Values are clamped to [0, 10000] to prevent unreasonable query option settings.
     /// </summary>
     public static int ToInt(this object value)
     {
-        if (value is JsonElement jsonElement)
-            return jsonElement.GetInt32();
+        try
+        {
+            int result = value is JsonElement jsonElement
+                ? jsonElement.GetInt32()
+                : Convert.ToInt32(value);
 
-        return Convert.ToInt32(value);
+            return Math.Clamp(result, 0, MaxHintIntValue);
+        }
+        catch (System.Exception ex) when (ex is FormatException or OverflowException or InvalidOperationException)
+        {
+            throw new UniverseException($"Hint value '{value}' is not a valid integer.", ex);
+        }
     }
 
     /// <summary>
@@ -23,9 +35,15 @@ internal static class HintValueExtensions
     /// </summary>
     public static bool ToBool(this object value)
     {
-        if (value is JsonElement jsonElement)
-            return jsonElement.GetBoolean();
-
-        return Convert.ToBoolean(value);
+        try
+        {
+            return value is JsonElement jsonElement
+                ? jsonElement.GetBoolean()
+                : Convert.ToBoolean(value);
+        }
+        catch (System.Exception ex) when (ex is FormatException or InvalidOperationException)
+        {
+            throw new UniverseException($"Hint value '{value}' is not a valid boolean.", ex);
+        }
     }
 }

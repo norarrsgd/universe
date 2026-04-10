@@ -576,6 +576,12 @@
         <member name="M:Universe.Builder.Orbit`1.GenerateQuery">
             <summary>Generate the SQL query without executing it.</summary>
         </member>
+        <member name="M:Universe.Builder.UniverseBuilder.ValidateWeightValue(System.String)">
+            <summary>
+            Validates that a weight value for ORDER BY RANK RRF contains only safe numeric content.
+            Weight values should be comma-separated decimal numbers, optionally bracket-wrapped (e.g., "0.7, 0.3").
+            </summary>
+        </member>
         <member name="T:Universe.Builder.Strategies.DirectQueryStrategy">
             <summary>
             Direct execution strategy for simple queries
@@ -911,6 +917,12 @@
             Thrown when the path is empty, contains null bytes, or cannot be resolved to a rooted path.
             </exception>
         </member>
+        <member name="M:Universe.Builder.Strategies.Storage.PlatformDetection.SetRestrictivePermissions(System.String)">
+            <summary>
+            Sets restrictive permissions (owner-only) on Unix-like systems to prevent other users from reading statistics.
+            No-op on Windows where NTFS ACLs are used instead.
+            </summary>
+        </member>
         <member name="T:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage">
             <summary>
             SQLite-based storage for query statistics with high-performance features:
@@ -1003,7 +1015,8 @@
         </member>
         <member name="M:Universe.Extensions.HintValueExtensions.ToInt(System.Object)">
             <summary>
-            Converts an object to int, handling both JsonElement (from deserialized JSON) and primitive types
+            Converts an object to int, handling both JsonElement (from deserialized JSON) and primitive types.
+            Values are clamped to [0, 10000] to prevent unreasonable query option settings.
             </summary>
         </member>
         <member name="M:Universe.Extensions.HintValueExtensions.ToBool(System.Object)">
@@ -1088,7 +1101,13 @@
             </summary>
         </member>
         <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
-            <summary></summary>
+            <summary>
+            Initialize Galaxy core with Cosmos DB connection.
+            </summary>
+            <remarks>
+            WARNING: Setting <paramref name="recordQueries"/> to <c>true</c> includes full query text and parameter values
+            in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
+            </remarks>
         </member>
         <member name="M:Universe.GalaxyCore.Dispose(System.Boolean)">
             <summary></summary>
