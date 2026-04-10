@@ -84,6 +84,10 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
         {
             Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            Trace.TraceWarning($"[UniverseQuery] File statistics save failed (access denied): {ex.Message}");
+        }
         finally
         {
             _lock.Release();
