@@ -65,4 +65,26 @@ internal static class PlatformDetection
 
         return fullPath;
     }
+
+    /// <summary>
+    /// Sets restrictive permissions (owner-only) on Unix-like systems to prevent other users from reading statistics.
+    /// No-op on Windows where NTFS ACLs are used instead.
+    /// </summary>
+    internal static void SetRestrictivePermissions(string path)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            return;
+
+        try
+        {
+            if (Directory.Exists(path))
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            else if (File.Exists(path))
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (IOException ex)
+        {
+            System.Diagnostics.Trace.TraceWarning($"[UniverseQuery] Failed to set file permissions: {ex.Message}");
+        }
+    }
 }

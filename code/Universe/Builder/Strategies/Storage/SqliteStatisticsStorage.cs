@@ -63,10 +63,13 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         _batchSize = batchSize;
         _flushInterval = TimeSpan.FromSeconds(flushIntervalSeconds);
 
-        // Ensure directory exists
+        // Ensure directory exists with restrictive permissions
         string directory = Path.GetDirectoryName(_dbPath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
             Directory.CreateDirectory(directory);
+            PlatformDetection.SetRestrictivePermissions(directory);
+        }
 
         // Create connection with WAL mode for better concurrency
         SqliteConnectionStringBuilder connectionBuilder = new()
@@ -143,7 +146,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
             if (result != "ok")
                 Trace.TraceWarning($"[UniverseQuery] SQLite integrity check failed: {result}");
         }
-        catch (SystemException ex)
+        catch (SqliteException ex)
         {
             Trace.TraceWarning($"[UniverseQuery] SQLite integrity check error: {ex.Message}");
         }
@@ -363,7 +366,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
                 {
                     hints = JsonSerializer.Deserialize<Dictionary<string, object>>(hintsJson);
                 }
-                catch (SystemException ex)
+                catch (JsonException ex)
                 {
                     Trace.TraceWarning($"[UniverseQuery] Failed to deserialize query hints: {ex.Message}");
                 }
@@ -437,7 +440,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
             foreach (QueryExecutionStatistics stat in toWrite)
                 _retryCounts.TryRemove(stat, out _);
         }
-        catch (SystemException ex)
+        catch (System.Exception ex) when (ex is SqliteException or IOException)
         {
             Trace.TraceWarning($"[UniverseQuery] SQLite flush failed: {ex.Message}");
             RequeueWithRetryLimit(toWrite);
@@ -480,7 +483,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         {
             await action();
         }
-        catch (SystemException ex)
+        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException)
         {
             Trace.TraceWarning($"[UniverseQuery] Background operation failed: {ex.Message}");
         }
@@ -504,7 +507,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         {
             FlushAsync().Wait(TimeSpan.FromSeconds(10));
         }
-        catch (SystemException ex)
+        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException or AggregateException)
         {
             Trace.TraceWarning($"[UniverseQuery] Final flush during dispose failed: {ex.Message}");
         }

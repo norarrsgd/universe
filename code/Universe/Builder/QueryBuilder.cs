@@ -401,10 +401,9 @@ internal class UniverseBuilder : IDisposable
         {
             foreach (Sorting.Option sort in sorting)
             {
-                // Skip validation for weight values that are already bracket-wrapped like [FieldName]
-                // or WEIGHTED direction columns (used in ORDER BY RANK), as these are intentionally
-                // formatted for ORDER BY RANK and not raw user identifiers
-                if (sort.Direction is not Sorting.Direction.WEIGHTED)
+                if (sort.Direction is Sorting.Direction.WEIGHTED)
+                    ValidateWeightValue(sort.Column);
+                else
                     ValidateIdentifier(sort.Column, "Sorting.Column");
             }
         }
@@ -451,6 +450,44 @@ internal class UniverseBuilder : IDisposable
         // Reject control characters which could lead to query corruption
         if (identifier.Any(char.IsControl))
             throw new UniverseException($"{parameterName} contains control characters.");
+    }
+
+    /// <summary>
+    /// Validates that a weight value for ORDER BY RANK RRF contains only safe numeric content.
+    /// Weight values should be comma-separated decimal numbers, optionally bracket-wrapped (e.g., "0.7, 0.3").
+    /// </summary>
+    private static void ValidateWeightValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new UniverseException("Weight value cannot be null or empty.");
+
+        // Strip optional surrounding brackets for validation
+        string inner = value.Trim();
+        if (inner.StartsWith('['))
+            inner = inner[1..];
+        if (inner.EndsWith(']'))
+            inner = inner[..^1];
+
+        if (string.IsNullOrWhiteSpace(inner))
+            throw new UniverseException("Weight value cannot be empty.");
+
+        // Defense-in-depth: reject invalid characters before parsing individual segments
+        foreach (char c in inner)
+        {
+            if (!char.IsDigit(c) && c != '.' && c != ',' && !char.IsWhiteSpace(c))
+                throw new UniverseException($"Weight value contains invalid character '{c}'. Only numeric values separated by commas are allowed.");
+        }
+
+        // Validate each segment is a parseable number
+        string[] segments = inner.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+            throw new UniverseException("Weight value must contain at least one numeric value.");
+
+        foreach (string segment in segments)
+        {
+            if (!double.TryParse(segment, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                throw new UniverseException($"Weight value '{segment}' is not a valid number.");
+        }
     }
 
     private string ConvertName(string name) => _namingPolicy?.ConvertName(name) ?? name;

@@ -28,10 +28,13 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
     {
         _filePath = PlatformDetection.ValidateStoragePath(filePath ?? ResolveDefaultPath());
 
-        // Ensure directory exists
+        // Ensure directory exists with restrictive permissions
         string directory = Path.GetDirectoryName(_filePath)!;
         if (!Directory.Exists(directory))
+        {
             Directory.CreateDirectory(directory);
+            PlatformDetection.SetRestrictivePermissions(directory);
+        }
     }
 
     /// <summary>
@@ -77,7 +80,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
         {
             Trace.TraceWarning($"[UniverseQuery] File statistics serialization failed: {ex.Message}");
         }
-        catch (SystemException ex)
+        catch (IOException ex)
         {
             Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");
         }
@@ -158,9 +161,9 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
             return JsonSerializer.Deserialize<List<QueryExecutionStatistics>>(json)
                    ?? [];
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // If file is corrupted, return empty list
+            Trace.TraceWarning($"[UniverseQuery] Statistics file may be corrupted or tampered with ({_filePath}): {ex.Message}");
             return [];
         }
     }
