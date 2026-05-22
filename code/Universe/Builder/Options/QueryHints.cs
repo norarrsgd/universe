@@ -48,6 +48,8 @@ public readonly record struct QueryHints(
     /// </summary>
     public IReadOnlyDictionary<string, object> ToContextHints()
     {
+        Validate();
+
         Dictionary<string, object> hints = [];
 
         if (MaxItemCount.HasValue)
@@ -64,5 +66,22 @@ public readonly record struct QueryHints(
             hints[nameof(ResponseContinuationTokenLimitInKb)] = ResponseContinuationTokenLimitInKb.Value;
 
         return hints;
+    }
+
+    private void Validate()
+    {
+        ValidateRange(MaxItemCount, nameof(MaxItemCount), 1, Q.Limits.MaxItems);
+        ValidateRange(MaxBufferedItemCount, nameof(MaxBufferedItemCount), 1, Q.Limits.MaxItems);
+        ValidateRange(MaxConcurrency, nameof(MaxConcurrency), 1, Environment.ProcessorCount);
+        ValidateRange(ResponseContinuationTokenLimitInKb, nameof(ResponseContinuationTokenLimitInKb), 1, Q.Limits.MaxContinuationTokenKb);
+    }
+
+    private static void ValidateRange(int? value, string name, int min, int max)
+    {
+        if (value is null)
+            return;
+
+        if (value.Value < min || value.Value > max)
+            throw new UniverseException($"{name} must be between {min} and {max}.");
     }
 }

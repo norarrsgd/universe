@@ -6,6 +6,28 @@ namespace Universe.Builder;
 
 internal class UniverseBuilder : IDisposable
 {
+    private static readonly HashSet<string> ReservedAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "AND",
+        "AS",
+        "ASC",
+        "BETWEEN",
+        "BY",
+        "DESC",
+        "DISTINCT",
+        "FROM",
+        "GROUP",
+        "IN",
+        "JOIN",
+        "NOT",
+        "OR",
+        "ORDER",
+        "RANK",
+        "SELECT",
+        "TOP",
+        "WHERE"
+    };
+
     private readonly bool _recordQueries;
     private readonly QueryTuner _queryTuner;
     private readonly QueryStrategySelector _strategySelector;
@@ -69,13 +91,14 @@ internal class UniverseBuilder : IDisposable
 
                 foreach (AggregationOption aggregate in columnOptions.Value.Aggregates)
                 {
+                    string aliasBase = BuildSqlAliasBase(aggregate.Column);
                     string toAppend = aggregate.Aggregate switch
                     {
-                        Q.Aggregate.Count => $"COUNT(1) AS {ConvertName(nameof(ICosmicEntity.CountAggregate))}",
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Count => $"COUNT(1) AS {BuildSqlAliasBase(nameof(ICosmicEntity.CountAggregate))}",
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aliasBase),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -102,14 +125,14 @@ internal class UniverseBuilder : IDisposable
                     columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
                     {
                         string alias = catalyst.Alias ?? "c";
-                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {ConvertName(catalyst.Column)}Score{(vectorDistanceCatalysts.IndexOf(catalyst) > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
+                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {BuildVectorScoreAlias(catalyst, vectorDistanceCatalysts.IndexOf(catalyst))}";
                     });
                     break;
                 case 1:
                     {
                         Catalyst catalyst = vectorDistanceCatalysts.First();
                         string alias = catalyst.Alias ?? "c";
-                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {ConvertName(catalyst.Column)}Score";
+                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {BuildVectorScoreAlias(catalyst)}";
                         break;
                     }
             }
@@ -148,13 +171,14 @@ internal class UniverseBuilder : IDisposable
 
                 foreach (AggregationOption aggregate in join.Aggregates)
                 {
+                    string aliasBase = BuildSqlAliasBase(aggregate.Column);
                     string toAppend = aggregate.Aggregate switch
                     {
-                        Q.Aggregate.Count => $"COUNT(1) AS {ConvertName(nameof(ICosmicEntity.CountAggregate))}",
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), ConvertName(aggregate.Column)),
+                        Q.Aggregate.Count => $"COUNT(1) AS {BuildSqlAliasBase(nameof(ICosmicEntity.CountAggregate))}",
+                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
                         _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
                     };
 
@@ -192,8 +216,8 @@ internal class UniverseBuilder : IDisposable
                 }
 
                 // ColumnOptions dependency check for VectorDistance or FTScore
-                if (cluster.Catalysts.Any(c => c.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore) && (columnOptions == null || columnOptions.GetValueOrDefault().Top <= 0))
-                    throw new UniverseException("ColumnOptions that specify a top value must be provided when using VectorDistance operator.");
+                if (cluster.Catalysts.Any(c => c.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore) && !HasValidRankTop(columnOptions))
+                    throw new UniverseException($"ColumnOptions.Top must be between 1 and {Q.Limits.MaxVectorItems} when using rank catalysts.");
 
                 // Skip if all catalysts are of VectorDistance or FTScore operator
                 if (cluster.Catalysts.All(c => c.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore))
@@ -350,6 +374,8 @@ internal class UniverseBuilder : IDisposable
         // Validate column options
         if (columnOptions.HasValue)
         {
+            ValidateTop(columnOptions.Value.Top, "ColumnOptions.Top");
+
             if (columnOptions.Value.Names is not null)
             {
                 foreach (string columnName in columnOptions.Value.Names)
@@ -365,7 +391,7 @@ internal class UniverseBuilder : IDisposable
             if (columnOptions.Value.Join is not null)
             {
                 JoinOptions join = columnOptions.Value.Join;
-                ValidateIdentifier(join.Alias, "JoinOptions.Alias");
+                ValidateSqlAlias(join.Alias, "JoinOptions.Alias");
                 ValidateIdentifier(join.ArrayPath, "JoinOptions.ArrayPath");
 
                 if (join.Columns is not null)
@@ -391,7 +417,7 @@ internal class UniverseBuilder : IDisposable
                 {
                     ValidateIdentifier(catalyst.Column, "Catalyst.Column");
                     if (!string.IsNullOrWhiteSpace(catalyst.Alias))
-                        ValidateIdentifier(catalyst.Alias, "Catalyst.Alias");
+                        ValidateSqlAlias(catalyst.Alias, "Catalyst.Alias");
                 }
             }
         }
@@ -414,6 +440,40 @@ internal class UniverseBuilder : IDisposable
             foreach (string group in groups)
                 ValidateIdentifier(group, "Group");
         }
+    }
+
+    private static void ValidateTop(int top, string parameterName)
+    {
+        if (top < 0 || top > Q.Limits.MaxItems)
+            throw new UniverseException($"{parameterName} must be between 0 and {Q.Limits.MaxItems}.");
+    }
+
+    private static bool HasValidRankTop(ColumnOptions? columnOptions)
+        => columnOptions.HasValue
+           && columnOptions.Value.Top >= 1
+           && columnOptions.Value.Top <= Q.Limits.MaxVectorItems;
+
+    private static void ValidateSqlAlias(string alias, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(alias))
+            throw new UniverseException($"{parameterName} cannot be null or empty.");
+
+        if (alias.Length > 128)
+            throw new UniverseException($"{parameterName} exceeds maximum alias length of 128 characters.");
+
+        if (!IsStrictSqlAlias(alias))
+            throw new UniverseException($"{parameterName} must match ^[A-Za-z_][A-Za-z0-9_]*$.");
+
+        if (ReservedAliases.Contains(alias))
+            throw new UniverseException($"{parameterName} cannot be a SQL keyword.");
+    }
+
+    private static bool IsStrictSqlAlias(string alias)
+    {
+        if (alias.Length == 0 || !(char.IsAsciiLetter(alias[0]) || alias[0] == '_'))
+            return false;
+
+        return alias.Skip(1).All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
     }
 
     private static void ValidateIdentifier(string identifier, string parameterName)
@@ -494,6 +554,38 @@ internal class UniverseBuilder : IDisposable
     }
 
     private string ConvertName(string name) => _namingPolicy?.ConvertName(name) ?? name;
+
+    private string BuildSqlAliasBase(string path)
+    {
+        string[] segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string convertedPath = string.Join("_", segments.Select(ConvertName));
+
+        StringBuilder alias = new(convertedPath.Length);
+        bool previousWasUnderscore = false;
+        foreach (char c in convertedPath)
+        {
+            bool isAliasChar = char.IsAsciiLetterOrDigit(c) || c == '_';
+            char next = isAliasChar ? c : '_';
+
+            if (next == '_' && previousWasUnderscore)
+                continue;
+
+            alias.Append(next);
+            previousWasUnderscore = next == '_';
+        }
+
+        string result = alias.ToString().Trim('_');
+        if (string.IsNullOrEmpty(result))
+            result = "value";
+
+        if (!(char.IsAsciiLetter(result[0]) || result[0] == '_'))
+            result = $"_{result}";
+
+        return result;
+    }
+
+    private string BuildVectorScoreAlias(Catalyst catalyst, int index = 0)
+        => $"{BuildSqlAliasBase(catalyst.Column)}Score{(index > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
 
     private string WhereClauseBuilder(Catalyst catalyst)
     {

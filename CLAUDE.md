@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+Read `CODEBASE.md` first before doing anything in this codebase. It contains the current codebase map, architecture notes, security-sensitive areas, and implementation nuances.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview

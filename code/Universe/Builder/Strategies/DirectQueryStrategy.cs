@@ -43,7 +43,7 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
             {
                 MaxItemCount = context.MaxItemCount ?? Q.Limits.MaxItems,
                 EnableOptimisticDirectExecution = true,
-                MaxConcurrency = -1 // Unlimited parallelism
+                MaxConcurrency = Environment.ProcessorCount
             };
 
             // Apply hints if available

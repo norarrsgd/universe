@@ -36,7 +36,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         string container,
         IReadOnlyList<string> partitionKey,
         UniverseOptions options,
-        bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries)
+        bool recordQueries = false) : base(client, database, container, partitionKey, options, recordQueries)
     {
         ArgumentNullException.ThrowIfNull(options);
         QueryTuner queryTuner = new(options.StatisticsStorage);

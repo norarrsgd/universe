@@ -80,6 +80,8 @@ public sealed class Orbit<T> where T : class, ICosmicEntity
 	{
 		if (count < 0)
 			throw new UniverseException("Top count must be a non-negative value.");
+		if (count > Q.Limits.MaxItems)
+			throw new UniverseException($"Top count must not exceed {Q.Limits.MaxItems}.");
 		_top = count;
 		return this;
 	}
