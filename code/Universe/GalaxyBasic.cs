@@ -38,7 +38,6 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         UniverseOptions options,
         bool recordQueries = false) : base(client, database, container, partitionKey, options, recordQueries)
     {
-        ArgumentNullException.ThrowIfNull(options);
         QueryTuner queryTuner = new(options.StatisticsStorage);
         QBuilder = new(_recordQuery, queryTuner, _namingPolicy);
     }

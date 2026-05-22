@@ -38,6 +38,38 @@ public sealed class QueryBuilderSecurityTests : IDisposable
         Assert.DoesNotContain("AS metadata.embeddingScore", sql);
     }
 
+    [Fact]
+    public void GeneratedAlias_ReservedKeyword_AppendsSafeSuffix()
+    {
+        ColumnOptions colOpts = new(
+            Names: ["category"],
+            Aggregates: [new("order", Q.Aggregate.Sum)]);
+
+        string sql = _builder.CreateQuery(null, colOpts).QueryText;
+
+        Assert.Contains("SUM(c[\"order\"]) AS order_alias_Sum", sql);
+        Assert.DoesNotContain(" AS order_Sum", sql);
+    }
+
+    [Fact]
+    public void VectorDistanceScoreAlias_ShortCatalystId_UsesAvailableSuffix()
+    {
+        float[] vector = [0.1f, 0.2f, 0.3f];
+        List<Cluster> clusters =
+        [
+            new(
+            [
+                new("embeddingA", vector, Operator: Q.Operator.VectorDistance),
+                new("embeddingB", vector, Operator: Q.Operator.VectorDistance) { CatalystId = "a-b$c" }
+            ])
+        ];
+        ColumnOptions colOpts = new(Names: ["name"], Top: 5);
+
+        string sql = _builder.CreateQuery(clusters, colOpts).QueryText;
+
+        Assert.Contains("AS embeddingBScorea_b_c", sql);
+    }
+
     [Theory]
     [InlineData("line item")]
     [InlineData("line-item")]

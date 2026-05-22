@@ -33,9 +33,12 @@ public abstract class GalaxyCore : IDisposable
     /// in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
     /// </remarks>
     protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, UniverseOptions options, bool recordQueries = false)
-        : this(client, database, container, partitionKey, recordQueries, (options ?? throw new ArgumentNullException(nameof(options))).AutoProvisionContainers)
+        : this(client, database, container, partitionKey, recordQueries, RequireOptions(options).AutoProvisionContainers)
     {
     }
+
+    private static UniverseOptions RequireOptions(UniverseOptions options) =>
+        options ?? throw new UniverseException("Universe options are required.");
 
     private GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries, bool autoProvisionContainers)
     {

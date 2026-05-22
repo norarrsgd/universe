@@ -1,4 +1,5 @@
 using Universe.Builder.Strategies.Storage;
+using Universe.Exception;
 using Xunit;
 
 namespace Universe.Tests.Storage;
@@ -48,6 +49,14 @@ public sealed class UniverseOptionsTests : IDisposable
     }
 
     [Fact]
+    public void GalaxyCore_NullOptions_ThrowsUniverseException()
+    {
+        UniverseException exception = Assert.Throws<UniverseException>(() => new NullOptionsGalaxyCore());
+
+        Assert.Equal("Universe options are required.", exception.Message);
+    }
+
+    [Fact]
     public void FilePersistence_WithAutoProvisioningFalse_PreservesStorage()
     {
         string path = Track(Path.Combine(AppContext.BaseDirectory, $"options-{Guid.NewGuid()}.json"));
@@ -93,4 +102,12 @@ public sealed class UniverseOptionsTests : IDisposable
 
     private static void DisposeStatisticsStorage(UniverseOptions options)
         => (options.StatisticsStorage as IDisposable)?.Dispose();
+
+    private sealed class NullOptionsGalaxyCore : GalaxyCore
+    {
+        public NullOptionsGalaxyCore()
+            : base(client: null, database: "database", container: "container", partitionKey: [], options: null)
+        {
+        }
+    }
 }

@@ -710,7 +710,7 @@ Catalyst rule validation:
 
 `Builder/Strategies/` contains the query execution pipeline.
 
-- `DirectQueryStrategy`: default path for simple queries, optimistic direct execution enabled, unlimited concurrency by default.
+- `DirectQueryStrategy`: default path for simple queries, optimistic direct execution enabled, CPU-core-limited concurrency by default.
 - `GatewayQueryStrategy`: fallback path for complex queries, conservative concurrency and small continuation tokens.
 - `VectorSearchStrategy`: preferred for vector and hybrid queries, optimistic direct execution disabled.
 - `EnhancedContextStrategy`: wraps the chosen strategy with merged recommendation/user hints.
@@ -721,7 +721,7 @@ Query type inference is string-based against the generated SQL text. Keep this i
 
 Strategy defaults:
 
-- Direct: `MaxItemCount` defaults to `Q.Limits.MaxItems` (`1000`), `EnableOptimisticDirectExecution = true`, `MaxConcurrency = -1`.
+- Direct: `MaxItemCount` defaults to `Q.Limits.MaxItems` (`1000`), `EnableOptimisticDirectExecution = true`, `MaxConcurrency = Environment.ProcessorCount`.
 - Gateway: `MaxItemCount` defaults to `Q.Limits.MaxItems`, `EnableOptimisticDirectExecution = false`, `MaxConcurrency = 1`, `ResponseContinuationTokenLimitInKb = 1`.
 - Vector: `EnableOptimisticDirectExecution = false`, `MaxConcurrency = Environment.ProcessorCount`; `MaxItemCount` is applied only when hints include it.
 

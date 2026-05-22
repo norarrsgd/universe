@@ -23,10 +23,10 @@ public struct Q
     public readonly record struct Page
     {
         /// <summary>Number of items requested for the page.</summary>
-        public int Size { get; init; }
+        public int Size { get; }
 
         /// <summary>Continuation token returned by Cosmos DB.</summary>
-        public string ContinuationToken { get; init; }
+        public string ContinuationToken { get; }
 
         /// <summary>Create a paginated query request.</summary>
         public Page(int Size, string ContinuationToken = null)

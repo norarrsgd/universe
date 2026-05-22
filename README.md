@@ -27,6 +27,10 @@ public class MyRepository : Galaxy<MyModel>
     public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey)
     {
     }
+
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, UniverseOptions options) : base(client, database, container, partitionKey, options)
+    {
+    }
 }
 
 // If you want to see debug information such as the full Query text executed, use the format below:
@@ -75,6 +79,16 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
 ```
 
 Repository construction creates the Cosmos database and container if they do not exist by default. In production environments where infrastructure is managed separately, pass `new UniverseOptions().WithAutoProvisioning(false)` to a repository constructor overload that accepts `UniverseOptions`.
+
+```csharp
+_ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyRepository(
+    client: service.GetRequiredService<CosmosClient>(),
+    database: "database-name",
+    container: "container-name",
+    partitionKey: typeof(MyModel).BuildPartitionKey(),
+    options: new UniverseOptions().WithAutoProvisioning(false)
+));
+```
 
 5. Inject your `IGalaxy<MyModel>` dependency into your classes and enjoy a simpler way to query CosmosDb
 

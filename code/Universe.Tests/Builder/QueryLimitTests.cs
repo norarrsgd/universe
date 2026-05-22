@@ -28,6 +28,13 @@ public sealed class QueryLimitTests : IDisposable
     }
 
     [Fact]
+    public void Page_PropertiesDoNotExposePublicSetters()
+    {
+        Assert.Null(typeof(Q.Page).GetProperty(nameof(Q.Page.Size))?.SetMethod);
+        Assert.Null(typeof(Q.Page).GetProperty(nameof(Q.Page.ContinuationToken))?.SetMethod);
+    }
+
+    [Fact]
     public void RankQuery_TopAboveMaxVectorItems_Throws()
     {
         float[] vector = [0.1f, 0.2f, 0.3f];

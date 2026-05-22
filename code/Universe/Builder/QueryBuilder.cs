@@ -581,11 +581,25 @@ internal class UniverseBuilder : IDisposable
         if (!(char.IsAsciiLetter(result[0]) || result[0] == '_'))
             result = $"_{result}";
 
+        if (ReservedAliases.Contains(result))
+            result = $"{result}_alias";
+
         return result;
     }
 
     private string BuildVectorScoreAlias(Catalyst catalyst, int index = 0)
-        => $"{BuildSqlAliasBase(catalyst.Column)}Score{(index > 0 ? catalyst.CatalystId[^8..] : string.Empty)}";
+    {
+        string suffix = string.Empty;
+        if (index > 0 && !string.IsNullOrEmpty(catalyst.CatalystId))
+        {
+            int start = Math.Max(0, catalyst.CatalystId.Length - 8);
+            suffix = new string(catalyst.CatalystId[start..]
+                .Select(c => char.IsAsciiLetterOrDigit(c) || c == '_' ? c : '_')
+                .ToArray());
+        }
+
+        return $"{BuildSqlAliasBase(catalyst.Column)}Score{suffix}";
+    }
 
     private string WhereClauseBuilder(Catalyst catalyst)
     {
