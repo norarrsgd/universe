@@ -30,8 +30,13 @@ public sealed class QueryLimitTests : IDisposable
     [Fact]
     public void Page_PropertiesDoNotExposePublicSetters()
     {
-        Assert.Null(typeof(Q.Page).GetProperty(nameof(Q.Page.Size))?.SetMethod);
-        Assert.Null(typeof(Q.Page).GetProperty(nameof(Q.Page.ContinuationToken))?.SetMethod);
+        var sizeProperty = typeof(Q.Page).GetProperty(nameof(Q.Page.Size));
+        var continuationTokenProperty = typeof(Q.Page).GetProperty(nameof(Q.Page.ContinuationToken));
+
+        Assert.NotNull(sizeProperty);
+        Assert.NotNull(continuationTokenProperty);
+        Assert.Null(sizeProperty.SetMethod);
+        Assert.Null(continuationTokenProperty.SetMethod);
     }
 
     [Fact]

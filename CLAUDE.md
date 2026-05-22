@@ -137,7 +137,7 @@ Currently (v3.1.x), optimization is rule-based. Full adaptive learning is planne
 
 ## Target Framework
 - **Current**: .NET 10.0 (C# 14.0)
-- **Package**: `Microsoft.Azure.Cosmos` v3.56.0
+- **Package**: `Microsoft.Azure.Cosmos` v3.58.0
 
 ## Git Workflow
 - **Main branch**: `dev` (for PRs)
@@ -166,4 +166,4 @@ Currently (v3.1.x), optimization is rule-based. Full adaptive learning is planne
 - `code/DarkMatter/Examples/`: 14 runnable examples covering all features
 
 ## Testing
-This project uses the DarkMatter example project as a test harness. There are no unit tests; examples are run against a live Cosmos DB instance.
+This project includes unit tests in `code/Universe.Tests`; update and run the relevant unit tests for code changes. `code/DarkMatter` is the integration/example harness and runs against a live Cosmos DB instance when live-account validation is needed.
