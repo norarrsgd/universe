@@ -27,6 +27,10 @@ public class MyRepository : Galaxy<MyModel>
     public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey)
     {
     }
+
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, UniverseOptions options) : base(client, database, container, partitionKey, options)
+    {
+    }
 }
 
 // If you want to see debug information such as the full Query text executed, use the format below:
@@ -71,6 +75,18 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
     database: "database-name",
     container: "container-name",
     partitionKey: typeof(MyModel).BuildPartitionKey()
+));
+```
+
+Repository construction creates the Cosmos database and container if they do not exist by default. In production environments where infrastructure is managed separately, pass `new UniverseOptions().WithAutoProvisioning(false)` to a repository constructor overload that accepts `UniverseOptions`.
+
+```csharp
+_ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyRepository(
+    client: service.GetRequiredService<CosmosClient>(),
+    database: "database-name",
+    container: "container-name",
+    partitionKey: typeof(MyModel).BuildPartitionKey(),
+    options: new UniverseOptions().WithAutoProvisioning(false)
 ));
 ```
 
@@ -259,6 +275,8 @@ See the [QUERY_EXECUTION_STRATEGIES.md](https://github.com/norarrsgd/universe/bl
 ## Stored Procedures
 
 You can manage and execute Cosmos DB stored procedures using the `IGalaxyProcedure` interface. Inject your repository as `IGalaxyProcedure` and use its methods for full stored procedure lifecycle management and execution.
+
+Stored procedure create, replace, and delete methods are administrative operations. The JavaScript body passed to `CreateSProc` and `ReplaceSProc` is raw code executed by Cosmos DB, so it should come only from trusted, version-controlled or operator-approved sources.
 
 ```csharp
 IGalaxyProcedure galaxyProcedure = ...; // Injected or resolved from DI

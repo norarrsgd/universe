@@ -309,11 +309,23 @@
         <member name="F:Universe.Builder.Options.Q.Limits.MaxRU">
             <summary>Maximum number of RU per query</summary>
         </member>
+        <member name="F:Universe.Builder.Options.Q.Limits.MaxContinuationTokenKb">
+            <summary>Maximum response continuation token size in KB</summary>
+        </member>
         <member name="T:Universe.Builder.Options.Q.Page">
             <summary>Page definition for paginated queries</summary>
         </member>
+        <member name="P:Universe.Builder.Options.Q.Page.Size">
+            <summary>Number of items requested for the page.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Q.Page.ContinuationToken">
+            <summary>Continuation token returned by Cosmos DB.</summary>
+        </member>
         <member name="M:Universe.Builder.Options.Q.Page.#ctor(System.Int32,System.String)">
-            <summary>Page definition for paginated queries</summary>
+            <summary>Create a paginated query request.</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.Q.Page.Deconstruct(System.Int32@,System.String@)">
+            <summary>Deconstruct a page request.</summary>
         </member>
         <member name="T:Universe.Builder.Options.Q.Where">
             <summary>AND / OR where clause operators</summary>
@@ -1109,6 +1121,15 @@
             in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
             </remarks>
         </member>
+        <member name="M:Universe.GalaxyCore.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},Universe.UniverseOptions,System.Boolean)">
+            <summary>
+            Initialize Galaxy core with Cosmos DB connection and custom Universe options.
+            </summary>
+            <remarks>
+            WARNING: Setting <paramref name="recordQueries"/> to <c>true</c> includes full query text and parameter values
+            in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
+            </remarks>
+        </member>
         <member name="M:Universe.GalaxyCore.Dispose(System.Boolean)">
             <summary></summary>
         </member>
@@ -1119,10 +1140,44 @@
             <summary></summary>
         </member>
         <member name="T:Universe.GalaxyProcedure">
-            <summary>Inherit repositories to implement stored procedures</summary>
+            <summary>Inherit repositories to implement stored procedure administration and execution.</summary>
+            <remarks>
+            Stored procedure create, replace, and delete operations are administrative capabilities. Stored procedure body strings
+            must come only from trusted, version-controlled or operator-approved sources.
+            </remarks>
         </member>
         <member name="M:Universe.GalaxyProcedure.#ctor(Microsoft.Azure.Cosmos.CosmosClient,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
-            <summary>Inherit repositories to implement stored procedures</summary>
+            <summary>Inherit repositories to implement stored procedure administration and execution.</summary>
+            <remarks>
+            Stored procedure create, replace, and delete operations are administrative capabilities. Stored procedure body strings
+            must come only from trusted, version-controlled or operator-approved sources.
+            </remarks>
+        </member>
+        <member name="M:Universe.GalaxyProcedure.Universe#Interfaces#IGalaxyProcedure#CreateSProc(System.String,System.String)">
+            <summary>
+            Creates a stored procedure from trusted administrative JavaScript source.
+            </summary>
+            <remarks>
+            The <paramref name="body"/> value is raw JavaScript executed by Cosmos DB and must come only from trusted,
+            version-controlled or operator-approved sources.
+            </remarks>
+        </member>
+        <member name="M:Universe.GalaxyProcedure.Universe#Interfaces#IGalaxyProcedure#ReplaceSProc(System.String,System.String)">
+            <summary>
+            Replaces a stored procedure with trusted administrative JavaScript source.
+            </summary>
+            <remarks>
+            The <paramref name="newBody"/> value is raw JavaScript executed by Cosmos DB and must come only from trusted,
+            version-controlled or operator-approved sources.
+            </remarks>
+        </member>
+        <member name="M:Universe.GalaxyProcedure.Universe#Interfaces#IGalaxyProcedure#DeleteSProc(System.String)">
+            <summary>
+            Deletes a stored procedure as an administrative operation.
+            </summary>
+            <remarks>
+            Only trusted administrative code paths should call this method.
+            </remarks>
         </member>
         <member name="T:Universe.Interfaces.ICosmicEntity">
             <summary>Base interface for Cosmos Entities</summary>
@@ -1254,7 +1309,13 @@
             <param name="partitionKey">Exact order of your defined partition keys</param>
         </member>
         <member name="T:Universe.Interfaces.IGalaxyProcedure">
-            <summary></summary>
+            <summary>
+            Stored procedure lifecycle and execution operations.
+            </summary>
+            <remarks>
+            Stored procedure create, replace, and delete operations are administrative capabilities. Stored procedure body strings
+            must come only from trusted, version-controlled or operator-approved sources.
+            </remarks>
         </member>
         <member name="M:Universe.Interfaces.IGalaxyProcedure.ExecSProc``1(System.String,System.String,System.Object[])">
             <summary>
@@ -1263,8 +1324,12 @@
         </member>
         <member name="M:Universe.Interfaces.IGalaxyProcedure.CreateSProc(System.String,System.String)">
             <summary>
-            Create a stored procedure
+            Create a stored procedure.
             </summary>
+            <remarks>
+            Administrative operation. The <paramref name="body"/> value is raw JavaScript executed by Cosmos DB and must come
+            only from trusted, version-controlled or operator-approved sources.
+            </remarks>
         </member>
         <member name="M:Universe.Interfaces.IGalaxyProcedure.ReadSProc(System.String)">
             <summary>
@@ -1273,13 +1338,20 @@
         </member>
         <member name="M:Universe.Interfaces.IGalaxyProcedure.ReplaceSProc(System.String,System.String)">
             <summary>
-            Replace a stored procedure
+            Replace a stored procedure.
             </summary>
+            <remarks>
+            Administrative operation. The <paramref name="newBody"/> value is raw JavaScript executed by Cosmos DB and must come
+            only from trusted, version-controlled or operator-approved sources.
+            </remarks>
         </member>
         <member name="M:Universe.Interfaces.IGalaxyProcedure.DeleteSProc(System.String)">
             <summary>
-            Delete a stored procedure
+            Delete a stored procedure.
             </summary>
+            <remarks>
+            Administrative operation. Only trusted administrative code paths should call this method.
+            </remarks>
         </member>
         <member name="M:Universe.Interfaces.IGalaxyProcedure.ListSProcs">
             <summary>
@@ -1317,10 +1389,24 @@
             Storage backend for query statistics. Defaults to InMemoryStatisticsStorage.
             </summary>
         </member>
+        <member name="P:Universe.UniverseOptions.AutoProvisionContainers">
+            <summary>
+            Whether repository construction should create the Cosmos database and container if they do not exist.
+            Defaults to true for backward compatibility.
+            </summary>
+        </member>
         <member name="M:Universe.UniverseOptions.#ctor">
             <summary>
             Creates default Universe options with in-memory storage
             </summary>
+        </member>
+        <member name="M:Universe.UniverseOptions.WithAutoProvisioning(System.Boolean)">
+            <summary>
+            Enables or disables automatic Cosmos database/container provisioning during repository construction.
+            Disable this in production environments where infrastructure is managed separately.
+            </summary>
+            <param name="enabled">True to create missing containers automatically; false to use existing containers only.</param>
+            <returns>The same UniverseOptions instance for fluent configuration.</returns>
         </member>
         <member name="M:Universe.UniverseOptions.WithFilePersistence(System.String)">
             <summary>

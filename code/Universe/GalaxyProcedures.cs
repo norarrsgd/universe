@@ -5,7 +5,11 @@ using Universe.Response;
 
 namespace Universe;
 
-/// <summary>Inherit repositories to implement stored procedures</summary>
+/// <summary>Inherit repositories to implement stored procedure administration and execution.</summary>
+/// <remarks>
+/// Stored procedure create, replace, and delete operations are administrative capabilities. Stored procedure body strings
+/// must come only from trusted, version-controlled or operator-approved sources.
+/// </remarks>
 public abstract class GalaxyProcedure(
     CosmosClient client,
     string database,
@@ -46,6 +50,13 @@ public abstract class GalaxyProcedure(
         }
     }
 
+    /// <summary>
+    /// Creates a stored procedure from trusted administrative JavaScript source.
+    /// </summary>
+    /// <remarks>
+    /// The <paramref name="body"/> value is raw JavaScript executed by Cosmos DB and must come only from trusted,
+    /// version-controlled or operator-approved sources.
+    /// </remarks>
     async Task<Gravity> IGalaxyProcedure.CreateSProc(string procedureName, string body)
     {
         try
@@ -85,6 +96,13 @@ public abstract class GalaxyProcedure(
         }
     }
 
+    /// <summary>
+    /// Replaces a stored procedure with trusted administrative JavaScript source.
+    /// </summary>
+    /// <remarks>
+    /// The <paramref name="newBody"/> value is raw JavaScript executed by Cosmos DB and must come only from trusted,
+    /// version-controlled or operator-approved sources.
+    /// </remarks>
     async Task<Gravity> IGalaxyProcedure.ReplaceSProc(string procedureName, string newBody)
     {
         try
@@ -107,6 +125,12 @@ public abstract class GalaxyProcedure(
         }
     }
 
+    /// <summary>
+    /// Deletes a stored procedure as an administrative operation.
+    /// </summary>
+    /// <remarks>
+    /// Only trusted administrative code paths should call this method.
+    /// </remarks>
     async Task<Gravity> IGalaxyProcedure.DeleteSProc(string procedureName)
     {
         try

@@ -14,10 +14,37 @@ public struct Q
 
         /// <summary>Maximum number of RU per query</summary>
         public const int MaxRU = 1000;
+
+        /// <summary>Maximum response continuation token size in KB</summary>
+        public const int MaxContinuationTokenKb = 16;
     }
 
     /// <summary>Page definition for paginated queries</summary>
-    public record struct Page(int Size, string ContinuationToken = null);
+    public readonly record struct Page
+    {
+        /// <summary>Number of items requested for the page.</summary>
+        public int Size { get; }
+
+        /// <summary>Continuation token returned by Cosmos DB.</summary>
+        public string ContinuationToken { get; }
+
+        /// <summary>Create a paginated query request.</summary>
+        public Page(int Size, string ContinuationToken = null)
+        {
+            if (Size < 1 || Size > Limits.MaxItems)
+                throw new UniverseException($"Page size must be between 1 and {Limits.MaxItems}.");
+
+            this.Size = Size;
+            this.ContinuationToken = ContinuationToken;
+        }
+
+        /// <summary>Deconstruct a page request.</summary>
+        public void Deconstruct(out int Size, out string ContinuationToken)
+        {
+            Size = this.Size;
+            ContinuationToken = this.ContinuationToken;
+        }
+    }
 
     /// <summary>AND / OR where clause operators</summary>
     public enum Where
