@@ -243,9 +243,28 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 
     private static void TryDeleteFiles(string dbPath)
     {
-        foreach (string suffix in new[] { "", "-wal", "-shm" })
+        string fullPath = Path.GetFullPath(dbPath);
+        string baseDirectory = Path.GetFullPath(AppContext.BaseDirectory);
+
+        string relativePath = Path.GetRelativePath(baseDirectory, fullPath);
+        if (Path.IsPathRooted(relativePath) || relativePath == ".." || relativePath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new InvalidOperationException("Test cleanup path must stay under the test output directory.");
+
+        string directory = Path.GetDirectoryName(fullPath)!;
+        string fileName = Path.GetFileName(fullPath);
+        HashSet<string> allowedNames = new HashSet<string>(StringComparer.Ordinal)
         {
-            try { if (File.Exists(dbPath + suffix)) File.Delete(dbPath + suffix); }
+            fileName,
+            fileName + "-wal",
+            fileName + "-shm"
+        };
+
+        foreach (FileInfo file in new DirectoryInfo(directory).EnumerateFiles(fileName + "*"))
+        {
+            if (!allowedNames.Contains(file.Name))
+                continue;
+
+            try { file.Delete(); }
             catch { /* best effort cleanup */ }
         }
     }
