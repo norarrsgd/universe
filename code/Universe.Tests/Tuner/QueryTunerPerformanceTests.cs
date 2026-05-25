@@ -3,7 +3,6 @@ using Universe.Builder.Strategies;
 using Universe.Builder.Strategies.Storage;
 using Universe.Tests.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Universe.Tests.Tuner;
 
@@ -206,7 +205,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
         // Measure InMemory startup
         Stopwatch sw = Stopwatch.StartNew();
         using QueryTuner inMemoryTuner = new QueryTuner();
-        await Task.Delay(100); // Give async loading a chance
+        await Task.Delay(100, TestContext.Current.CancellationToken); // Give async loading a chance
         QueryTuningRecommendations inMemoryRec = inMemoryTuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
         TimeSpan inMemoryTime = sw.Elapsed;
@@ -225,7 +224,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
             {
                 sqliteRec = sqliteTuner.GetRecommendations(QueryType.Simple);
                 if (sqliteRec.IsDataDriven) break;
-                await Task.Delay(100);
+                await Task.Delay(100, TestContext.Current.CancellationToken);
             }
             sw.Stop();
             sqliteTime = sw.Elapsed;
@@ -244,9 +243,31 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 
     private static void TryDeleteFiles(string dbPath)
     {
-        foreach (string suffix in new[] { "", "-wal", "-shm" })
+        string fullPath = Path.GetFullPath(dbPath);
+        string baseDirectory = Path.GetFullPath(AppContext.BaseDirectory);
+
+        string relativePath = Path.GetRelativePath(baseDirectory, fullPath);
+        if (Path.IsPathRooted(relativePath) || relativePath == ".." || relativePath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new InvalidOperationException("Test cleanup path must stay under the test output directory.");
+
+        string directory = Path.GetDirectoryName(fullPath)!;
+        string fileName = Path.GetFileName(fullPath);
+        if (!Directory.Exists(directory))
+            return;
+
+        HashSet<string> allowedNames = new HashSet<string>(StringComparer.Ordinal)
         {
-            try { if (File.Exists(dbPath + suffix)) File.Delete(dbPath + suffix); }
+            fileName,
+            fileName + "-wal",
+            fileName + "-shm"
+        };
+
+        foreach (FileInfo file in new DirectoryInfo(directory).EnumerateFiles(fileName + "*"))
+        {
+            if (!allowedNames.Contains(file.Name))
+                continue;
+
+            try { file.Delete(); }
             catch { /* best effort cleanup */ }
         }
     }
