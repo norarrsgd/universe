@@ -154,7 +154,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"batch-{i}"));
 
         // Allow fire-and-forget flush triggered at batchSize threshold
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
 
         IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(100);
         Assert.Equal(5, loaded.Count);
@@ -174,7 +174,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"timer-{i}"));
 
         // Wait for timer-based flush (1 second interval)
-        await Task.Delay(2000);
+        await Task.Delay(2000, TestContext.Current.CancellationToken);
 
         IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(100);
         Assert.Equal(3, loaded.Count);
@@ -345,22 +345,23 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-dl-{Guid.NewGuid()}.db");
         using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 2, flushIntervalSeconds: 1);
 
-        using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
 
         Task saveTask = Task.Run(async () =>
         {
             for (int i = 0; i < 50 && !cts.IsCancellationRequested; i++)
                 await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"dl-{i}"));
-        });
+        }, cts.Token);
 
         Task loadTask = Task.Run(async () =>
         {
             for (int i = 0; i < 10 && !cts.IsCancellationRequested; i++)
             {
                 await storage.LoadRecentAsync(10);
-                await Task.Delay(50);
+                await Task.Delay(50, cts.Token);
             }
-        });
+        }, cts.Token);
 
         // If we reach here without timeout, no deadlock occurred
         await Task.WhenAll(saveTask, loadTask);

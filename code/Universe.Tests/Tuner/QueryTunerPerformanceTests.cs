@@ -3,7 +3,6 @@ using Universe.Builder.Strategies;
 using Universe.Builder.Strategies.Storage;
 using Universe.Tests.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Universe.Tests.Tuner;
 
@@ -206,7 +205,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
         // Measure InMemory startup
         Stopwatch sw = Stopwatch.StartNew();
         using QueryTuner inMemoryTuner = new QueryTuner();
-        await Task.Delay(100); // Give async loading a chance
+        await Task.Delay(100, TestContext.Current.CancellationToken); // Give async loading a chance
         QueryTuningRecommendations inMemoryRec = inMemoryTuner.GetRecommendations(QueryType.Simple);
         sw.Stop();
         TimeSpan inMemoryTime = sw.Elapsed;
@@ -225,7 +224,7 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
             {
                 sqliteRec = sqliteTuner.GetRecommendations(QueryType.Simple);
                 if (sqliteRec.IsDataDriven) break;
-                await Task.Delay(100);
+                await Task.Delay(100, TestContext.Current.CancellationToken);
             }
             sw.Stop();
             sqliteTime = sw.Elapsed;

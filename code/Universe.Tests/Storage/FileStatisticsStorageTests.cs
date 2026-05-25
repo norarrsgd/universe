@@ -3,7 +3,6 @@ using Universe.Builder.Strategies;
 using Universe.Builder.Strategies.Storage;
 using Universe.Tests.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Universe.Tests.Storage;
 
@@ -95,7 +94,7 @@ public sealed class FileStatisticsStorageTests : IDisposable
     public async Task CorruptJson_RecoversGracefully()
     {
         // Write corrupt JSON directly to the file
-        await File.WriteAllTextAsync(_filePath, "{ this is not valid json [[[");
+        await File.WriteAllTextAsync(_filePath, "{ this is not valid json [[[", TestContext.Current.CancellationToken);
 
         // LoadRecentAsync should return empty (not throw)
         IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(10);

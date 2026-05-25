@@ -360,7 +360,7 @@ public sealed class QueryTunerTests
         {
             rec = tuner.GetRecommendations(QueryType.Simple);
             if (rec.IsDataDriven) break;
-            await Task.Delay(100);
+            await Task.Delay(100, TestContext.Current.CancellationToken);
         }
 
         Assert.True(rec.IsDataDriven,
