@@ -69,10 +69,10 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("Ensuring sample data with rich text content exists...");
 
         // Check if data already exists
-        (Gravity checkGravity, IList<MyObject> existingData) = await galaxy.List(
-            clusters: [],
-            columnOptions: new(Names: [nameof(MyObject.id).ToLowerCamelCase()], Top: 1)
-        );
+        (Gravity checkGravity, IList<MyObject> existingData) = await galaxy.Query()
+            .Select(nameof(MyObject.id).ToLowerCamelCase())
+            .Top(1)
+            .ToListAsync();
 
         ruUsed += checkGravity.RU;
 
@@ -103,16 +103,14 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("1. Basic Full-Text Contains Search");
         Console.WriteLine("Searching for products with 'machine learning' in the name...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), "machine learning", Operator: Q.Operator.FTContains)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c.FTContains(nameof(MyObject.Name).ToLowerCamelCase(), "machine learning"))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -128,16 +126,14 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("2. Full-Text Search with Relevance Scoring");
         Console.WriteLine("Ranking products by relevance to 'artificial intelligence'...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 5)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(5)
+            .Cluster(c => c.FTScore(nameof(MyObject.Description).ToLowerCamelCase(), ["artificial", "intelligence"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -153,17 +149,16 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("3. Multi-Field Full-Text Search with RRF");
         Console.WriteLine("Searching 'machine learning' in name and 'neural networks' in description with RRF...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "neural", "networks" }, Operator: Q.Operator.FTScore)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .FTScore(nameof(MyObject.Name).ToLowerCamelCase(), ["machine", "learning"])
+                .FTScore(nameof(MyObject.Description).ToLowerCamelCase(), ["neural", "networks"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -179,21 +174,17 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("4. Weighted Multi-Field Full-Text Search");
         Console.WriteLine("Searching with 80% weight on name, 20% weight on description...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "deep", "learning" }, Operator: Q.Operator.FTScore)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10),
-            sorting:
-            [
-                new(Column: "[0.8, 0.2]", Direction: Sorting.Direction.WEIGHTED)
-            ]
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .FTScore(nameof(MyObject.Name).ToLowerCamelCase(), ["machine", "learning"])
+                .FTScore(nameof(MyObject.Description).ToLowerCamelCase(), ["deep", "learning"]))
+            .WithWeights("[0.8, 0.2]")
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -209,16 +200,14 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("5. Full-Text Contains All Terms");
         Console.WriteLine("Finding products where description contains ALL terms: machine, learning, algorithms...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "machine", "learning", "algorithms" }, Operator: Q.Operator.FTContainsAll)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c.FTContainsAll(nameof(MyObject.Description).ToLowerCamelCase(), ["machine", "learning", "algorithms"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -234,17 +223,16 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("6. Full-Text Contains Any Terms");
         Console.WriteLine("Finding products in Electronics category with ANY of: AI, ML, DL, NLP...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "AI", "ML", "DL", "NLP" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase()], Top: 15)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase())
+            .Top(15)
+            .Cluster(c => c
+                .Eq(nameof(MyObject.Category).ToLowerCamelCase(), "Electronics")
+                .And().FTContainsAny(nameof(MyObject.Description).ToLowerCamelCase(), ["AI", "ML", "DL", "NLP"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -260,17 +248,16 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("7. Negated Full-Text Search");
         Console.WriteLine("Finding products NOT containing 'deprecated' in description and NOT containing 'obsolete' or 'legacy' in name...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), "deprecated", Operator: Q.Operator.NotFTContains),
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "obsolete", "legacy" }, Operator: Q.Operator.NotFTContainsAny, Where: Q.Where.And)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .NotFTContains(nameof(MyObject.Description).ToLowerCamelCase(), "deprecated")
+                .And().NotFTContainsAny(nameof(MyObject.Name).ToLowerCamelCase(), ["obsolete", "legacy"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -286,23 +273,18 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("8. Hybrid Search: Full-Text + Traditional Filters");
         Console.WriteLine("Full-text search for 'machine learning' with price filter and category filter...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-				// Full-text search cluster
-				new(Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
-                ]),
-				// Traditional filter cluster
-				new(Where: Q.Where.And, Catalysts:
-                [
-                    new(nameof(MyObject.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), 1000.0, Operator: Q.Operator.Lt)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase(), nameof(MyObject.Price).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase(),
+                nameof(MyObject.Price).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c.FTScore(nameof(MyObject.Description).ToLowerCamelCase(), ["machine", "learning"]))
+            .Cluster(c => c
+                .Eq(nameof(MyObject.Category).ToLowerCamelCase(), "Electronics")
+                .And().Lt(nameof(MyObject.Price).ToLowerCamelCase(), 1000.0))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -318,23 +300,18 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("9. Complex Multi-Cluster Full-Text Search");
         Console.WriteLine("Primary search for 'artificial intelligence' in name, secondary search for ML terms in description or category...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-				// Primary content search
-				new(Catalysts:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
-                ]),
-				// Secondary content search
-				new(Where: Q.Where.And, Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTContainsAny),
-                    new(nameof(MyObject.Category).ToLowerCamelCase(), new[] { "AI", "ML" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.Or)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase()], Top: 20)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase())
+            .Top(20)
+            .Cluster(c => c.FTScore(nameof(MyObject.Name).ToLowerCamelCase(), ["artificial", "intelligence"]))
+            .Cluster(c => c
+                .FTContainsAny(nameof(MyObject.Description).ToLowerCamelCase(), ["machine", "learning"])
+                .Or().FTContainsAny(nameof(MyObject.Category).ToLowerCamelCase(), ["AI", "ML"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);
@@ -350,22 +327,11 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("10. Full-Text Search with Aggregation");
         Console.WriteLine("Group by category and count products containing 'technology' or 'innovation'...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "technology", "innovation" }, Operator: Q.Operator.FTContainsAny)
-                ])
-            ],
-            columnOptions: new(
-                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
-                Aggregates:
-                [
-                    new(nameof(MyObject.id).ToLowerCamelCase(), Aggregate: Q.Aggregate.Count)
-                ]
-            )
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(nameof(MyObject.Category).ToLowerCamelCase())
+            .Aggregate(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
+            .Cluster(c => c.FTContainsAny(nameof(MyObject.Description).ToLowerCamelCase(), ["technology", "innovation"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         Console.WriteLine($"RU Spent: {gravity.RU}");
@@ -403,17 +369,16 @@ public class Example10_FullTextSearch(IGalaxy<MyObject> galaxy)
         Console.WriteLine("11. Boolean Full-Text Logic");
         Console.WriteLine("Must contain 'machine learning' AND any of the AI-related terms...\n");
 
-        (Gravity gravity, IList<MyObject> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), "machine learning", Operator: Q.Operator.FTContains),
-                    new(nameof(MyObject.Description).ToLowerCamelCase(), new[] { "AI", "artificial intelligence", "neural" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.Code).ToLowerCamelCase(), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.Code).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .FTContains(nameof(MyObject.Description).ToLowerCamelCase(), "machine learning")
+                .And().FTContainsAny(nameof(MyObject.Description).ToLowerCamelCase(), ["AI", "artificial intelligence", "neural"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintQueryResults(gravity, results);

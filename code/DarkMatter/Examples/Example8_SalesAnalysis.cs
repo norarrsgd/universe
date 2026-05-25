@@ -23,18 +23,12 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
 
         // Run an analysis query: Sales by Region
         Console.WriteLine("\nSales Analysis by Region:");
-        (Gravity g8b, IList<MyObjectAggregation> resultsByRegion) = await galaxy.List<MyObjectAggregation>(
-            clusters: null,
-            columnOptions: new(
-                Names: [nameof(MyObject.Category) /* represents Region in this example */],
-                Aggregates:
-                [
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
-                ]
-            )
-        );
+        (Gravity g8b, IList<MyObjectAggregation> resultsByRegion) = await galaxy.Query()
+            .Select(nameof(MyObject.Category) /* represents Region in this example */)
+            .Aggregate(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
+            .ToListAsync<MyObjectAggregation>();
 
         PrintQueryResults(g8b, resultsByRegion);
 
@@ -42,48 +36,27 @@ public class Example8_SalesAnalysis(IGalaxy<MyObject> galaxy) : ExampleBase(gala
         Console.WriteLine("\nSales Analysis by Recency:");
 
         // First, recent sales (last 7 days)
-        (Gravity g8c, IList<MyObjectAggregation> recentSales) = await galaxy.List<MyObjectAggregation>(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-7), Operator: Q.Operator.Gte)
-                ])
-            ],
-            columnOptions: new(
-                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
-                Aggregates:
-                [
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
-                ]
-            )
-        );
+        (Gravity g8c, IList<MyObjectAggregation> recentSales) = await galaxy.Query()
+            .Select(nameof(MyObject.Category).ToLowerCamelCase())
+            .Aggregate(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
+            .Cluster(c => c.Gte(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-7)))
+            .ToListAsync<MyObjectAggregation>();
 
         Console.WriteLine("Recent Sales (Last 7 days):");
         PrintQueryResults(g8c, recentSales);
 
         // Then, older sales
-        (Gravity g8d, IList<MyObject> olderSales) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-7), Operator: Q.Operator.Lt),
-                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And)
-                ])
-            ],
-            columnOptions: new(
-                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
-                Aggregates:
-                [
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
-                ]
-            )
-        );
+        (Gravity g8d, IList<MyObject> olderSales) = await galaxy.Query()
+            .Select(nameof(MyObject.Category).ToLowerCamelCase())
+            .Aggregate(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
+            .Cluster(c => c
+                .Lt(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-7))
+                .And().Gte(nameof(MyObject.AddedOn).ToLowerCamelCase(), today.AddDays(-30)))
+            .ToListAsync();
 
         Console.WriteLine("Older Sales (7-30 days ago):");
         PrintQueryResults(g8d, olderSales);

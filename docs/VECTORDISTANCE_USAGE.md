@@ -4,11 +4,11 @@ This document demonstrates how to use **VectorDistance** functionality with the 
 
 ## Overview
 
-The Universe library supports vector similarity search through the `Q.Operator.VectorDistance` operator, which leverages Azure Cosmos DB's built-in vector search capabilities.
+The Universe library supports vector similarity search through the fluent `.VectorDistance(...)` query operator, which leverages Azure Cosmos DB's built-in vector search capabilities.
 
 ## Key Requirements
 
-1. **TOP clause is mandatory** - Vector searches require a `Top` value in `ColumnOptions`
+1. **TOP clause is mandatory** - Vector searches require `.Top(...)` in the fluent query chain
 2. **Vector format** - Values must be `float[]` arrays with finite numbers
 3. **Container setup** - Your Cosmos DB container must have vector indexing configured
 4. **No traditional sorting** - Cannot combine `VectorDistance` with regular `ORDER BY` clauses
@@ -21,12 +21,10 @@ The Universe library supports vector similarity search through the `Q.Operator.V
 Make sure to initialize your Cosmos DB client and create a vector repository:
 
 ```csharp
-MyRepoVector vectorGalaxy = new(
-    client: cosmosClient,
-    database: "test-database",
-    container: "vector-container",
-    partitionKey: typeof(MyObjectVector).BuildPartitionKey()
-);
+using Universe.Extensions;
+using Universe.Interfaces;
+
+IGalaxy<MyObjectWithVector> galaxy = ...;
 ```
 
 ### Single Vector Search
@@ -34,14 +32,11 @@ MyRepoVector vectorGalaxy = new(
 // Input
 float[] queryVector = [0.1f, 0.8f, 0.3f, 0.9f, 0.2f];
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new(nameof(MyObjectWithVector.DescriptionEmbedding), queryVector, Operator: Q.Operator.VectorDistance)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "name"], Top: 5)
-);
+(Gravity gravity, IList<MyObjectWithVector> results) = await galaxy.Query()
+    .Select("id", "name")
+    .Top(5)
+    .Cluster(c => c.VectorDistance(nameof(MyObjectWithVector.DescriptionEmbedding), queryVector))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -57,15 +52,13 @@ ORDER BY VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding)
 float[] titleVector = [0.2f, 0.9f, 0.1f, 0.8f];
 float[] descVector = [0.3f, 0.7f, 0.2f, 0.9f];
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new(nameof(MyObjectWithVector.TitleEmbedding), titleVector, Operator: Q.Operator.VectorDistance),
-            new(nameof(MyObjectWithVector.DescriptionEmbedding), descVector, Operator: Q.Operator.VectorDistance)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "name"], Top: 3)
-);
+(Gravity gravity, IList<MyObjectWithVector> results) = await galaxy.Query()
+    .Select("id", "name")
+    .Top(3)
+    .Cluster(c => c
+        .VectorDistance(nameof(MyObjectWithVector.TitleEmbedding), titleVector)
+        .VectorDistance(nameof(MyObjectWithVector.DescriptionEmbedding), descVector))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -83,18 +76,14 @@ ORDER BY RANK RRF(VectorDistance(c.TitleEmbedding, @TitleEmbedding), VectorDista
 float[] titleVector = [0.2f, 0.9f, 0.1f, 0.8f];
 float[] descVector = [0.3f, 0.7f, 0.2f, 0.9f];
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new(nameof(MyObjectWithVector.TitleEmbedding), titleVector, Operator: Q.Operator.VectorDistance),
-            new(nameof(MyObjectWithVector.DescriptionEmbedding), descVector, Operator: Q.Operator.VectorDistance)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "name"], Top: 3),
-    sorting: [
-        new(Column: "[1, 2]", Direction: Sorting.Direction.WEIGHTED)
-    ]
-);
+(Gravity gravity, IList<MyObjectWithVector> results) = await galaxy.Query()
+    .Select("id", "name")
+    .Top(3)
+    .Cluster(c => c
+        .VectorDistance(nameof(MyObjectWithVector.TitleEmbedding), titleVector)
+        .VectorDistance(nameof(MyObjectWithVector.DescriptionEmbedding), descVector))
+    .WithWeights("[1, 2]")
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -111,20 +100,14 @@ ORDER BY RANK RRF(VectorDistance(c.TitleEmbedding, @TitleEmbedding), VectorDista
 // Input  
 float[] queryVector = [0.4f, 0.6f, 0.8f, 0.2f];
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        // Vector similarity
-        new(Catalysts: [
-            new(nameof(MyObjectWithVector.DescriptionEmbedding), queryVector, Operator: Q.Operator.VectorDistance)
-        ]),
-        // Traditional filters
-        new(Where: Q.Where.And, Catalysts: [
-            new(nameof(MyObjectWithVector.Category), "Electronics", Operator: Q.Operator.Eq),
-            new(nameof(MyObjectWithVector.Price), 1000.0, Operator: Q.Operator.Lt)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "name", "price"], Top: 5)
-);
+(Gravity gravity, IList<MyObjectWithVector> results) = await galaxy.Query()
+    .Select("id", "name", "price")
+    .Top(5)
+    .Cluster(c => c.VectorDistance(nameof(MyObjectWithVector.DescriptionEmbedding), queryVector))
+    .Cluster(c => c
+        .Eq(nameof(MyObjectWithVector.Category), "Electronics")
+        .And().Lt(nameof(MyObjectWithVector.Price), 1000.0))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -136,12 +119,12 @@ ORDER BY VectorDistance(c.DescriptionEmbedding, @DescriptionEmbedding)
 ```
 
 ### Validation Rules
-- VectorDistance requires `columnOptions.Top > 0`
+- VectorDistance requires `.Top(...)`
 - Cannot combine VectorDistance with regular sorting (scalar fields)
 - Vector values must be non-empty `float[]` with finite numbers
-- Each Catalyst must have unique Column+Operator combination
-- Only one `Sorting.Direction.WEIGHTED` option is allowed per query
-- Weight values must be formatted as bracketed arrays (e.g., `"[0.8, 1.2]"`)
+- Each rank condition must use a unique column/operator combination
+- Only one `.WithWeights(...)` option is allowed per query
+- Weight values passed to `.WithWeights(...)` must be formatted as bracketed arrays (e.g., `"[0.8, 1.2]"`)
 - Weighted sorting only works with multiple VectorDistance operators (RRF scenarios)
 
 ## Sample Data Model
@@ -198,10 +181,10 @@ Your Azure Cosmos DB container needs vector indexing configured:
 ## Error Handling
 
 Common errors and solutions:
-- **"Top value required"**: Always specify `Top` in `ColumnOptions` for VectorDistance
+- **"Top value required"**: Always specify `.Top(...)` for VectorDistance
 - **"Invalid vector"**: Ensure vectors are non-empty `float[]` with finite values
 - **"Sorting not supported"**: Don't mix VectorDistance with manual sorting
-- **"Duplicate catalysts"**: Ensure unique Column+Operator combinations per cluster
+- **"Duplicate catalysts"**: Ensure unique column/operator combinations inside each fluent `.Cluster(...)`
 
 ## Limitations
 

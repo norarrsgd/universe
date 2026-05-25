@@ -14,16 +14,10 @@ public class Example12_QueryGeneration(IGalaxy<MyObject> galaxy) : ExampleBase(g
 
         // Example 1: Generate a simple query
         Console.WriteLine("1. Generating Simple Query:");
-        Gravity simpleQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Code), Value: "%SAMPLE_CODE%", Operator: Q.Operator.Like)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.id), nameof(MyObject.Name).ToLowerCamelCase()])
-        );
+        Gravity simpleQuery = galaxy.Query()
+            .Select(nameof(MyObject.id), nameof(MyObject.Name).ToLowerCamelCase())
+            .Cluster(c => c.Like(nameof(MyObject.Code), "%SAMPLE_CODE%"))
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {simpleQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", simpleQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");
@@ -31,36 +25,22 @@ public class Example12_QueryGeneration(IGalaxy<MyObject> galaxy) : ExampleBase(g
 
         // Example 2: Generate a complex query with aggregations
         Console.WriteLine("2. Generating Query with Aggregations:");
-        Gravity aggregateQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Links), Value: "active", Operator: Q.Operator.In),
-                    new(Column: nameof(MyObject.Name), Operator: Q.Operator.Defined, Where: Q.Where.And)
-                ])
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObject.Category).ToLowerCamelCase(),
-                    nameof(MyObject.Code).ToLowerCamelCase()
-                ],
-                Aggregates:
-                [
-                    new(nameof(MyObject.Price), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Price), Q.Aggregate.Avg),
-                    new("*", Q.Aggregate.Count)
-                ],
-                IsDistinct: false,
-                Top: 50
-            ),
-            sorting:
-            [
-                new(nameof(MyObject.Category).ToLowerCamelCase(), Sorting.Direction.ASC)
-            ],
-            group: [nameof(MyObject.Category).ToLowerCamelCase(), nameof(MyObject.Code).ToLowerCamelCase()]
-        );
+        Gravity aggregateQuery = galaxy.Query()
+            .Select(
+                nameof(MyObject.Category).ToLowerCamelCase(),
+                nameof(MyObject.Code).ToLowerCamelCase())
+            .Top(50)
+            .Aggregate(nameof(MyObject.Price), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.Price), Q.Aggregate.Avg)
+            .Aggregate("*", Q.Aggregate.Count)
+            .GroupBy(
+                nameof(MyObject.Category).ToLowerCamelCase(),
+                nameof(MyObject.Code).ToLowerCamelCase())
+            .Cluster(c => c
+                .In(nameof(MyObject.Links), "active")
+                .And().Defined(nameof(MyObject.Name)))
+            .OrderBy(nameof(MyObject.Category).ToLowerCamelCase())
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {aggregateQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", aggregateQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");
@@ -68,36 +48,22 @@ public class Example12_QueryGeneration(IGalaxy<MyObject> galaxy) : ExampleBase(g
 
         // Example 3: Generate a filtered query with sorting
         Console.WriteLine("3. Generating Filtered Query with Sorting:");
-        Gravity filteredQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Price), Value: 100.0, Operator: Q.Operator.Gte),
-                    new(Column: nameof(MyObject.AddedOn), Value: DateTime.Now.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And)
-                ], Where: Q.Where.And),
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Description), Operator: Q.Operator.Defined)
-                ], Where: Q.Where.Or)
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObject.id),
-                    nameof(MyObject.Name).ToLowerCamelCase(),
-                    nameof(MyObject.Price).ToLowerCamelCase(),
-                    nameof(MyObject.Category).ToLowerCamelCase()
-                ],
-                IsDistinct: true,
-                Top: 25
-            ),
-            sorting:
-            [
-                new(nameof(MyObject.Price).ToLowerCamelCase(), Sorting.Direction.DESC),
-                new(nameof(MyObject.Name).ToLowerCamelCase(), Sorting.Direction.ASC)
-            ]
-        );
+        Gravity filteredQuery = galaxy.Query()
+            .Select(
+                nameof(MyObject.id),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Price).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase())
+            .Distinct()
+            .Top(25)
+            .Cluster(c => c
+                .Gte(nameof(MyObject.Price), 100.0)
+                .And().Gte(nameof(MyObject.AddedOn), DateTime.Now.AddDays(-30)))
+            .Or()
+            .Cluster(c => c.Defined(nameof(MyObject.Description)))
+            .OrderByDescending(nameof(MyObject.Price).ToLowerCamelCase())
+            .OrderBy(nameof(MyObject.Name).ToLowerCamelCase())
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {filteredQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", filteredQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");
@@ -105,28 +71,16 @@ public class Example12_QueryGeneration(IGalaxy<MyObject> galaxy) : ExampleBase(g
 
         // Example 4: Generate a query with array joins
         Console.WriteLine("4. Generating Query with Array Joins:");
-        Gravity joinQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Category), Value: "%Electronics%", Operator: Q.Operator.Like)
-                ])
-            ],
-            columnOptions: new(
-                Names: [nameof(MyObject.id), nameof(MyObject.Name).ToLowerCamelCase()],
-                Join: new(
-                    ArrayPath: nameof(MyObject.Links).ToLowerCamelCase(),
-                    Alias: "link",
-                    Columns: ["url", "type"],
-                    Aggregates:
-                    [
-                        new("*", Q.Aggregate.Count)
-                    ]
-                ),
-                Top: 10
-            )
-        );
+        Gravity joinQuery = galaxy.Query()
+            .Select(nameof(MyObject.id), nameof(MyObject.Name).ToLowerCamelCase())
+            .Top(10)
+            .Join(
+                arrayPath: nameof(MyObject.Links).ToLowerCamelCase(),
+                alias: "link",
+                columns: ["url", "type"],
+                aggregates: [new("*", Q.Aggregate.Count)])
+            .Cluster(c => c.Like(nameof(MyObject.Category), "%Electronics%"))
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {joinQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", joinQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");

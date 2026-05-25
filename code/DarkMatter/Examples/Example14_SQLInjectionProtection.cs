@@ -65,16 +65,10 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.Paged(
-                page: new(10),
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new("name\"; DROP TABLE c; --", "<VALUE>", Operator: Q.Operator.Eq)
-                    ])
-                ]
-            );
+            _ = await galaxy.Query()
+                .Paged(10)
+                .Cluster(c => c.Eq("name\"; DROP TABLE c; --", "<VALUE>"))
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -90,16 +84,10 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.Paged(
-                page: new(10),
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Code), "<VALUE>", Alias: "c] OR 1=1 --", Operator: Q.Operator.Eq)
-                    ])
-                ]
-            );
+            _ = await galaxy.Query()
+                .Paged(10)
+                .Cluster(c => c.Eq(nameof(MyObject.Code), "<VALUE>", alias: "c] OR 1=1 --"))
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -115,20 +103,11 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.Paged(
-                page: new(10),
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Code), "<VALUE>", Operator: Q.Operator.Eq)
-                    ])
-                ],
-                sorting:
-                [
-                    new("code; DELETE FROM c; --")
-                ]
-            );
+            _ = await galaxy.Query()
+                .Paged(10)
+                .Cluster(c => c.Eq(nameof(MyObject.Code), "<VALUE>"))
+                .OrderBy("code; DELETE FROM c; --")
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -144,23 +123,12 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.List(
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Code), "<VALUE>", Operator: Q.Operator.Eq)
-                    ])
-                ],
-                columnOptions: new(
-                    Aggregates:
-                    [
-                        new(nameof(MyObject.Name), Q.Aggregate.Count)
-                    ],
-                    Names: [nameof(MyObject.Name)]
-                ),
-                group: ["name\"], [c.id"]
-            );
+            _ = await galaxy.Query()
+                .Select(nameof(MyObject.Name))
+                .Aggregate(nameof(MyObject.Name), Q.Aggregate.Count)
+                .GroupBy("name\"], [c.id")
+                .Cluster(c => c.Eq(nameof(MyObject.Code), "<VALUE>"))
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -176,24 +144,12 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.Paged(
-                page: new(10),
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Code), "<VALUE>", Operator: Q.Operator.Eq)
-                    ])
-                ],
-                columnOptions: new(
-                    Names: [nameof(MyObject.Code)],
-                    Join: new(
-                        "items] OR 1=1 --",
-                        "relatedItems",
-                        null
-                    )
-                )
-            );
+            _ = await galaxy.Query()
+                .Select(nameof(MyObject.Code))
+                .Paged(10)
+                .Join(arrayPath: "relatedItems", alias: "items] OR 1=1 --")
+                .Cluster(c => c.Eq(nameof(MyObject.Code), "<VALUE>"))
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -209,16 +165,10 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.Paged(
-                page: new(10),
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new("code -- SELECT * FROM c", "<VALUE>", Operator: Q.Operator.Eq)
-                    ])
-                ]
-            );
+            _ = await galaxy.Query()
+                .Paged(10)
+                .Cluster(c => c.Eq("code -- SELECT * FROM c", "<VALUE>"))
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -234,28 +184,15 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            (Gravity g, IList<MyObject> results) = await galaxy.Paged(
-                page: new(10),
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Name), Operator: Q.Operator.Defined)
-                    ])
-                ],
-                columnOptions: new(
-                    Names:
-                    [
-                        nameof(MyObject.id),
-                        nameof(MyObject.Code).ToLowerCamelCase(),
-                        nameof(MyObject.Name).ToLowerCamelCase()
-                    ]
-                ),
-                sorting:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase())
-                ]
-            );
+            (Gravity g, IList<MyObject> results) = await galaxy.Query()
+                .Select(
+                    nameof(MyObject.id),
+                    nameof(MyObject.Code).ToLowerCamelCase(),
+                    nameof(MyObject.Name).ToLowerCamelCase())
+                .Paged(10)
+                .Cluster(c => c.Defined(nameof(MyObject.Name)))
+                .OrderBy(nameof(MyObject.Name).ToLowerCamelCase())
+                .ToListAsync();
 
             ruUsed += g.RU;
             Console.WriteLine("SUCCESS: Query executed successfully!\n");
@@ -274,19 +211,11 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.List(
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Name), new[] { "test') OR ('1'='1" }, Operator: Q.Operator.FTScore)
-                    ])
-                ],
-                columnOptions: new(
-                    Top: 10,
-                    Names: [nameof(MyObject.Name)]
-                )
-            );
+            _ = await galaxy.Query()
+                .Select(nameof(MyObject.Name))
+                .Top(10)
+                .Cluster(c => c.FTScore(nameof(MyObject.Name), ["test') OR ('1'='1"]))
+                .ToListAsync();
             Console.WriteLine("Query executed (values are parameterized, injection payload treated as literal text).\n");
         }
         catch (UniverseException ex)
@@ -306,26 +235,14 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            // Construct a sorting option with WEIGHTED direction and a malicious weight value.
-            // This simulates what Orbit.WithWeights() produces internally.
-            Sorting.Option maliciousWeight = new("0.7], COUNT(*) AS total --", Sorting.Direction.WEIGHTED);
-
-            // SanitizeInputs validates weight values before any query execution or Cosmos DB call
-            _ = await galaxy.List(
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Name), new[] { "test" }, Operator: Q.Operator.FTScore),
-                        new(nameof(MyObject.Name), new[] { "test2" }, Operator: Q.Operator.FTScore)
-                    ])
-                ],
-                columnOptions: new(
-                    Top: 10,
-                    Names: [nameof(MyObject.Name)]
-                ),
-                sorting: [maliciousWeight]
-            );
+            _ = await galaxy.Query()
+                .Select(nameof(MyObject.Name))
+                .Top(10)
+                .Cluster(c => c
+                    .FTScore(nameof(MyObject.Name), ["test"])
+                    .FTScore(nameof(MyObject.Name), ["test2"]))
+                .WithWeights("0.7], COUNT(*) AS total --")
+                .ToListAsync();
             Console.WriteLine("FAILED: Injection was not blocked!\n");
         }
         catch (UniverseException ex)
@@ -341,20 +258,13 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
 
         try
         {
-            _ = await galaxy.List(
-                clusters:
-                [
-                    new(Catalysts:
-                    [
-                        new(nameof(MyObject.Name), new[] { "test'); DROP TABLE c; --" }, Operator: Q.Operator.FTScore),
-                        new(nameof(MyObject.Name), new[] { "safe value" }, Operator: Q.Operator.FTScore)
-                    ])
-                ],
-                columnOptions: new(
-                    Top: 10,
-                    Names: [nameof(MyObject.Name)]
-                )
-            );
+            _ = await galaxy.Query()
+                .Select(nameof(MyObject.Name))
+                .Top(10)
+                .Cluster(c => c
+                    .FTScore(nameof(MyObject.Name), ["test'); DROP TABLE c; --"])
+                    .FTScore(nameof(MyObject.Name), ["safe value"]))
+                .ToListAsync();
             Console.WriteLine("Query executed (values are parameterized, injection payload treated as literal text).\n");
         }
         catch (UniverseException ex)
@@ -367,4 +277,3 @@ public class Example14_SqlInjectionProtection(IGalaxy<MyObject> galaxy) : Exampl
         }
     }
 }
-

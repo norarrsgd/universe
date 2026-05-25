@@ -29,17 +29,12 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
             MaxConcurrency: Environment.ProcessorCount
         );
 
-        (Gravity gravity1, IList<MyObjectVector> results1) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.Category), "Electronics", Operator: Q.Operator.Eq)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Name), nameof(MyObjectVector.Price)], Top: 10),
-            hints: hints
-        );
+        (Gravity gravity1, IList<MyObjectVector> results1) = await galaxy.Query()
+            .Select(nameof(MyObjectVector.Name), nameof(MyObjectVector.Price))
+            .Top(10)
+            .Cluster(c => c.Eq(nameof(MyObjectVector.Category), "Electronics"))
+            .WithHints(hints)
+            .ToListAsync();
 
         totalRU += gravity1.RU;
         Console.WriteLine($"RU Used: {gravity1.RU:F2}");
@@ -54,18 +49,14 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
             MaxConcurrency: 1
         );
 
-        (Gravity gravity2, IList<MyObjectVector> results2) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.Price), 1000.0, Operator: Q.Operator.Lt),
-                    new(nameof(MyObjectVector.Category), "Electronics", Operator: Q.Operator.Eq)
-                ], Where: Q.Where.And)
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Name), nameof(MyObjectVector.Price)], Top: 10),
-            hints: gatewayHints
-        );
+        (Gravity gravity2, IList<MyObjectVector> results2) = await galaxy.Query()
+            .Select(nameof(MyObjectVector.Name), nameof(MyObjectVector.Price))
+            .Top(10)
+            .Cluster(c => c
+                .Lt(nameof(MyObjectVector.Price), 1000.0)
+                .And().Eq(nameof(MyObjectVector.Category), "Electronics"))
+            .WithHints(gatewayHints)
+            .ToListAsync();
 
         totalRU += gravity2.RU;
         Console.WriteLine($"RU Used: {gravity2.RU:F2}");
@@ -82,17 +73,12 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
 
         float[] searchVector = [.. Enumerable.Range(1, 1536).Select(i => (float)Math.Sin(i * 0.1))];
 
-        (Gravity gravity3, IList<MyObjectVector> results3) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.TitleEmbedding), searchVector, Operator: Q.Operator.VectorDistance)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Name), nameof(MyObjectVector.Description)], Top: 5),
-            hints: vectorHints
-        );
+        (Gravity gravity3, IList<MyObjectVector> results3) = await galaxy.Query()
+            .Select(nameof(MyObjectVector.Name), nameof(MyObjectVector.Description))
+            .Top(5)
+            .Cluster(c => c.VectorDistance(nameof(MyObjectVector.TitleEmbedding), searchVector))
+            .WithHints(vectorHints)
+            .ToListAsync();
 
         totalRU += gravity3.RU;
         Console.WriteLine($"RU Used: {gravity3.RU:F2}");
@@ -141,21 +127,13 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
             MaxConcurrency: 2
         );
 
-        (Gravity gravity5, IList<MyObjectVector> results5) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq)
-                ])
-            ],
-            columnOptions: new(
-                Names: [nameof(MyObjectVector.Category).ToLowerCamelCase()],
-                Aggregates: [new(nameof(MyObjectVector.Category).ToLowerCamelCase(), Q.Aggregate.Count)]
-            ),
-            group: [nameof(MyObjectVector.Category).ToLowerCamelCase()],
-            hints: aggregationHints
-        );
+        (Gravity gravity5, IList<MyObjectVector> results5) = await galaxy.Query()
+            .Select(nameof(MyObjectVector.Category).ToLowerCamelCase())
+            .Aggregate(nameof(MyObjectVector.Category).ToLowerCamelCase(), Q.Aggregate.Count)
+            .GroupBy(nameof(MyObjectVector.Category).ToLowerCamelCase())
+            .Cluster(c => c.Eq(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics"))
+            .WithHints(aggregationHints)
+            .ToListAsync();
 
         totalRU += gravity5.RU;
         Console.WriteLine($"RU Used: {gravity5.RU:F2}");
@@ -171,26 +149,26 @@ public class Example13_QueryOptimization(IGalaxy<MyObjectVector> vectorGalaxy)
 
         // Option 1: Default path (platform-aware)
         Console.WriteLine("   Option 1 - Default path (platform-aware):");
-        Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence();");
+        Console.WriteLine("   UniverseOptions options = UniverseOptions.WithSqlitePersistence();");
         UniverseOptions defaultOptions = UniverseOptions.WithSqlitePersistence();
         Console.WriteLine($"   Creates: universe-stats.db in app directory (locally) or temp directory (on Azure)");
         Console.WriteLine();
 
         // Option 2: Custom path
         Console.WriteLine("   Option 2 - Custom path:");
-        Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence(\"/path/to/stats.db\");");
+        Console.WriteLine("   UniverseOptions options = UniverseOptions.WithSqlitePersistence(\"/path/to/stats.db\");");
         Console.WriteLine();
 
         // Option 3: With retention policy
         Console.WriteLine("   Option 3 - With retention policy:");
-        Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence(retentionDays: 14);");
+        Console.WriteLine("   UniverseOptions options = UniverseOptions.WithSqlitePersistence(retentionDays: 14);");
         UniverseOptions retentionOptions = UniverseOptions.WithSqlitePersistence(retentionDays: 14);
         Console.WriteLine($"   Keeps statistics for 14 days before auto-cleanup");
         Console.WriteLine();
 
         // Option 4: Full configuration
         Console.WriteLine("   Option 4 - Full configuration:");
-        Console.WriteLine("   var options = UniverseOptions.WithSqlitePersistence(");
+        Console.WriteLine("   UniverseOptions options = UniverseOptions.WithSqlitePersistence(");
         Console.WriteLine("       path: \"/data/cosmos-stats.db\",");
         Console.WriteLine("       retentionDays: 30,");
         Console.WriteLine("       batchSize: 20,");
