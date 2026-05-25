@@ -252,6 +252,9 @@ public sealed class QueryTunerPerformanceTests(ITestOutputHelper output)
 
         string directory = Path.GetDirectoryName(fullPath)!;
         string fileName = Path.GetFileName(fullPath);
+        if (!Directory.Exists(directory))
+            return;
+
         HashSet<string> allowedNames = new HashSet<string>(StringComparer.Ordinal)
         {
             fileName,
