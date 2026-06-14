@@ -23,15 +23,9 @@ public class Example5_SingleItemOperations(IGalaxy<MyObject> galaxy) : ExampleBa
         Console.WriteLine($"Retrieved item: {retrievedObject.Name}, RU: {g5b.RU}");
 
         // Get the item by custom filter
-        (Gravity g5c, MyObject filteredObject) = await galaxy.Get(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), newObject.Name)
-                ])
-            ]
-        );
+        (Gravity g5c, MyObject filteredObject) = await galaxy.Query()
+            .Cluster(c => c.Eq(nameof(MyObject.Name).ToLowerCamelCase(), newObject.Name))
+            .GetAsync();
         Console.WriteLine($"Filtered item: {filteredObject.Name}, RU: {g5c.RU}");
 
         // Update the item

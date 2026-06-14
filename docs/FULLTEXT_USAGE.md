@@ -6,10 +6,10 @@ This document demonstrates how to use **Full-Text Search** functionality with th
 
 The Universe library supports comprehensive full-text search through various operators that leverage Azure Cosmos DB's built-in full-text search capabilities:
 
-- `Q.Operator.FTContains` - Search for text within a field
-- `Q.Operator.FTContainsAll` - All terms must be present
-- `Q.Operator.FTContainsAny` - Any of the terms must be present
-- `Q.Operator.FTScore` - Relevance scoring for ranking results
+- `.FTContains(...)` - Search for text within a field
+- `.FTContainsAll(...)` - All terms must be present
+- `.FTContainsAny(...)` - Any of the terms must be present
+- `.FTScore(...)` - Relevance scoring for ranking results
 
 ## Key Features
 
@@ -27,25 +27,20 @@ The Universe library supports comprehensive full-text search through various ope
 Initialize your Cosmos DB client and repository:
 
 ```csharp
-MyRepo galaxy = new(
-    client: cosmosClient,
-    database: "test-database",
-    container: "documents-container",
-    partitionKey: typeof(MyObject).BuildPartitionKey()
-);
+using Universe.Extensions;
+using Universe.Interfaces;
+
+IGalaxy<ArticleDocument> galaxy = ...;
 ```
 
 ### Basic Full-Text Contains Search
 ```csharp
 // Input
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("title", "machine learning", Operator: Q.Operator.FTContains)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "description"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "description")
+    .Top(10)
+    .Cluster(c => c.FTContains("title", "machine learning"))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -58,14 +53,11 @@ WHERE (FullTextContains(c.title, @title))
 ### Full-Text Search with Relevance Scoring
 ```csharp
 // Input
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("content", new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "content"], Top: 5)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "content")
+    .Top(5)
+    .Cluster(c => c.FTScore("content", ["artificial", "intelligence"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -78,15 +70,13 @@ ORDER BY RANK FullTextScore(c.content, @content)
 ### Multi-Field Full-Text Search with RRF
 ```csharp
 // Input
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("title", new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-            new("description", new[] { "neural", "networks" }, Operator: Q.Operator.FTScore)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "description"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "description")
+    .Top(10)
+    .Cluster(c => c
+        .FTScore("title", ["machine", "learning"])
+        .FTScore("description", ["neural", "networks"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -99,18 +89,14 @@ ORDER BY RANK RRF(FullTextScore(c.title, @title), FullTextScore(c.description, @
 ### Weighted Multi-Field Full-Text Search
 ```csharp
 // Input
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("title", new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-            new("description", new[] { "deep", "learning" }, Operator: Q.Operator.FTScore)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "description"], Top: 10),
-    sorting: [
-        new(Column: "[0.8, 0.2]", Direction: Sorting.Direction.WEIGHTED)
-    ]
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "description")
+    .Top(10)
+    .Cluster(c => c
+        .FTScore("title", ["machine", "learning"])
+        .FTScore("description", ["deep", "learning"]))
+    .WithWeights("[0.8, 0.2]")
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -123,14 +109,11 @@ ORDER BY RANK RRF(FullTextScore(c.title, @title), FullTextScore(c.description, @
 ### Full-Text Contains All Terms
 ```csharp
 // Input - All specified terms must be present
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("content", new[] { "machine", "learning", "algorithms" }, Operator: Q.Operator.FTContainsAll)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "content"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "content")
+    .Top(10)
+    .Cluster(c => c.FTContainsAll("content", ["machine", "learning", "algorithms"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -143,14 +126,11 @@ WHERE (FullTextContainsAll(c.content, @content))
 ### Full-Text Contains Any Terms
 ```csharp
 // Input - Any of the specified terms can be present
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("tags", new[] { "AI", "ML", "DL", "NLP" }, Operator: Q.Operator.FTContainsAny)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "tags"], Top: 15)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "tags")
+    .Top(15)
+    .Cluster(c => c.FTContainsAny("tags", ["AI", "ML", "DL", "NLP"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -163,15 +143,13 @@ WHERE (FullTextContainsAny(c.tags, @tags))
 ### Negated Full-Text Search
 ```csharp
 // Input - Exclude documents containing specific terms
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("content", "deprecated", Operator: Q.Operator.NotFTContains),
-            new("title", new[] { "obsolete", "legacy" }, Operator: Q.Operator.NotFTContainsAny)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "content"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "content")
+    .Top(10)
+    .Cluster(c => c
+        .NotFTContains("content", "deprecated")
+        .And().NotFTContainsAny("title", ["obsolete", "legacy"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -184,21 +162,15 @@ WHERE (NOT FullTextContains(c.content, @content) AND NOT FullTextContainsAny(c.t
 ### Hybrid Search: Full-Text + Traditional Filters
 ```csharp
 // Input - Combine full-text search with regular filters
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        // Full-text search cluster
-        new(Catalysts: [
-            new("content", new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
-        ]),
-        // Traditional filter cluster
-        new(Where: Q.Where.And, Catalysts: [
-            new("category", "Technology", Operator: Q.Operator.Eq),
-            new("publishDate", DateTime.Now.AddDays(-30), Operator: Q.Operator.Gte),
-            new("status", "Published", Operator: Q.Operator.Eq)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "category", "publishDate"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "category", "publishDate")
+    .Top(10)
+    .Cluster(c => c.FTScore("content", ["machine", "learning"]))
+    .Cluster(c => c
+        .Eq("category", "Technology")
+        .And().Gte("publishDate", DateTime.Now.AddDays(-30))
+        .And().Eq("status", "Published"))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -212,20 +184,15 @@ ORDER BY RANK FullTextScore(c.content, @content)
 ### Complex Multi-Cluster Full-Text Search
 ```csharp
 // Input - Multiple search clusters with different criteria
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        // Primary content search
-        new(Catalysts: [
-            new("title", new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
-        ]),
-        // Secondary content search
-        new(Where: Q.Where.OR, Catalysts: [
-            new("description", new[] { "machine", "learning" }, Operator: Q.Operator.FTContainsAny),
-            new("tags", new[] { "AI", "ML" }, Operator: Q.Operator.FTContainsAny)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "description", "tags"], Top: 20)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "description", "tags")
+    .Top(20)
+    .Cluster(c => c.FTScore("title", ["artificial", "intelligence"]))
+    .Or()
+    .Cluster(c => c
+        .FTContainsAny("description", ["machine", "learning"])
+        .And().FTContainsAny("tags", ["AI", "ML"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -239,19 +206,11 @@ ORDER BY RANK FullTextScore(c.title, @title)
 ### Full-Text Search with Aggregation
 ```csharp
 // Input - Group results by category and count
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("content", new[] { "technology", "innovation" }, Operator: Q.Operator.FTContainsAny)
-        ])
-    ],
-    columnOptions: new(
-        Names: ["category"],
-        Aggregates: [
-            new(Aggregate: Q.Aggregate.Count)
-        ]
-    )
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("category")
+    .Aggregate("id", Q.Aggregate.Count)
+    .Cluster(c => c.FTContainsAny("content", ["technology", "innovation"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -267,16 +226,14 @@ GROUP BY c.category
 // Input - Combine full-text scoring with vector similarity
 float[] queryVector = [0.1f, 0.8f, 0.3f, 0.9f, 0.2f];
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("contentEmbedding", queryVector, Operator: Q.Operator.VectorDistance),
-            new("title", new[] { "machine", "learning" }, Operator: Q.Operator.FTScore),
-            new("description", new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "description"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "description")
+    .Top(10)
+    .Cluster(c => c
+        .VectorDistance("contentEmbedding", queryVector)
+        .FTScore("title", ["machine", "learning"])
+        .FTScore("description", ["artificial", "intelligence"]))
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -291,18 +248,14 @@ ORDER BY RANK RRF(VectorDistance(c.contentEmbedding, @contentEmbedding), FullTex
 // Input - Combine full-text and vector search with custom weights
 float[] queryVector = [0.1f, 0.8f, 0.3f, 0.9f, 0.2f];
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("contentEmbedding", queryVector, Operator: Q.Operator.VectorDistance),
-            new("title", new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "content"], Top: 10),
-    sorting: [
-        new(Column: "[0.6, 0.4]", Direction: Sorting.Direction.WEIGHTED) // 60% vector, 40% text
-    ]
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "content")
+    .Top(10)
+    .Cluster(c => c
+        .VectorDistance("contentEmbedding", queryVector)
+        .FTScore("title", ["machine", "learning"]))
+    .WithWeights("[0.6, 0.4]") // 60% vector, 40% text
+    .ToListAsync();
 ```
 
 **Generated SQL:**
@@ -324,7 +277,7 @@ ORDER BY RANK RRF(VectorDistance(c.contentEmbedding, @contentEmbedding), FullTex
 - **RRF support**: Multiple `FTScore` operators automatically use Reciprocal Rank Fusion
 - **No scalar sorting with vectors**: Cannot use traditional `ORDER BY` with scalar fields when `VectorDistance` is present
 - **Weight limitations**: Only one `WEIGHTED` sorting option allowed per query
-- **Unique catalysts**: Each catalyst must have unique Column+Operator combination per cluster
+- **Unique conditions**: Each fluent cluster must use a unique column/operator combination
 
 ### Performance Considerations
 - **Indexing**: Ensure your container has full-text indexing enabled
@@ -388,7 +341,7 @@ Common errors and solutions:
 - **"Value must be a non-empty array of strings"**: Provide valid string arrays for array-based operators
 - **"All elements must be non-empty strings"**: Avoid null or empty strings in arrays
 - **"Only one WEIGHT option allowed"**: Use single weighted sorting configuration
-- **"Duplicate catalysts"**: Ensure unique Column+Operator combinations per cluster
+- **"Duplicate catalysts"**: Ensure unique column/operator combinations inside each fluent `.Cluster(...)`
 
 ## Advanced Features
 
@@ -398,32 +351,26 @@ Common errors and solutions:
 double titleWeight = 0.7;
 double contentWeight = 0.3;
 
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("title", searchTerms, Operator: Q.Operator.FTScore),
-            new("content", searchTerms, Operator: Q.Operator.FTScore)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "content"], Top: 10),
-    sorting: [
-        new(Column: $"[{titleWeight}, {contentWeight}]", Direction: Sorting.Direction.WEIGHTED)
-    ]
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "content")
+    .Top(10)
+    .Cluster(c => c
+        .FTScore("title", searchTerms)
+        .FTScore("content", searchTerms))
+    .WithWeights($"[{titleWeight}, {contentWeight}]")
+    .ToListAsync();
 ```
 
 ### Boolean Full-Text Logic
 ```csharp
 // Must contain "machine learning" AND any of the AI-related terms
-(Gravity, IList<T>) results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new("content", "machine learning", Operator: Q.Operator.FTContains),
-            new("content", new[] { "AI", "artificial intelligence", "neural" }, Operator: Q.Operator.FTContainsAny, Where: Q.Where.And)
-        ])
-    ],
-    columnOptions: new(Names: ["id", "title", "content"], Top: 10)
-);
+(Gravity gravity, IList<ArticleDocument> results) = await galaxy.Query()
+    .Select("id", "title", "content")
+    .Top(10)
+    .Cluster(c => c
+        .FTContains("content", "machine learning")
+        .And().FTContainsAny("content", ["AI", "artificial intelligence", "neural"]))
+    .ToListAsync();
 ```
 
 ## Limitations
@@ -432,4 +379,4 @@ double contentWeight = 0.3;
 - **Weighted sorting**: Only supported with multiple ranking operators (`FTScore`, `VectorDistance`) in RRF scenarios
 - **Query complexity**: Highly complex full-text queries may impact performance
 - **Real-time indexing**: Text changes may have slight indexing delays
-- **Vector requirements**: When combining with `VectorDistance`, `ColumnOptions.Top` must be specified
+- **Vector requirements**: When combining with `VectorDistance`, `.Top(...)` must be specified

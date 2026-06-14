@@ -1,6 +1,6 @@
 # Fluent Query Builder (Orbit)
 
-The `Orbit<T>` fluent query builder provides a chainable, readable alternative to the declarative `Cluster`/`Catalyst` array syntax. Both approaches produce identical Cosmos DB queries — `Orbit` is purely a construction layer that delegates to the existing `IGalaxy<T>` methods.
+The `Orbit<T>` fluent query builder provides the recommended, chainable API for building Cosmos DB queries. It produces the same SQL as the lower-level declarative `Cluster`/`Catalyst` API while keeping query intent easier to read in application code.
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ The `Orbit<T>` fluent query builder provides a chainable, readable alternative t
 using Universe.Extensions; // Provides the .Query() extension method
 
 // Fluent
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<MyModel> results) = await galaxy.Query()
     .Select("id", "name", "price")
     .Top(20)
     .Cluster(c => c.Like("name", "%Test%").And().Lte("price", 50.0))
@@ -18,35 +18,19 @@ var (g, results) = await galaxy.Query()
     .ToListAsync();
 ```
 
-This is equivalent to the declarative approach:
-
-```csharp
-var (g, results) = await galaxy.List(
-    clusters:
-    [
-        new(Catalysts:
-        [
-            new("name", "%Test%", Operator: Q.Operator.Like),
-            new("price", 50.0, Operator: Q.Operator.Lte, Where: Q.Where.And)
-        ], Where: Q.Where.And),
-        new(Catalysts:
-        [
-            new("code", "SPECIAL")
-        ], Where: Q.Where.Or)
-    ],
-    columnOptions: new(Names: ["id", "name", "price"], Top: 20),
-    sorting: [new("price", Sorting.Direction.DESC)]
-);
-```
+Internally, the fluent chain is materialized into the same query structures used by the lower-level declarative API.
 
 ## Entry Point
 
 Call `.Query()` on any `IGalaxy<T>` instance to start building a fluent query:
 
 ```csharp
+using Universe.Builder;
+using Universe.Extensions;
+
 IGalaxy<MyModel> galaxy = ...; // injected via DI
 
-var orbit = galaxy.Query(); // returns Orbit<MyModel>
+Orbit<MyModel> orbit = galaxy.Query();
 ```
 
 The `Query()` extension method is defined in the `Universe.Extensions` namespace, which is automatically available within the Universe library via global usings.
@@ -205,7 +189,7 @@ Requires `.Top()` to be set. See [VECTORDISTANCE_USAGE.md](VECTORDISTANCE_USAGE.
 
 ```csharp
 float[] queryVector = /* your embedding */;
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<MyModel> results) = await galaxy.Query()
     .Select("name", "description")
     .Top(10)
     .Cluster(c => c.VectorDistance("descriptionEmbedding", queryVector))
@@ -217,7 +201,7 @@ Multi-vector search with RRF (Reciprocal Rank Fusion):
 ```csharp
 float[] titleVector = /* ... */;
 float[] descVector = /* ... */;
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<MyModel> results) = await galaxy.Query()
     .Select("name", "description")
     .Top(10)
     .Cluster(c => c
@@ -424,7 +408,7 @@ Supported aggregation functions: `Count`, `Sum`, `Min`, `Max`, `Avg`.
 
 ```csharp
 // First page
-var (g1, page1) = await galaxy.Query()
+(Gravity g1, IList<MyModel> page1) = await galaxy.Query()
     .Select("id", "name", "price")
     .Paged(25)
     .Cluster(c => c.Eq("status", "active"))
@@ -432,7 +416,7 @@ var (g1, page1) = await galaxy.Query()
     .ToListAsync();
 
 // Next page using continuation token
-var (g2, page2) = await galaxy.Query()
+(Gravity g2, IList<MyModel> page2) = await galaxy.Query()
     .Select("id", "name", "price")
     .Paged(25, g1.ContinuationToken)
     .Cluster(c => c.Eq("status", "active"))
@@ -484,13 +468,13 @@ Project results to a different type. The projection target can be any type — c
 
 ```csharp
 // String select + generic terminal method
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<ProductSummary> results) = await galaxy.Query()
     .Select("Name", "Price")
     .Cluster(c => c.Eq("category", "Electronics"))
     .ToListAsync<ProductSummary>();
 
 // Type-based select + generic terminal method
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<ProductSummary> results) = await galaxy.Query()
     .Select<ProductSummary>()
     .Cluster(c => c.Eq("category", "Electronics"))
     .ToListAsync<ProductSummary>();
@@ -517,7 +501,7 @@ Console.WriteLine(queryInfo.Query.Value.Text);
 Omit `.Cluster()` entirely to query all documents:
 
 ```csharp
-var (g, all) = await galaxy.Query()
+(Gravity g, IList<MyModel> all) = await galaxy.Query()
     .Select("id", "name")
     .Top(100)
     .ToListAsync();
@@ -548,7 +532,7 @@ galaxy.Query()
 
 ```csharp
 // Complex multi-cluster query with all features
-var (gravity, results) = await galaxy.Query()
+(Gravity gravity, IList<MyModel> results) = await galaxy.Query()
     .Select("id", "name", "price", "category")
     .Top(20)
     .Cluster(c => c

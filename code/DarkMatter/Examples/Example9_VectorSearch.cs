@@ -51,10 +51,10 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         Console.WriteLine("Ensuring sample vector data exists...");
 
         // Check if data already exists
-        (Gravity checkGravity, IList<MyObjectVector> existingData) = await galaxy.List(
-            clusters: [],
-            columnOptions: new(Names: [nameof(MyObjectVector.id)], Top: 1)
-        );
+        (Gravity checkGravity, IList<MyObjectVector> existingData) = await galaxy.Query()
+            .Select(nameof(MyObjectVector.id))
+            .Top(1)
+            .ToListAsync();
 
         ruUsed += checkGravity.RU;
 
@@ -87,25 +87,15 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         // Use the predefined gaming laptop query vector from VectorDataGenerator
         float[] queryEmbedding = VectorDataGenerator.SampleQueryVectors.GamingLaptopQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.DescriptionEmbedding), queryEmbedding, Operator: Q.Operator.VectorDistance)
-                ])
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObjectVector.Code),
-                    nameof(MyObjectVector.Name),
-                    nameof(MyObjectVector.Description),
-                    nameof(MyObjectVector.Price)
-                ],
-                Top: 5 // Required for VectorDistance - get top 5 most similar
-            )
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code),
+                nameof(MyObjectVector.Name),
+                nameof(MyObjectVector.Description),
+                nameof(MyObjectVector.Price))
+            .Top(5) // Required for VectorDistance - get top 5 most similar
+            .Cluster(c => c.VectorDistance(nameof(MyObjectVector.DescriptionEmbedding), queryEmbedding))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Single Vector Search");
@@ -124,26 +114,17 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         float[] titleEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
         float[] descriptionEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.TitleEmbedding), titleEmbedding, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.DescriptionEmbedding), descriptionEmbedding, Operator: Q.Operator.VectorDistance)
-                ])
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObjectVector.Code),
-                    nameof(MyObjectVector.Name),
-                    nameof(MyObjectVector.Category),
-                    nameof(MyObjectVector.Price)
-                ],
-                Top: 3 // Get top 3 results from RRF ranking
-            )
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code),
+                nameof(MyObjectVector.Name),
+                nameof(MyObjectVector.Category),
+                nameof(MyObjectVector.Price))
+            .Top(3) // Get top 3 results from RRF ranking
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.TitleEmbedding), titleEmbedding)
+                .VectorDistance(nameof(MyObjectVector.DescriptionEmbedding), descriptionEmbedding))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Multi-Vector RRF Search");
@@ -163,30 +144,18 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         float[] titleEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
         float[] descriptionEmbedding = VectorDataGenerator.SampleQueryVectors.BusinessLaptopQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), titleEmbedding, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), descriptionEmbedding, Operator: Q.Operator.VectorDistance)
-                ])
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObjectVector.Code).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Name).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Category).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Price).ToLowerCamelCase()
-                ],
-                Top: 3 // Get top 3 results from weighted RRF ranking
-            ),
-            sorting:
-            [
-                new(Column: "[1, 2]", Direction: Sorting.Direction.WEIGHTED)
-            ]
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                nameof(MyObjectVector.Price).ToLowerCamelCase())
+            .Top(3) // Get top 3 results from weighted RRF ranking
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), titleEmbedding)
+                .VectorDistance(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), descriptionEmbedding))
+            .WithWeights("[1, 2]")
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Weighted Multi-Vector RRF Search");
@@ -203,36 +172,19 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         // Use the predefined affordable electronics query vector
         float[] queryEmbedding = VectorDataGenerator.SampleQueryVectors.AffordableElectronicsQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-				// First cluster: Vector similarity
-				new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryEmbedding, Operator: Q.Operator.VectorDistance)
-                ]),
-				// Second cluster: Traditional filters (AND logic)
-				new(
-                    Where: Q.Where.And,
-                    Catalysts:
-                    [
-                        new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
-                        new(nameof(MyObjectVector.Price).ToLowerCamelCase(), 1000.0, Operator: Q.Operator.Lt)
-                    ]
-                )
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObjectVector.Code).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Name).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Category).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Price).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Description).ToLowerCamelCase()
-                ],
-                Top: 4 // Get top 4 filtered and ranked results
-            )
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                nameof(MyObjectVector.Price).ToLowerCamelCase(),
+                nameof(MyObjectVector.Description).ToLowerCamelCase())
+            .Top(4) // Get top 4 filtered and ranked results
+            .Cluster(c => c.VectorDistance(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryEmbedding))
+            .Cluster(c => c
+                .Eq(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics")
+                .And().Lt(nameof(MyObjectVector.Price).ToLowerCamelCase(), 1000.0))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Hybrid Vector + Filter Search");
@@ -249,26 +201,16 @@ public class Example9_VectorSearch(IGalaxy<MyObjectVector> galaxy)
         // Use the predefined furniture query vector
         float[] queryEmbedding = VectorDataGenerator.SampleQueryVectors.FurnitureQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryEmbedding, Operator: Q.Operator.VectorDistance)
-                ])
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObjectVector.Code).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Name).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Category).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Price).ToLowerCamelCase(),
-                    nameof(MyObjectVector.Description).ToLowerCamelCase()
-                ],
-                Top: 3 // Get top 3 furniture-related results
-            )
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                nameof(MyObjectVector.Price).ToLowerCamelCase(),
+                nameof(MyObjectVector.Description).ToLowerCamelCase())
+            .Top(3) // Get top 3 furniture-related results
+            .Cluster(c => c.VectorDistance(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryEmbedding))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintVectorQueryResults(gravity, results, "Furniture Vector Search");

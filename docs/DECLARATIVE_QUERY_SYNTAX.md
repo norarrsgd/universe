@@ -1,6 +1,8 @@
-# Declarative Query Syntax (Cluster / Catalyst)
+# Declarative Query Syntax Reference (Cluster / Catalyst)
 
-The declarative syntax is the original query construction API in Universe. It uses `Cluster` and `Catalyst` structs to build queries by composing filter conditions as data structures. This approach is fully supported and produces identical Cosmos DB queries to the [fluent Orbit API](FLUENT_QUERY_BUILDER.md) — use whichever style you prefer.
+The declarative syntax is the original lower-level query construction API in Universe. It uses `Cluster` and `Catalyst` structs to build queries by composing filter conditions as data structures.
+
+This API is still fully supported for compatibility and advanced scenarios where callers already have query parts represented as data. For new application code and examples, prefer the [fluent Orbit API](FLUENT_QUERY_BUILDER.md), which provides the same query behavior through `galaxy.Query()`.
 
 ## Query with Clusters
 
@@ -137,7 +139,7 @@ The declarative syntax is the original query construction API in Universe. It us
 );
 ```
 
-_See [example 1](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs), [example 3](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example3_TopAndDistinct.cs)._
+For fluent examples of sorting and selection, see [Fluent Query Builder (Orbit)](FLUENT_QUERY_BUILDER.md).
 
 ## Pagination
 
@@ -158,7 +160,7 @@ string continuationToken = gravity.ContinuationToken;
 );
 ```
 
-_See [example 1](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example1_BasicPagedQuery.cs)._
+For fluent pagination examples, see [Fluent Query Builder (Orbit)](FLUENT_QUERY_BUILDER.md#pagination).
 
 ## Aggregation and Group By Queries
 
@@ -205,12 +207,12 @@ The `Aggregates` parameter in `ColumnOptions` takes an array of `AggregationOpti
 
 When using aggregates, the query will automatically be grouped by the columns specified in the `Names` parameter. The output column names will be suffixed with the aggregate function name (e.g., `Price_Sum`, `Price_Avg`, `Quantity_Max`).
 
-_See [example 2](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example2_AggregatesWithGroupBy.cs), [example 7](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example7_AdvancedAggregation.cs), [example 8](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples/Example8_SalesAnalysis.cs)._
+For fluent aggregation examples, see [Fluent Query Builder (Orbit)](FLUENT_QUERY_BUILDER.md#aggregation).
 
 ## See Also
 
-- [Fluent Query Builder (Orbit)](FLUENT_QUERY_BUILDER.md) — the fluent alternative to this declarative syntax
+- [Fluent Query Builder (Orbit)](FLUENT_QUERY_BUILDER.md) — the recommended query-builder API for new code
 - [Vector Distance Search](VECTORDISTANCE_USAGE.md) — vector similarity search
 - [Full-Text Search](FULLTEXT_USAGE.md) — full-text search operators
 - [Query Execution Strategies](QUERY_EXECUTION_STRATEGIES.md) — query optimization and strategy selection
-- [DarkMatter Examples](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples) — runnable examples covering all features
+- [DarkMatter Examples](https://github.com/norarrsgd/universe/blob/dev/code/DarkMatter/Examples) — runnable fluent-first examples covering all features

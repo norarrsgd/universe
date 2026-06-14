@@ -41,21 +41,20 @@ The system automatically detects query types:
 ### Basic Query with Hints
 
 ```csharp
+using Universe.Extensions;
+
 QueryHints hints = new(
     MaxItemCount: 100,
     EnableOptimisticDirectExecution: true,
     MaxConcurrency: Environment.ProcessorCount
 );
 
-(Gravity gravity, IList<MyObject> results) = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new(nameof(MyObject.Category), "Electronics", Operator: Q.Operator.Eq)
-        ])
-    ],
-    columnOptions: new(Names: [nameof(MyObject.Name), nameof(MyObject.Price)], Top: 10),
-    hints: hints
-);
+(Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+    .Select(nameof(MyObject.Name), nameof(MyObject.Price))
+    .Top(10)
+    .Cluster(c => c.Eq(nameof(MyObject.Category), "Electronics"))
+    .WithHints(hints)
+    .ToListAsync();
 ```
 
 ### Force Specific Strategy
@@ -67,7 +66,10 @@ QueryHints gatewayHints = new(
     MaxConcurrency: 1
 );
 
-var results = await galaxy.List(clusters, columnOptions: null, hints: gatewayHints);
+(Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+    .Cluster(c => c.Eq(nameof(MyObject.Category), "Electronics"))
+    .WithHints(gatewayHints)
+    .ToListAsync();
 ```
 
 ### Vector Search Optimization
@@ -81,15 +83,11 @@ QueryHints vectorHints = new(
 
 float[] searchVector = GetEmbedding("search query");
 
-var results = await galaxy.List(
-    clusters: [
-        new(Catalysts: [
-            new(nameof(MyObjectVector.TitleEmbedding), searchVector, Operator: Q.Operator.VectorDistance)
-        ])
-    ],
-    columnOptions: new(Top: 5),
-    hints: vectorHints
-);
+(Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+    .Top(5)
+    .Cluster(c => c.VectorDistance(nameof(MyObjectVector.TitleEmbedding), searchVector))
+    .WithHints(vectorHints)
+    .ToListAsync();
 ```
 
 ### Get Performance Recommendations (v3.2.0+)
@@ -119,7 +117,7 @@ if (recommendations.RecommendedStrategy != null)
 if (recommendations.SuggestedHints?.Any() == true)
 {
     Console.WriteLine("Suggested Hints:");
-    foreach (var hint in recommendations.SuggestedHints)
+    foreach (KeyValuePair<string, object> hint in recommendations.SuggestedHints)
     {
         Console.WriteLine($"  {hint.Key} = {hint.Value}");
     }
@@ -239,7 +237,13 @@ The system follows this priority order:
 The system tracks Request Unit (RU) consumption for each query execution, returned in the `Gravity` response object:
 
 ```csharp
-(Gravity gravity, IList<MyObject> results) = await galaxy.List(clusters, columnOptions, hints);
+(Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+    .Select(nameof(MyObject.Name), nameof(MyObject.Price))
+    .Top(25)
+    .Cluster(c => c.Eq(nameof(MyObject.Category), "Electronics"))
+    .WithHints(hints)
+    .ToListAsync();
+
 Console.WriteLine($"RU consumed: {gravity.RU}");
 ```
 
@@ -331,14 +335,21 @@ See [SQLITE_STATISTICS_STORAGE.md](./SQLITE_STATISTICS_STORAGE.md) for detailed 
 
 ## Integration with Existing Code
 
-The query execution strategies are backward compatible. Existing code will automatically benefit from the new optimization system without any changes required.
+The query execution strategies are backward compatible. Existing declarative code will still work, but new query examples should prefer the fluent API.
 
 ```csharp
-// v3.1.x code (still works, uses rule-based optimization)
-var results = await galaxy.List(clusters, columnOptions);
+// Fluent query with automatic optimization
+(Gravity gravity, IList<MyObject> results) = await galaxy.Query()
+    .Select(nameof(MyObject.Name), nameof(MyObject.Price))
+    .Cluster(c => c.Eq(nameof(MyObject.Category), "Electronics"))
+    .ToListAsync();
 
-// v3.2.0+ code (with adaptive learning)
-var results = await galaxy.List(clusters, columnOptions, hints: new QueryHints(MaxItemCount: 100));
+// Fluent query with explicit hints
+(Gravity hintedGravity, IList<MyObject> hintedResults) = await galaxy.Query()
+    .Select(nameof(MyObject.Name), nameof(MyObject.Price))
+    .Cluster(c => c.Eq(nameof(MyObject.Category), "Electronics"))
+    .WithHints(new QueryHints(MaxItemCount: 100))
+    .ToListAsync();
 
 // v3.2.0+ with file persistence
 public class MyRepository : Galaxy<MyObject>

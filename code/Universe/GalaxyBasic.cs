@@ -36,9 +36,8 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         string container,
         IReadOnlyList<string> partitionKey,
         UniverseOptions options,
-        bool recordQueries = false) : base(client, database, container, partitionKey, recordQueries)
+        bool recordQueries = false) : base(client, database, container, partitionKey, options, recordQueries)
     {
-        ArgumentNullException.ThrowIfNull(options);
         QueryTuner queryTuner = new(options.StatisticsStorage);
         QBuilder = new(_recordQuery, queryTuner, _namingPolicy);
     }
@@ -106,12 +105,12 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
                 {
                     if (!t.IsCompletedSuccessfully)
-                        throw new UniverseException(t.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+                        throw new UniverseException("Bulk create batch operation failed.", t.Exception?.Flatten().InnerException);
 
                     if (t.Result.IsSuccessStatusCode)
                         return t.Result.RequestCharge;
                     else
-                        throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}. Message: {t.Result.ErrorMessage}");
+                        throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}.");
                 }));
             }
 
@@ -183,12 +182,12 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 tasks.Add(batch.ExecuteAsync().ContinueWith(t =>
                 {
                     if (!t.IsCompletedSuccessfully)
-                        throw new UniverseException(t.Exception?.Flatten().InnerException?.Message ?? "Oops! Something went wrong!");
+                        throw new UniverseException("Bulk modify batch operation failed.", t.Exception?.Flatten().InnerException);
 
                     if (t.Result.IsSuccessStatusCode)
                         return t.Result.RequestCharge;
                     else
-                        throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}. Message: {t.Result.ErrorMessage}");
+                        throw new UniverseException($"Transaction batch failed with status code {t.Result.StatusCode}.");
                 }));
             }
 
@@ -199,7 +198,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
-            throw new UniverseException($"Something went wrong doing the bulk operation. See error: {ex.Message}");
+            throw new UniverseException("Bulk modify operation failed.", ex);
         }
         catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
         {

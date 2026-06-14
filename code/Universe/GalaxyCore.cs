@@ -13,18 +13,40 @@ public abstract class GalaxyCore : IDisposable
     internal readonly bool _allowBulk;
     internal readonly JsonNamingPolicy _namingPolicy;
 
-    /// <summary></summary>
+    /// <summary>
+    /// Initialize Galaxy core with Cosmos DB connection.
+    /// </summary>
+    /// <remarks>
+    /// WARNING: Setting <paramref name="recordQueries"/> to <c>true</c> includes full query text and parameter values
+    /// in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
+    /// </remarks>
     protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries = false)
+        : this(client, database, container, partitionKey, recordQueries, autoProvisionContainers: true)
+    {
+    }
+
+    /// <summary>
+    /// Initialize Galaxy core with Cosmos DB connection and custom Universe options.
+    /// </summary>
+    /// <remarks>
+    /// WARNING: Setting <paramref name="recordQueries"/> to <c>true</c> includes full query text and parameter values
+    /// in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
+    /// </remarks>
+    protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, UniverseOptions options, bool recordQueries = false)
+        : this(client, database, container, partitionKey, recordQueries, RequireOptions(options).AutoProvisionContainers)
+    {
+    }
+
+    private static UniverseOptions RequireOptions(UniverseOptions options) =>
+        options ?? throw new UniverseException("Universe options are required.");
+
+    private GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries, bool autoProvisionContainers)
     {
         if (string.IsNullOrWhiteSpace(container))
             throw new UniverseException("Container name is required");
 
         if (string.IsNullOrWhiteSpace(database))
             throw new UniverseException("Database name is required");
-
-        client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
-
-        ContainerProperties containerProps = new(container, partitionKey);
 
         _recordQuery = recordQueries;
         if (client.ClientOptions is not null)
@@ -33,7 +55,18 @@ public abstract class GalaxyCore : IDisposable
             if (client.ClientOptions.Serializer is UniverseSerializer universeSerializer)
                 _namingPolicy = universeSerializer.NamingPolicy;
         }
-        _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(containerProps).GetAwaiter().GetResult();
+
+        if (autoProvisionContainers)
+        {
+            client.CreateDatabaseIfNotExistsAsync(database).GetAwaiter().GetResult();
+
+            ContainerProperties containerProps = new(container, partitionKey);
+            _container = client.GetDatabase(database).CreateContainerIfNotExistsAsync(containerProps).GetAwaiter().GetResult();
+        }
+        else
+        {
+            _container = client.GetContainer(database, container);
+        }
     }
 
     #region Dispose Pattern

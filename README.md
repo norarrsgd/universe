@@ -27,6 +27,10 @@ public class MyRepository : Galaxy<MyModel>
     public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey)
     {
     }
+
+    public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, UniverseOptions options) : base(client, database, container, partitionKey, options)
+    {
+    }
 }
 
 // If you want to see debug information such as the full Query text executed, use the format below:
@@ -71,6 +75,18 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
     database: "database-name",
     container: "container-name",
     partitionKey: typeof(MyModel).BuildPartitionKey()
+));
+```
+
+Repository construction creates the Cosmos database and container if they do not exist by default. In production environments where infrastructure is managed separately, pass `new UniverseOptions().WithAutoProvisioning(false)` to a repository constructor overload that accepts `UniverseOptions`.
+
+```csharp
+_ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyRepository(
+    client: service.GetRequiredService<CosmosClient>(),
+    database: "database-name",
+    container: "container-name",
+    partitionKey: typeof(MyModel).BuildPartitionKey(),
+    options: new UniverseOptions().WithAutoProvisioning(false)
 ));
 ```
 
@@ -170,7 +186,7 @@ Gravity gravity = await galaxy.Remove("document-id", "partition-key-value1", "pa
 
 ## Querying Documents
 
-Universe provides two equivalent ways to build queries. Both produce identical Cosmos DB SQL — choose whichever style you prefer.
+Universe's recommended query path is the fluent `Orbit<T>` API exposed by `.Query()`. The lower-level declarative `Cluster`/`Catalyst` API remains supported for compatibility and advanced scenarios where query parts are already represented as data.
 
 ### Fluent Query Builder (Orbit)
 
@@ -180,7 +196,7 @@ The `Orbit<T>` fluent query builder provides a chainable, readable API for const
 using Universe.Extensions; // Provides the .Query() extension method
 
 // Filter + sort
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<MyModel> results) = await galaxy.Query()
     .Select("id", "name", "price")
     .Top(20)
     .Cluster(c => c.Like("name", "%Test%").And().Lte("price", 50.0))
@@ -192,7 +208,7 @@ var (g, results) = await galaxy.Query()
 
 ```csharp
 // Pagination
-var (g1, page1) = await galaxy.Query()
+(Gravity g1, IList<MyModel> page1) = await galaxy.Query()
     .Select("id", "name", "price")
     .Paged(25)
     .Cluster(c => c.Eq("status", "active"))
@@ -200,7 +216,7 @@ var (g1, page1) = await galaxy.Query()
     .ToListAsync();
 
 // Next page
-var (g2, page2) = await galaxy.Query()
+(Gravity g2, IList<MyModel> page2) = await galaxy.Query()
     .Select("id", "name", "price")
     .Paged(25, g1.ContinuationToken)
     .Cluster(c => c.Eq("status", "active"))
@@ -210,7 +226,7 @@ var (g2, page2) = await galaxy.Query()
 
 ```csharp
 // Aggregation
-var (g, results) = await galaxy.Query()
+(Gravity g, IList<MyModel> results) = await galaxy.Query()
     .Select("category")
     .Aggregate("price", Q.Aggregate.Sum)
     .Aggregate("price", Q.Aggregate.Avg)
@@ -224,7 +240,7 @@ See the [Fluent Query Builder (Orbit) Reference](https://github.com/norarrsgd/un
 
 ### Declarative Syntax (Cluster / Catalyst)
 
-The declarative syntax uses `Cluster` and `Catalyst` structs to compose filter conditions as data structures.
+The declarative syntax uses `Cluster` and `Catalyst` structs to compose filter conditions as data structures. Prefer the fluent API for new application code unless you specifically need this lower-level representation.
 
 ```csharp
 (Gravity gravity, IList<MyModel> results) = await galaxy.List(
@@ -259,6 +275,8 @@ See the [QUERY_EXECUTION_STRATEGIES.md](https://github.com/norarrsgd/universe/bl
 ## Stored Procedures
 
 You can manage and execute Cosmos DB stored procedures using the `IGalaxyProcedure` interface. Inject your repository as `IGalaxyProcedure` and use its methods for full stored procedure lifecycle management and execution.
+
+Stored procedure create, replace, and delete methods are administrative operations. The JavaScript body passed to `CreateSProc` and `ReplaceSProc` is raw code executed by Cosmos DB, so it should come only from trusted, version-controlled or operator-approved sources.
 
 ```csharp
 IGalaxyProcedure galaxyProcedure = ...; // Injected or resolved from DI

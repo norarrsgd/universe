@@ -22,16 +22,13 @@ public class Example15_ContainsOperator(IGalaxy<MyObject> galaxy) : ExampleBase(
         // Example 1: Contains with a string array
         Console.WriteLine("1. Contains — filter documents whose Category is in a given list:");
         string[] allowedCategories = ["Electronics", "Books", "Clothing"];
-        Gravity containsQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Category), Value: allowedCategories, Operator: Q.Operator.Contains)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.id), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase()])
-        );
+        Gravity containsQuery = galaxy.Query()
+            .Select(
+                nameof(MyObject.id),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase())
+            .Cluster(c => c.Contains(nameof(MyObject.Category), allowedCategories))
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {containsQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", containsQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");
@@ -40,16 +37,10 @@ public class Example15_ContainsOperator(IGalaxy<MyObject> galaxy) : ExampleBase(
         // Example 2: NotContains — exclude certain categories
         Console.WriteLine("2. NotContains — exclude documents whose Code is in a blocklist:");
         string[] blockedCodes = ["DISC-001", "DISC-002"];
-        Gravity notContainsQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Code), Value: blockedCodes, Operator: Q.Operator.NotContains)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObject.id), nameof(MyObject.Code).ToLowerCamelCase()])
-        );
+        Gravity notContainsQuery = galaxy.Query()
+            .Select(nameof(MyObject.id), nameof(MyObject.Code).ToLowerCamelCase())
+            .Cluster(c => c.NotContains(nameof(MyObject.Code), blockedCodes))
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {notContainsQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", notContainsQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");
@@ -57,28 +48,19 @@ public class Example15_ContainsOperator(IGalaxy<MyObject> galaxy) : ExampleBase(
 
         // Example 3: Contains combined with other operators
         Console.WriteLine("3. Contains combined with other operators:");
-        Gravity combinedQuery = galaxy.GenerateQuery(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Category), Value: allowedCategories, Operator: Q.Operator.Contains),
-                    new(Column: nameof(MyObject.Price), Value: 50.0, Operator: Q.Operator.Gte, Where: Q.Where.And)
-                ]),
-                new(Catalysts:
-                [
-                    new(Column: nameof(MyObject.Description), Operator: Q.Operator.Defined)
-                ], Where: Q.Where.And)
-            ],
-            columnOptions: new(
-                Names: [nameof(MyObject.id), nameof(MyObject.Name).ToLowerCamelCase(), nameof(MyObject.Category).ToLowerCamelCase(), nameof(MyObject.Price).ToLowerCamelCase()],
-                Top: 25
-            ),
-            sorting:
-            [
-                new(nameof(MyObject.Price).ToLowerCamelCase(), Sorting.Direction.DESC)
-            ]
-        );
+        Gravity combinedQuery = galaxy.Query()
+            .Select(
+                nameof(MyObject.id),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase(),
+                nameof(MyObject.Price).ToLowerCamelCase())
+            .Top(25)
+            .Cluster(c => c
+                .Contains(nameof(MyObject.Category), allowedCategories)
+                .And().Gte(nameof(MyObject.Price), 50.0))
+            .Cluster(c => c.Defined(nameof(MyObject.Description)))
+            .OrderByDescending(nameof(MyObject.Price).ToLowerCamelCase())
+            .GenerateQuery();
 
         Console.WriteLine($"   Query: {combinedQuery.Query.Text}");
         Console.WriteLine($"   Parameters: {string.Join(", ", combinedQuery.Query.Parameters.Select(p => $"{p.Item1}={p.Item2}"))}");

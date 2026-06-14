@@ -11,33 +11,22 @@ public class Example4_ComplexFiltering(IGalaxy<MyObject> galaxy) : ExampleBase(g
     public override async Task<double> RunAsync()
     {
         Console.WriteLine("\n=== EXAMPLE 4: Complex Filtering ===\n");
-        (Gravity g4, IList<MyObject> results4) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Name).ToLowerCamelCase(), "%Test%", Operator: Q.Operator.Like),
-                    new(nameof(MyObject.AddedOn).ToLowerCamelCase(), DateTime.Now.AddDays(-30), Operator: Q.Operator.Gte, Where: Q.Where.And),
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), 50.0, Operator: Q.Operator.Lte, Where: Q.Where.And)
-                ], Where: Q.Where.And),
-                new(Catalysts:
-                [
-                    new(nameof(MyObject.Code).ToLowerCamelCase(), "SPECIAL", Where: Q.Where.Or),
-                    new(nameof(MyObject.Category).ToLowerCamelCase(), "Premium", Where: Q.Where.And)
-                ])
-            ],
-            columnOptions: new(
-                Names:
-                [
-                    nameof(MyObject.id).ToLowerCamelCase(),
-                    nameof(MyObject.Name).ToLowerCamelCase(),
-                    nameof(MyObject.Price).ToLowerCamelCase(),
-                    nameof(MyObject.Category).ToLowerCamelCase()
-                ],
-                Top: 20
-            ),
-            sorting: [new(nameof(MyObject.Price).ToLowerCamelCase(), Sorting.Direction.DESC)]
-        );
+        (Gravity g4, IList<MyObject> results4) = await galaxy.Query()
+            .Select(
+                nameof(MyObject.id).ToLowerCamelCase(),
+                nameof(MyObject.Name).ToLowerCamelCase(),
+                nameof(MyObject.Price).ToLowerCamelCase(),
+                nameof(MyObject.Category).ToLowerCamelCase())
+            .Top(20)
+            .Cluster(c => c
+                .Like(nameof(MyObject.Name).ToLowerCamelCase(), "%Test%")
+                .And().Gte(nameof(MyObject.AddedOn).ToLowerCamelCase(), DateTime.Now.AddDays(-30))
+                .And().Lte(nameof(MyObject.Price).ToLowerCamelCase(), 50.0))
+            .Cluster(c => c
+                .Eq(nameof(MyObject.Code).ToLowerCamelCase(), "SPECIAL")
+                .And().Eq(nameof(MyObject.Category).ToLowerCamelCase(), "Premium"))
+            .OrderByDescending(nameof(MyObject.Price).ToLowerCamelCase())
+            .ToListAsync();
 
         ruUsed = g4.RU;
         PrintQueryResults(g4, results4);

@@ -13,11 +13,30 @@ public sealed class UniverseOptions
     public IQueryStatisticsStorage StatisticsStorage { get; set; }
 
     /// <summary>
+    /// Whether repository construction should create the Cosmos database and container if they do not exist.
+    /// Defaults to true for backward compatibility.
+    /// </summary>
+    public bool AutoProvisionContainers { get; set; }
+
+    /// <summary>
     /// Creates default Universe options with in-memory storage
     /// </summary>
     public UniverseOptions()
     {
         StatisticsStorage = null; // Will default to InMemoryStatisticsStorage in QueryTuner
+        AutoProvisionContainers = true;
+    }
+
+    /// <summary>
+    /// Enables or disables automatic Cosmos database/container provisioning during repository construction.
+    /// Disable this in production environments where infrastructure is managed separately.
+    /// </summary>
+    /// <param name="enabled">True to create missing containers automatically; false to use existing containers only.</param>
+    /// <returns>The same UniverseOptions instance for fluent configuration.</returns>
+    public UniverseOptions WithAutoProvisioning(bool enabled)
+    {
+        AutoProvisionContainers = enabled;
+        return this;
     }
 
     /// <summary>

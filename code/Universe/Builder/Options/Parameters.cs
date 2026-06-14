@@ -63,6 +63,8 @@ public readonly record struct Catalyst(
         {
             if (Value is not float[] vector || vector.Length == 0)
                 violations.Add("Value must be a non-empty array of floats for VectorDistance operator");
+            else if (vector.Length > 4096)
+                violations.Add("Vector dimension exceeds maximum allowed size of 4096 for VectorDistance operator");
             else if (vector.Any(v => float.IsNaN(v) || float.IsInfinity(v)))
                 violations.Add("All elements in the vector must be finite numbers for VectorDistance operator");
         }

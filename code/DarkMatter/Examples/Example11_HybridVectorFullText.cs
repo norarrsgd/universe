@@ -52,10 +52,10 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
         Console.WriteLine("Ensuring sample vector data with rich text content exists...");
 
         // Check if data already exists
-        (Gravity checkGravity, IList<MyObjectVector> existingData) = await galaxy.List(
-            clusters: [],
-            columnOptions: new(Names: [nameof(MyObjectVector.id).ToLowerCamelCase()], Top: 1)
-        );
+        (Gravity checkGravity, IList<MyObjectVector> existingData) = await galaxy.Query()
+            .Select(nameof(MyObjectVector.id).ToLowerCamelCase())
+            .Top(1)
+            .ToListAsync();
 
         ruUsed += checkGravity.RU;
 
@@ -89,19 +89,16 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
         // Use predefined gaming laptop query vector
         float[] queryVector = VectorDataGenerator.SampleQueryVectors.GamingLaptopQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-					// Semantic similarity via vector
-					new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
-					// Lexical matching via full-text
-					new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "machine", "learning" }, Operator: Q.Operator.FTScore)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector)
+                .FTScore(nameof(MyObjectVector.Name).ToLowerCamelCase(), ["machine", "learning"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintHybridQueryResults(gravity, results);
@@ -119,20 +116,17 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
 
         float[] queryVector = VectorDataGenerator.SampleQueryVectors.AffordableElectronicsQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-					// Semantic similarity
-					new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
-					// Lexical matching on multiple fields
-					new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "artificial", "intelligence" }, Operator: Q.Operator.FTScore),
-                    new(nameof(MyObjectVector.Description).ToLowerCamelCase(), new[] { "neural", "networks", "deep", "learning" }, Operator: Q.Operator.FTScore)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Description).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Description).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector)
+                .FTScore(nameof(MyObjectVector.Name).ToLowerCamelCase(), ["artificial", "intelligence"])
+                .FTScore(nameof(MyObjectVector.Description).ToLowerCamelCase(), ["neural", "networks", "deep", "learning"]))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintHybridQueryResults(gravity, results);
@@ -150,21 +144,17 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
 
         float[] queryVector = VectorDataGenerator.SampleQueryVectors.GamingLaptopQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-                new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "gaming", "performance" }, Operator: Q.Operator.FTScore)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 10),
-            sorting:
-            [
-                new(Column: "[0.6, 0.4]", Direction: Sorting.Direction.WEIGHTED) // 60% vector, 40% text
-			]
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Price).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector)
+                .FTScore(nameof(MyObjectVector.Name).ToLowerCamelCase(), ["gaming", "performance"]))
+            .WithWeights("[0.6, 0.4]") // 60% vector, 40% text
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintHybridQueryResults(gravity, results);
@@ -182,24 +172,20 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
 
         float[] queryVector = VectorDataGenerator.SampleQueryVectors.AffordableElectronicsQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-				// Hybrid ranking cluster (Vector + Full-Text)
-				new(Catalysts:
-                [
-                    new(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.Description).ToLowerCamelCase(), new[] { "technology", "innovation" }, Operator: Q.Operator.FTScore)
-                ]),
-				// Traditional filter cluster
-				new(Where: Q.Where.And, Catalysts:
-                [
-                    new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq),
-                    new(nameof(MyObjectVector.Price).ToLowerCamelCase(), 2000.0, Operator: Q.Operator.Lt)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Category).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 10)
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                nameof(MyObjectVector.Price).ToLowerCamelCase())
+            .Top(10)
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.DescriptionEmbedding).ToLowerCamelCase(), queryVector)
+                .FTScore(nameof(MyObjectVector.Description).ToLowerCamelCase(), ["technology", "innovation"]))
+            .Cluster(c => c
+                .Eq(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics")
+                .And().Lt(nameof(MyObjectVector.Price).ToLowerCamelCase(), 2000.0))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintHybridQueryResults(gravity, results);
@@ -217,23 +203,18 @@ public class Example11_HybridVectorFullText(IGalaxy<MyObjectVector> galaxy)
 
         float[] queryVector = VectorDataGenerator.SampleQueryVectors.GamingLaptopQuery;
 
-        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.List(
-            clusters:
-            [
-				// Hybrid ranking cluster (Vector + Full-Text)
-				new(Catalysts:
-                [
-					new(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector, Operator: Q.Operator.VectorDistance),
-                    new(nameof(MyObjectVector.Name).ToLowerCamelCase(), new[] { "laptop", "computer", "gaming" }, Operator: Q.Operator.FTScore)
-                ]),
-				// Traditional filter cluster
-				new(Where: Q.Where.And, Catalysts:
-                [
-					new(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics", Operator: Q.Operator.Eq)
-                ])
-            ],
-            columnOptions: new(Names: [nameof(MyObjectVector.Code).ToLowerCamelCase(), nameof(MyObjectVector.Name).ToLowerCamelCase(), nameof(MyObjectVector.Category).ToLowerCamelCase(), nameof(MyObjectVector.Price).ToLowerCamelCase()], Top: 8)
-        );
+        (Gravity gravity, IList<MyObjectVector> results) = await galaxy.Query()
+            .Select(
+                nameof(MyObjectVector.Code).ToLowerCamelCase(),
+                nameof(MyObjectVector.Name).ToLowerCamelCase(),
+                nameof(MyObjectVector.Category).ToLowerCamelCase(),
+                nameof(MyObjectVector.Price).ToLowerCamelCase())
+            .Top(8)
+            .Cluster(c => c
+                .VectorDistance(nameof(MyObjectVector.TitleEmbedding).ToLowerCamelCase(), queryVector)
+                .FTScore(nameof(MyObjectVector.Name).ToLowerCamelCase(), ["laptop", "computer", "gaming"]))
+            .Cluster(c => c.Eq(nameof(MyObjectVector.Category).ToLowerCamelCase(), "Electronics"))
+            .ToListAsync();
 
         ruUsed += gravity.RU;
         PrintHybridQueryResults(gravity, results);

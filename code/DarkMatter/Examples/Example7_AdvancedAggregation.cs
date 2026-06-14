@@ -21,19 +21,13 @@ public class Example7_AdvancedAggregation(IGalaxy<MyObject> galaxy) : ExampleBas
         Console.WriteLine($"Created {categoryItems.Count} category items for aggregation, RU: {g7a.RU}");
 
         // Now run an aggregation query grouped by Category
-        (Gravity g7b, IList<MyObjectAggregation> results7) = await galaxy.List<MyObjectAggregation>(
-            clusters: null,
-            columnOptions: new(
-                Names: [nameof(MyObject.Category).ToLowerCamelCase()],
-                Aggregates:
-                [
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Avg),
-                    new(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum),
-                    new(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
-                ]
-            )
-        );
+        (Gravity g7b, IList<MyObjectAggregation> results7) = await galaxy.Query()
+            .Select(nameof(MyObject.Category).ToLowerCamelCase())
+            .Aggregate(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.Price).ToLowerCamelCase(), Q.Aggregate.Avg)
+            .Aggregate(nameof(MyObject.Quantity).ToLowerCamelCase(), Q.Aggregate.Sum)
+            .Aggregate(nameof(MyObject.id).ToLowerCamelCase(), Q.Aggregate.Count)
+            .ToListAsync<MyObjectAggregation>();
 
         Console.WriteLine("Category Aggregation Results:");
         Console.WriteLine($"RU: {g7b.RU}");
