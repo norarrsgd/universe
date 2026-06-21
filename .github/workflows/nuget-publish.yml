@@ -6,6 +6,9 @@ on:
       - 'prod'
       - 'beta'
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     name: Build, Pack & Publish NuGet
