@@ -1,0 +1,157 @@
+# Universe Roadmap Status
+
+This is the current source-verified roadmap status for the `3.0.0` through `3.7.0` feature targets.
+
+## Partially Complete
+
+### 1.1 Parameterized Stored Procedures Support
+
+Status: partially complete.
+
+Implemented:
+
+- Stored procedure execution accepts `params object[]` inputs.
+- Parameters are checked for JSON serializability before execution.
+- Stored procedure lifecycle operations exist for create, read, replace, delete, and list.
+
+Remaining gap:
+
+- Dedicated deployment/versioning utilities are not implemented. Stored procedure bodies are still raw trusted administrative JavaScript strings.
+
+## Verified Complete
+
+### 1.2 Aggregation Pipeline Support
+
+Status: complete.
+
+Implemented:
+
+- `COUNT`, `SUM`, `AVG`, `MIN`, and `MAX` are available through `Q.Aggregate`.
+- Aggregates are supported through declarative `ColumnOptions` and fluent `Orbit.Aggregate(...)`.
+- Aggregate identifiers are validated and bracket-formatted before SQL generation.
+
+### 1.3 Basic Transaction Batch Support
+
+Status: complete.
+
+Implemented:
+
+- Bulk create and bulk modify group documents by partition key.
+- Each partition-key group executes through Cosmos `TransactionalBatch`.
+- Batch size and payload size limits are enforced before execution.
+
+### 1.4 Multi-Level Partitioning
+
+Status: complete.
+
+Implemented:
+
+- `[PartitionKey]` supports one to three partition-key levels.
+- Partition-key path generation and runtime value generation are sequence ordered.
+- Duplicate sequence values and more than three levels are rejected.
+- Explicit partition-key path names are honored through `PartitionKeyAttribute(int sequence, string keyName = null)`.
+
+### 1.5 Vector Search Capabilities
+
+Status: complete.
+
+Implemented:
+
+- `Q.Operator.VectorDistance` generates Cosmos `VectorDistance(...)` SQL.
+- Vector ranking requires `TOP` and enforces vector-size and finite-number validation.
+- Vector queries use the vector execution strategy.
+
+### 1.6 Full Text Search Capabilities
+
+Status: complete.
+
+Implemented:
+
+- `FullTextContains`, `FullTextContainsAll`, `FullTextContainsAny`, and negated variants are supported.
+- `FullTextScore` supports relevance ranking.
+- Hybrid vector/full-text ranking uses RRF when multiple rank catalysts are present.
+
+### 2.1 Query Execution Strategy
+
+Status: complete.
+
+Implemented:
+
+- Direct, gateway, and vector strategies are available.
+- Query hints can force supported strategies and tune request options.
+- Query execution statistics track RU, duration, result count, success, strategy, and hints.
+- Query tuning recommendations can be rule-based or data-driven from historical samples.
+- File and SQLite statistics persistence are available through `UniverseOptions`.
+
+## Not Complete
+
+### 2.2 Optional Document Cache And Invalidation Layer
+
+Status: not implemented.
+
+The current in-memory components are query-statistics storage and reflection/projection metadata caches. They do not satisfy the roadmap item for an optional cache of frequently accessed documents with invalidation based on document changes.
+
+Recommended next feature:
+
+- Add an explicit optional document cache feature with configuration, clear invalidation semantics on create/modify/remove, and tests that do not require live Cosmos DB.
+
+### 2.3 RU Budget Management
+
+Status: not implemented.
+
+Remaining scope:
+
+- RU quota management.
+- Rate limiting and automatic throttling for bulk operations.
+- RU analytics and recommendations beyond the current per-operation `Gravity.RU` and query statistics.
+
+Preferred future direction:
+
+- Design this as a global coordinator rather than a per-repository quick patch.
+
+### 3.1 Enhanced Bulk Operation Support
+
+Status: not implemented.
+
+Remaining scope:
+
+- Optimistic concurrency with ETags.
+- Rollback or compensation support for multi-document workflows.
+
+### 3.2 Atomic Operations
+
+Status: not implemented.
+
+Remaining scope:
+
+- Conditional update operations, such as update only if a predicate or ETag condition is satisfied.
+
+### 4.1 Change Feed Processing
+
+Status: not implemented.
+
+Remaining scope:
+
+- Change feed processing abstraction.
+- Resume token or checkpoint management.
+- Event-driven handlers for document changes.
+- Long-running processor support.
+
+### 4.2 Enhanced Debugging
+
+Status: not implemented.
+
+Remaining scope:
+
+- Query plan visualization.
+- RU cost estimation before execution.
+- Expanded performance analytics and optimization suggestions.
+
+## Verification
+
+Current local verification for this audit:
+
+```bash
+cd code
+dotnet test --no-restore --filter "Category!=Performance"
+```

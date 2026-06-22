@@ -663,24 +663,5 @@ internal class UniverseBuilder : IDisposable
     internal QueryTuningRecommendations GetQueryRecommendations(QueryType queryType) => _queryTuner.GetRecommendations(queryType);
 
     private static QueryContext InferQueryContext(QueryDefinition query)
-    {
-        string queryText = query.QueryText.ToUpperInvariant();
-
-        QueryType type = QueryType.Simple;
-
-        if (queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) && queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()))
-            type = QueryType.HybridSearch;
-        else if (queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()))
-            type = QueryType.VectorSearch;
-        else if (queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()))
-            type = QueryType.FullTextSearch;
-        else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
-            type = QueryType.Aggregation;
-        else if (queryText.Contains("JOIN"))
-            type = QueryType.Join;
-        else if (queryText.Contains("RRF") || queryText.Split(' ').Length > 20)
-            type = QueryType.Complex;
-
-        return new(type);
-    }
+        => new(QueryTypeDetector.Infer(query));
 }

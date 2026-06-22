@@ -33,6 +33,7 @@ The library is centered on these concepts:
 |   |-- FLUENT_QUERY_BUILDER.md
 |   |-- FULLTEXT_USAGE.md
 |   |-- QUERY_EXECUTION_STRATEGIES.md
+|   |-- ROADMAP_STATUS.md
 |   |-- SQLITE_STATISTICS_STORAGE.md
 |   `-- VECTORDISTANCE_USAGE.md
 `-- code/
@@ -110,6 +111,7 @@ code/Universe/
 |       |-- QueryExecutionStatistics.cs
 |       |-- QueryStrategySelector.cs
 |       |-- QueryTuner.cs
+|       |-- QueryTypeDetector.cs
 |       |-- VectorSearchStrategy.cs
 |       `-- Storage/
 |           |-- FileStatisticsStorage.cs
@@ -167,6 +169,7 @@ File responsibilities:
 - `Builder/Strategies/QueryExecutionStatistics.cs`: recorded performance/statistics model.
 - `Builder/Strategies/QueryStrategySelector.cs`: strategy selection and hint merging.
 - `Builder/Strategies/QueryTuner.cs`: in-memory statistics window, persistence coordination, and hint recommendation logic.
+- `Builder/Strategies/QueryTypeDetector.cs`: shared generated-SQL classifier used by strategy selection and hint-aware list execution.
 - `Builder/Strategies/Storage/IQueryStatisticsStorage.cs`: storage abstraction.
 - `Builder/Strategies/Storage/InMemoryStatisticsStorage.cs`: volatile statistics storage.
 - `Builder/Strategies/Storage/FileStatisticsStorage.cs`: JSON statistics persistence.
@@ -196,7 +199,10 @@ code/Universe.Tests/
 |-- Builder/
 |   |-- NamingPolicyQueryTests.cs
 |   |-- OrbitQueryTests.cs
+|   |-- QueryTypeDetectorTests.cs
 |   `-- ProjectionSelectTests.cs
+|-- Extensions/
+|   `-- PartitionKeyExtensionTests.cs
 |-- Helpers/
 |   `-- TestStatisticsFactory.cs
 |-- Storage/
@@ -336,8 +342,8 @@ The main library currently targets:
 - .NET `net10.0`
 - C# `14.0`
 - Nullable disabled
-- `Microsoft.Azure.Cosmos` `3.58.0`
-- `Microsoft.Data.Sqlite` `10.0.5`
+- `Microsoft.Azure.Cosmos` `3.61.0`
+- `Microsoft.Data.Sqlite` `10.0.9`
 - `Newtonsoft.Json` `13.0.4`
 
 `Universe.Tests` is an xUnit test project targeting `net10.0`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
@@ -919,6 +925,8 @@ Example sequencing:
 - `Builder/OrbitQueryTests.cs`: fluent API mirrors declarative API.
 - `Builder/NamingPolicyQueryTests.cs`: naming policy effects on SQL columns and aliases.
 - `Builder/ProjectionSelectTests.cs`: type-based projection column extraction.
+- `Builder/QueryTypeDetectorTests.cs`: generated-query classification for aggregation, full-text, vector, and hybrid strategy selection.
+- `Extensions/PartitionKeyExtensionTests.cs`: partition-key path and runtime value ordering, explicit key names, duplicate sequence validation, and max-level validation.
 - `Storage/FileStatisticsStorageTests.cs`: JSON statistics storage behavior.
 - `Storage/InMemoryStatisticsStorageTests.cs`: in-memory storage behavior.
 - `Storage/PlatformDetectionTests.cs`: path/platform detection behavior.
@@ -943,6 +951,7 @@ When adding tests:
 - `docs/VECTORDISTANCE_USAGE.md`: vector search guide.
 - `docs/FULLTEXT_USAGE.md`: full-text search guide.
 - `docs/QUERY_EXECUTION_STRATEGIES.md`: strategy and tuning overview.
+- `docs/ROADMAP_STATUS.md`: source-verified feature roadmap status and remaining gaps.
 - `docs/SQLITE_STATISTICS_STORAGE.md`: SQLite persistence configuration.
 - `docs/ADAPTIVE_QUERY_OPTIMIZATION_DESIGN.md`: design notes for adaptive optimization.
 
