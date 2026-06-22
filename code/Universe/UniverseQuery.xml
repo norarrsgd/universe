@@ -1008,6 +1008,29 @@
             Specialized strategy for vector search queries
             </summary>
         </member>
+        <member name="T:Universe.DocumentCacheOptions">
+            <summary>
+            Optional in-memory document cache configuration.
+            </summary>
+        </member>
+        <member name="F:Universe.DocumentCacheOptions.DefaultTimeToLive">
+            <summary>Default cache entry time-to-live.</summary>
+        </member>
+        <member name="F:Universe.DocumentCacheOptions.DefaultMaxEntries">
+            <summary>Default maximum number of cached entries.</summary>
+        </member>
+        <member name="P:Universe.DocumentCacheOptions.TimeToLive">
+            <summary>How long cached documents remain valid.</summary>
+        </member>
+        <member name="P:Universe.DocumentCacheOptions.MaxEntries">
+            <summary>Maximum number of entries retained by the cache.</summary>
+        </member>
+        <member name="P:Universe.DocumentCacheOptions.CloneDocuments">
+            <summary>Whether cache reads and writes clone document instances.</summary>
+        </member>
+        <member name="M:Universe.DocumentCacheOptions.#ctor(System.Nullable{System.TimeSpan},System.Int32,System.Boolean)">
+            <summary>Create document cache options.</summary>
+        </member>
         <member name="T:Universe.Exception.UniverseException">
             <summary></summary>
         </member>
@@ -1389,6 +1412,11 @@
             Storage backend for query statistics. Defaults to InMemoryStatisticsStorage.
             </summary>
         </member>
+        <member name="P:Universe.UniverseOptions.DocumentCache">
+            <summary>
+            Optional in-memory document cache. Null keeps caching fully disabled.
+            </summary>
+        </member>
         <member name="P:Universe.UniverseOptions.AutoProvisionContainers">
             <summary>
             Whether repository construction should create the Cosmos database and container if they do not exist.
@@ -1406,6 +1434,21 @@
             Disable this in production environments where infrastructure is managed separately.
             </summary>
             <param name="enabled">True to create missing containers automatically; false to use existing containers only.</param>
+            <returns>The same UniverseOptions instance for fluent configuration.</returns>
+        </member>
+        <member name="M:Universe.UniverseOptions.WithDocumentCache(System.Nullable{System.TimeSpan},System.Int32,System.Boolean)">
+            <summary>
+            Enables the optional in-memory document cache.
+            </summary>
+            <param name="timeToLive">Optional cache entry time-to-live. Defaults to 5 minutes.</param>
+            <param name="maxEntries">Maximum number of entries retained by the cache. Defaults to 1000.</param>
+            <param name="cloneDocuments">Whether cached documents should be cloned before storing and returning. Defaults to true.</param>
+            <returns>The same UniverseOptions instance for fluent configuration.</returns>
+        </member>
+        <member name="M:Universe.UniverseOptions.WithoutDocumentCache">
+            <summary>
+            Disables the optional document cache.
+            </summary>
             <returns>The same UniverseOptions instance for fluent configuration.</returns>
         </member>
         <member name="M:Universe.UniverseOptions.WithFilePersistence(System.String)">

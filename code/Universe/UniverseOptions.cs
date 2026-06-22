@@ -13,6 +13,11 @@ public sealed class UniverseOptions
     public IQueryStatisticsStorage StatisticsStorage { get; set; }
 
     /// <summary>
+    /// Optional in-memory document cache. Null keeps caching fully disabled.
+    /// </summary>
+    public DocumentCacheOptions DocumentCache { get; private set; }
+
+    /// <summary>
     /// Whether repository construction should create the Cosmos database and container if they do not exist.
     /// Defaults to true for backward compatibility.
     /// </summary>
@@ -36,6 +41,29 @@ public sealed class UniverseOptions
     public UniverseOptions WithAutoProvisioning(bool enabled)
     {
         AutoProvisionContainers = enabled;
+        return this;
+    }
+
+    /// <summary>
+    /// Enables the optional in-memory document cache.
+    /// </summary>
+    /// <param name="timeToLive">Optional cache entry time-to-live. Defaults to 5 minutes.</param>
+    /// <param name="maxEntries">Maximum number of entries retained by the cache. Defaults to 1000.</param>
+    /// <param name="cloneDocuments">Whether cached documents should be cloned before storing and returning. Defaults to true.</param>
+    /// <returns>The same UniverseOptions instance for fluent configuration.</returns>
+    public UniverseOptions WithDocumentCache(TimeSpan? timeToLive = null, int maxEntries = DocumentCacheOptions.DefaultMaxEntries, bool cloneDocuments = true)
+    {
+        DocumentCache = new(timeToLive, maxEntries, cloneDocuments);
+        return this;
+    }
+
+    /// <summary>
+    /// Disables the optional document cache.
+    /// </summary>
+    /// <returns>The same UniverseOptions instance for fluent configuration.</returns>
+    public UniverseOptions WithoutDocumentCache()
+    {
+        DocumentCache = null;
         return this;
     }
 

@@ -90,6 +90,27 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
 ));
 ```
 
+Document caching is available as an opt-in add-on and is disabled by default. It caches direct id/partition-key reads and single-document query reads only; list and paged queries still execute normally.
+
+```csharp
+UniverseOptions options = new UniverseOptions()
+    .WithAutoProvisioning(false)
+    .WithDocumentCache(
+        timeToLive: TimeSpan.FromMinutes(2),
+        maxEntries: 500,
+        cloneDocuments: true);
+
+_ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyRepository(
+    client: service.GetRequiredService<CosmosClient>(),
+    database: "database-name",
+    container: "container-name",
+    partitionKey: typeof(MyModel).BuildPartitionKey(),
+    options: options
+));
+```
+
+The cache is process-local memory. Universe invalidates local cached single-document query results on successful create, modify, and remove operations through the same repository scope. Changes made by other processes or direct Cosmos clients are visible after the configured cache time-to-live expires.
+
 5. Inject your `IGalaxy<MyModel>` dependency into your classes and enjoy a simpler way to query CosmosDb
 
 ## Understanding the Gravity Object

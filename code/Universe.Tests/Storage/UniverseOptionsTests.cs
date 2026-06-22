@@ -41,6 +41,67 @@ public sealed class UniverseOptionsTests : IDisposable
     }
 
     [Fact]
+    public void DefaultOptions_DisableDocumentCache()
+    {
+        UniverseOptions options = new();
+
+        Assert.Null(options.DocumentCache);
+    }
+
+    [Fact]
+    public void WithDocumentCache_EnablesDocumentCacheWithDefaults()
+    {
+        UniverseOptions options = new UniverseOptions().WithDocumentCache();
+
+        Assert.NotNull(options.DocumentCache);
+        Assert.Equal(TimeSpan.FromMinutes(5), options.DocumentCache.TimeToLive);
+        Assert.Equal(1000, options.DocumentCache.MaxEntries);
+        Assert.True(options.DocumentCache.CloneDocuments);
+    }
+
+    [Fact]
+    public void WithDocumentCache_AcceptsCustomOptions()
+    {
+        UniverseOptions options = new UniverseOptions().WithDocumentCache(
+            timeToLive: TimeSpan.FromSeconds(30),
+            maxEntries: 25,
+            cloneDocuments: false);
+
+        Assert.NotNull(options.DocumentCache);
+        Assert.Equal(TimeSpan.FromSeconds(30), options.DocumentCache.TimeToLive);
+        Assert.Equal(25, options.DocumentCache.MaxEntries);
+        Assert.False(options.DocumentCache.CloneDocuments);
+    }
+
+    [Fact]
+    public void WithoutDocumentCache_DisablesDocumentCache()
+    {
+        UniverseOptions options = new UniverseOptions()
+            .WithDocumentCache()
+            .WithoutDocumentCache();
+
+        Assert.Null(options.DocumentCache);
+    }
+
+    [Fact]
+    public void WithDocumentCache_InvalidTimeToLive_ThrowsUniverseException()
+    {
+        UniverseException exception = Assert.Throws<UniverseException>(
+            () => new UniverseOptions().WithDocumentCache(TimeSpan.Zero));
+
+        Assert.Equal("Document cache time-to-live must be greater than zero.", exception.Message);
+    }
+
+    [Fact]
+    public void WithDocumentCache_InvalidMaxEntries_ThrowsUniverseException()
+    {
+        UniverseException exception = Assert.Throws<UniverseException>(
+            () => new UniverseOptions().WithDocumentCache(maxEntries: 0));
+
+        Assert.Equal("Document cache max entries must be greater than zero.", exception.Message);
+    }
+
+    [Fact]
     public void WithAutoProvisioningFalse_DisablesAutoProvisioning()
     {
         UniverseOptions options = new UniverseOptions().WithAutoProvisioning(false);
@@ -67,6 +128,25 @@ public sealed class UniverseOptionsTests : IDisposable
             options = options.WithAutoProvisioning(false);
 
             Assert.False(options.AutoProvisionContainers);
+            Assert.IsType<FileStatisticsStorage>(options.StatisticsStorage);
+        }
+        finally
+        {
+            DisposeStatisticsStorage(options);
+        }
+    }
+
+    [Fact]
+    public void FilePersistence_WithDocumentCache_PreservesStorage()
+    {
+        string path = Track(Path.Combine(AppContext.BaseDirectory, $"options-{Guid.NewGuid()}.json"));
+
+        UniverseOptions options = UniverseOptions.WithFilePersistence(path);
+        try
+        {
+            options = options.WithDocumentCache(TimeSpan.FromSeconds(15), 10);
+
+            Assert.NotNull(options.DocumentCache);
             Assert.IsType<FileStatisticsStorage>(options.StatisticsStorage);
         }
         finally

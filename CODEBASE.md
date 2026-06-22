@@ -54,11 +54,13 @@ code/
 |   |-- GalaxyBasic.cs
 |   |-- Galaxy.cs
 |   |-- GalaxyProcedures.cs
+|   |-- DocumentCacheOptions.cs
 |   |-- UniverseOptions.cs
 |   |-- Builder/
 |   |   |-- QueryBuilder.cs
 |   |   |-- Orbit.cs
 |   |   |-- ClusterBuilder.cs
+|   |   |-- Caching/
 |   |   |-- Options/
 |   |   `-- Strategies/
 |   |-- Interfaces/
@@ -138,6 +140,7 @@ code/Universe/
 |-- GalaxyBasic.cs
 |-- GalaxyCore.cs
 |-- GalaxyProcedures.cs
+|-- DocumentCacheOptions.cs
 |-- UniverseOptions.cs
 |-- UniverseQuery.csproj
 |-- UniverseQuery.xml
@@ -148,6 +151,7 @@ code/Universe/
 File responsibilities:
 
 - `Attributes/PartitionKeyAttribute.cs`: attribute for marking partition-key properties. It supports default sequence `1`, validates sequence `1` through `3`, and optionally accepts an explicit Cosmos key name.
+- `Builder/Caching/DocumentCache.cs`: optional process-local document cache used only when `UniverseOptions.WithDocumentCache(...)` is configured.
 - `Builder/ClusterBuilder.cs`: fluent builder for one `Cluster`. It stores catalysts in order and tracks the next intra-cluster `AND` / `OR` connector.
 - `Builder/Orbit.cs`: public fluent query builder. It accumulates clusters, selected columns, sort options, aggregates, group-by columns, pagination, joins, hints, and execution mode.
 - `Builder/QueryBuilder.cs`: internal SQL-generation and query-dispatch core. Treat as security-sensitive.
@@ -185,9 +189,10 @@ File responsibilities:
 - `GalaxyBasic.cs`: basic document operations and bulk transaction batch operations.
 - `Galaxy.cs`: advanced query operations and generated-query inspection.
 - `GalaxyProcedures.cs`: stored procedure operations.
+- `DocumentCacheOptions.cs`: opt-in document-cache configuration and cache ownership.
 - `Interfaces/*.cs`: public contracts.
 - `Response/Response.cs`: `Gravity` response record.
-- `UniverseOptions.cs`: user-facing query-statistics persistence configuration.
+- `UniverseOptions.cs`: user-facing query-statistics persistence, document-cache, and repository provisioning configuration.
 - `global-usings.cs`: shared namespace imports.
 
 ### `code/Universe.Tests`
@@ -361,6 +366,7 @@ Primary consumer entry points:
 - Use `Cluster` / `Catalyst` directly for declarative query construction.
 - Configure serializer behavior with `new UniverseSerializer(...)` on `CosmosClientOptions.Serializer`.
 - Configure tuning persistence with `UniverseOptions.WithFilePersistence(...)` or `UniverseOptions.WithSqlitePersistence(...)`.
+- Enable optional process-local document caching with `UniverseOptions.WithDocumentCache(...)`.
 
 Important public contracts:
 
@@ -387,6 +393,7 @@ Important public contracts:
 6. Query execution uses a strategy selected by `QueryStrategySelector`.
 7. Execution returns `Gravity` plus the requested model/list/projection result.
 8. Query execution statistics are recorded by `QueryTuner` and optionally persisted through `UniverseOptions`.
+9. If document caching is explicitly enabled, point reads and single-document query reads check the process-local cache before executing Cosmos requests.
 
 ## Detailed Operation Flows
 
@@ -464,6 +471,8 @@ Both set `EnableContentResponseOnWrite = false` and convert not found into `{T} 
 
 `Get(id, string partitionKey)` and `Get(id, params string[] partitionKey)` call `ReadItemAsync` and return request charge plus resource. Not found is converted into `{T} does not exist.`
 
+When `UniverseOptions.WithDocumentCache(...)` is configured, direct id reads are cached by hashed database/container/type/id/partition-key scope. Cache hits return `Gravity.RU = 0`. Without `DocumentCache`, the code path only performs a null check and behaves as before.
+
 ### Query Get/List/Paged
 
 `Galaxy<T>.Get(...)`:
@@ -472,6 +481,7 @@ Both set `EnableContentResponseOnWrite = false` and convert not found into `{T} 
 - Executes through `QBuilder.GetOneFromQuery`.
 - Internally forces `MaxItemCount = 1` in the `QueryContext`.
 - Returns first result or `default`.
+- When document caching is enabled, generated SQL and ordered parameter values are normalized into a hashed cache key before execution. Random catalyst ids in parameter names are normalized so equivalent query shapes can hit the same cache entry.
 
 `Galaxy<T>.List(...)`:
 
@@ -798,6 +808,34 @@ Storage behavior:
 - `PlatformDetection.IsAzureEnvironment()` checks `WEBSITE_INSTANCE_ID` and Functions environment variables.
 - `ValidateStoragePath` normalizes with `Path.GetFullPath`, rejects null bytes, and requires a rooted result.
 
+## Optional Document Cache
+
+Document caching is an opt-in add-on configured through `UniverseOptions.WithDocumentCache(...)`. A default `UniverseOptions` instance leaves `DocumentCache` null, and repository read paths do not allocate cache entries, serialize query parameters, clone documents, or build cache keys unless the option is set.
+
+Cached operations:
+
+- `IGalaxyBasic<T>.Get(id, partitionKey...)`
+- `IGalaxy<T>.Get(...)`
+- `IGalaxy<T>.Get<TS>(...)`
+
+Uncached operations:
+
+- `List`
+- `Paged`
+- `GenerateQuery`
+- Query recommendations
+- Stored procedure operations
+
+Invalidation behavior:
+
+- Successful create/modify/remove operations clear same-repository single-document query cache entries.
+- Successful create/modify operations update known point-read entries.
+- Successful remove operations delete known point-read entries.
+- Bulk create and bulk modify update known submitted point entries and clear same-repository query entries after all batches succeed.
+- External writers are not observed; they rely on cache time-to-live expiration.
+
+Cache keys are SHA-256 hashes built from operation kind, database, container, source entity type, result type, and operation inputs. Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with `System.Text.Json` settings aligned with `UniverseSerializer`; clone failures skip or evict the affected cache entry.
+
 ## Data Model And Serialization
 
 `ICosmicEntity` requires:
@@ -866,6 +904,7 @@ Current protections:
 - Identifier segments are rendered as bracketed Cosmos property access.
 - FTScore values are parameterized even in rank ordering.
 - RRF weights are validated as numeric content.
+- Optional document-cache dictionary keys are hashed instead of storing raw ids, partition keys, query text, or parameter values as readable key strings.
 - Query statistics store query hashes and performance metadata, not raw parameter values.
 - `recordQueries` defaults to `false`.
 
@@ -931,6 +970,8 @@ Example sequencing:
 - `Storage/InMemoryStatisticsStorageTests.cs`: in-memory storage behavior.
 - `Storage/PlatformDetectionTests.cs`: path/platform detection behavior.
 - `Storage/SqliteStatisticsStorageTests.cs`: SQLite persistence behavior.
+- `Caching/DocumentCacheTests.cs`: cache key hashing, TTL, eviction, cloning, and query-key normalization behavior.
+- `Caching/DocumentCacheRepositoryTests.cs`: opt-in repository cache behavior using fake Cosmos SDK abstractions.
 - `Tuner/QueryTunerTests.cs`: recommendation and persistence behavior.
 - `Tuner/QueryTunerPerformanceTests.cs`: tuner performance checks.
 - `Helpers/TestStatisticsFactory.cs`: shared test statistics builders.
@@ -996,6 +1037,7 @@ coderabbit review
 ## Common Gotchas
 
 - `recordQueries` is convenient but can expose sensitive parameter values.
+- Document caching is disabled by default; enabling it creates process-local state and external writers are visible after TTL expiration, not through distributed invalidation.
 - `DarkMatter` examples intentionally use debug-style logging and should not define production logging standards.
 - `Paged()` stops after the first non-empty page except for `GROUP BY`, where continuation token behavior is different.
 - Query hints are not accepted with fluent paged queries.
