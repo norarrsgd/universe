@@ -32,5 +32,6 @@ public class PartitionKeyAttribute : Attribute
             throw new ArgumentOutOfRangeException(nameof(sequence), "Partition key sequence must be between 1 and 3.");
 
         Sequence = sequence;
+        KeyName = keyName;
     }
 }

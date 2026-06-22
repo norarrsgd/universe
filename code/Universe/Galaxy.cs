@@ -137,22 +137,5 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
     }
 
     private static QueryType InferQueryType(QueryDefinition query)
-    {
-        string queryText = query.QueryText.ToUpperInvariant();
-
-        if (queryText.Contains("VECTORDISTANCE") && queryText.Contains("FULLTEXTSCORE"))
-            return QueryType.HybridSearch;
-        else if (queryText.Contains("VECTORDISTANCE"))
-            return QueryType.VectorSearch;
-        else if (queryText.Contains("FULLTEXTSCORE"))
-            return QueryType.FullTextSearch;
-        else if (queryText.Contains("GROUP BY") || queryText.Contains("COUNT") || queryText.Contains("SUM"))
-            return QueryType.Aggregation;
-        else if (queryText.Contains("JOIN"))
-            return QueryType.Join;
-        else if (queryText.Contains("RRF") || queryText.Split(' ').Length > 20)
-            return QueryType.Complex;
-
-        return QueryType.Simple;
-    }
+        => QueryTypeDetector.Infer(query);
 }
