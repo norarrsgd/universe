@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Universe.Builder.Caching;
 
 namespace Universe;
 
@@ -12,6 +13,9 @@ public abstract class GalaxyCore : IDisposable
     internal readonly bool _recordQuery;
     internal readonly bool _allowBulk;
     internal readonly JsonNamingPolicy _namingPolicy;
+    internal readonly string _databaseName;
+    internal readonly string _containerName;
+    internal readonly DocumentCacheOptions _documentCacheOptions;
 
     /// <summary>
     /// Initialize Galaxy core with Cosmos DB connection.
@@ -33,7 +37,7 @@ public abstract class GalaxyCore : IDisposable
     /// in Gravity responses. This may expose sensitive data (PII, filter values). Use only for debugging — never enable in production.
     /// </remarks>
     protected GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, UniverseOptions options, bool recordQueries = false)
-        : this(client, database, container, partitionKey, recordQueries, RequireOptions(options).AutoProvisionContainers)
+        : this(client, database, container, partitionKey, recordQueries, RequireOptions(options))
     {
     }
 
@@ -41,6 +45,23 @@ public abstract class GalaxyCore : IDisposable
         options ?? throw new UniverseException("Universe options are required.");
 
     private GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries, bool autoProvisionContainers)
+        : this(client, database, container, partitionKey, recordQueries, autoProvisionContainers, documentCacheOptions: null)
+    {
+    }
+
+    private GalaxyCore(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey, bool recordQueries, UniverseOptions options)
+        : this(client, database, container, partitionKey, recordQueries, options.AutoProvisionContainers, options.DocumentCache)
+    {
+    }
+
+    private GalaxyCore(
+        CosmosClient client,
+        string database,
+        string container,
+        IReadOnlyList<string> partitionKey,
+        bool recordQueries,
+        bool autoProvisionContainers,
+        DocumentCacheOptions documentCacheOptions)
     {
         if (string.IsNullOrWhiteSpace(container))
             throw new UniverseException("Container name is required");
@@ -49,6 +70,9 @@ public abstract class GalaxyCore : IDisposable
             throw new UniverseException("Database name is required");
 
         _recordQuery = recordQueries;
+        _databaseName = database;
+        _containerName = container;
+        _documentCacheOptions = documentCacheOptions;
         if (client.ClientOptions is not null)
         {
             _allowBulk = client.ClientOptions.AllowBulkExecution;
@@ -68,6 +92,11 @@ public abstract class GalaxyCore : IDisposable
             _container = client.GetContainer(database, container);
         }
     }
+
+    internal DocumentCache DocumentCache => _documentCacheOptions?.Cache;
+
+    internal string DocumentCacheScopeHash(Type sourceType)
+        => DocumentCache.CreateScopeHash(_databaseName, _containerName, sourceType);
 
     #region Dispose Pattern
 

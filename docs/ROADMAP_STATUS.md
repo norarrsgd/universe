@@ -83,17 +83,25 @@ Implemented:
 - Query tuning recommendations can be rule-based or data-driven from historical samples.
 - File and SQLite statistics persistence are available through `UniverseOptions`.
 
-## Not Complete
-
 ### 2.2 Optional Document Cache And Invalidation Layer
 
-Status: not implemented.
+Status: complete.
 
-The current in-memory components are query-statistics storage and reflection/projection metadata caches. They do not satisfy the roadmap item for an optional cache of frequently accessed documents with invalidation based on document changes.
+Implemented:
 
-Recommended next feature:
+- Document caching is disabled by default and enabled explicitly through `UniverseOptions.WithDocumentCache(...)`.
+- Direct id/partition-key reads and single-document query reads can be cached.
+- Cache keys are hashed and scoped by database, container, source type, result type, and operation kind.
+- Cached values are cloned by default to prevent caller mutation from corrupting cache state.
+- Successful create, modify, remove, bulk create, and bulk modify operations invalidate same-repository single-document query cache entries.
+- Point-read cache entries are updated or removed for local single-document writes where the affected id and partition key are known.
+- Tests use fake Cosmos SDK abstractions and do not require a live Cosmos DB account.
 
-- Add an explicit optional document cache feature with configuration, clear invalidation semantics on create/modify/remove, and tests that do not require live Cosmos DB.
+Caveat:
+
+- The cache is process-local. External writers are handled by the configured time-to-live, not distributed invalidation.
+
+## Not Complete
 
 ### 2.3 RU Budget Management
 

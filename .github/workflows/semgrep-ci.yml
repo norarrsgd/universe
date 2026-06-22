@@ -5,6 +5,9 @@ on:
       - dev
       - prod
 
+permissions:
+  contents: read
+
 jobs:
   semgrep:
     name: Semgrep Scan

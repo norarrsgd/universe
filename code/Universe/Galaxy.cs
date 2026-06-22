@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using Universe.Builder.Caching;
 using Universe.Response;
 using Universe.Builder.Strategies;
 
@@ -51,7 +52,12 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         try
         {
             QueryDefinition query = QBuilder.CreateQuery(clusters, columnOptions: columns is null || !columns.Any() ? null : new(columns));
-            return await QBuilder.GetOneFromQuery<TArgType>(_container, query);
+            if (TryGetQueryCache(query, out TArgType cached, out IReadOnlyList<(string, object)> cacheParameters))
+                return (new(0, null, _recordQuery ? (query.QueryText, cacheParameters) : default), cached);
+
+            (Gravity gravity, TArgType result) = await QBuilder.GetOneFromQuery<TArgType>(_container, query);
+            SetQueryCache(query, result);
+            return (gravity, result);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -116,6 +122,52 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
     }
 
     QueryTuningRecommendations IGalaxy<T>.GetQueryRecommendations(string queryPattern, QueryType queryType) => QBuilder.GetQueryRecommendations(queryType);
+
+    private bool TryGetQueryCache<TArgType>(QueryDefinition query, out TArgType value, out IReadOnlyList<(string, object)> parameters)
+    {
+        value = default;
+        parameters = default;
+        DocumentCache cache = DocumentCache;
+        if (cache is null)
+            return false;
+
+        if (!TryCreateQueryCacheKey<TArgType>(cache, query, out DocumentCacheKey key, out parameters))
+            return false;
+
+        return cache.TryGet(key, out value);
+    }
+
+    private void SetQueryCache<TArgType>(QueryDefinition query, TArgType value)
+    {
+        DocumentCache cache = DocumentCache;
+        if (cache is null)
+            return;
+
+        if (!TryCreateQueryCacheKey<TArgType>(cache, query, out DocumentCacheKey key, out _))
+            return;
+
+        cache.Set(key, DocumentCacheOperation.SingleQuery, DocumentCacheScopeHash(typeof(T)), value);
+    }
+
+    private bool TryCreateQueryCacheKey<TArgType>(
+        DocumentCache cache,
+        QueryDefinition query,
+        out DocumentCacheKey key,
+        out IReadOnlyList<(string, object)> parameters)
+    {
+        key = default;
+        parameters = default;
+        try
+        {
+            parameters = query.GetQueryParameters();
+            key = cache.CreateQueryKey(_databaseName, _containerName, typeof(T), typeof(TArgType), query.QueryText, parameters);
+            return true;
+        }
+        catch (SystemException)
+        {
+            return false;
+        }
+    }
 
     private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints)
     {

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Universe.Builder;
+using Universe.Builder.Caching;
 using Universe.Builder.Strategies;
 using Universe.Response;
 
@@ -57,6 +58,8 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 {
                     EnableContentResponseOnWrite = false
                 });
+            SetPointCache(model);
+            ClearQueryCache();
             return (new(response.RequestCharge, null), model.id);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
@@ -117,6 +120,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             await Task.WhenAll(tasks);
             double totalRu = tasks.Sum(t => t.Result);
 
+            foreach (T model in models)
+                SetPointCache(model);
+
+            ClearQueryCache();
             return new(totalRu, string.Empty);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
@@ -136,6 +143,8 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             model.ModifiedOn = DateTime.UtcNow;
 
             ItemResponse<T> response = await _container.ReplaceItemAsync(model, model.id, model.BuildPartitionKey());
+            SetPointCache(response.Resource ?? model);
+            ClearQueryCache();
             return (new(response.RequestCharge, null), response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -194,6 +203,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             await Task.WhenAll(tasks);
             double totalRu = tasks.Sum(t => t.Result);
 
+            foreach (T model in models)
+                SetPointCache(model);
+
+            ClearQueryCache();
             return new(totalRu, string.Empty);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -231,6 +244,8 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             {
                 EnableContentResponseOnWrite = false
             });
+            RemovePointCache(id, partitionKey);
+            ClearQueryCache();
             return new(response.RequestCharge, null);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -251,6 +266,8 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             {
                 EnableContentResponseOnWrite = false
             });
+            RemovePointCache(id, [partitionKey]);
+            ClearQueryCache();
             return new(response.RequestCharge, null);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -267,7 +284,11 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         try
         {
+            if (TryGetPointCache(id, partitionKey, out T cached))
+                return (new(0, null), cached);
+
             ItemResponse<T> response = await _container.ReadItemAsync<T>(id, BuildPartitionKey(partitionKey));
+            SetPointCache(id, partitionKey, response.Resource);
             return (new(response.RequestCharge, null), response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -284,7 +305,11 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         try
         {
+            if (TryGetPointCache(id, [partitionKey], out T cached))
+                return (new(0, null), cached);
+
             ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new(partitionKey));
+            SetPointCache(id, [partitionKey], response.Resource);
             return (new(response.RequestCharge, null), response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -295,5 +320,54 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
         }
+    }
+
+    private bool TryGetPointCache(string id, IReadOnlyList<string> partitionKeys, out T value)
+    {
+        value = default;
+        DocumentCache cache = DocumentCache;
+        if (cache is null)
+            return false;
+
+        DocumentCacheKey key = cache.CreatePointKey(_databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
+        return cache.TryGet(key, out value);
+    }
+
+    private void SetPointCache(T model)
+    {
+        DocumentCache cache = DocumentCache;
+        if (cache is null || model is null)
+            return;
+
+        SetPointCache(model.id, [.. model.PartitionKeys()], model);
+    }
+
+    private void SetPointCache(string id, IReadOnlyList<string> partitionKeys, T model)
+    {
+        DocumentCache cache = DocumentCache;
+        if (cache is null || model is null)
+            return;
+
+        DocumentCacheKey key = cache.CreatePointKey(_databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
+        cache.Set(key, DocumentCacheOperation.PointRead, DocumentCacheScopeHash(typeof(T)), model);
+    }
+
+    private void RemovePointCache(string id, IReadOnlyList<string> partitionKeys)
+    {
+        DocumentCache cache = DocumentCache;
+        if (cache is null)
+            return;
+
+        DocumentCacheKey key = cache.CreatePointKey(_databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
+        cache.Remove(key);
+    }
+
+    private void ClearQueryCache()
+    {
+        DocumentCache cache = DocumentCache;
+        if (cache is null)
+            return;
+
+        cache.ClearQueries(DocumentCacheScopeHash(typeof(T)));
     }
 }
