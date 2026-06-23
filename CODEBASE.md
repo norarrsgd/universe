@@ -350,6 +350,8 @@ The main library currently targets:
 - `Microsoft.Azure.Cosmos` `3.61.0`
 - `Microsoft.Data.Sqlite` `10.0.9`
 - `Newtonsoft.Json` `13.0.4`
+- `SQLitePCLRaw.bundle_e_sqlite3` `3.0.3`
+- `SQLitePCLRaw.core` `3.0.3`
 
 `Universe.Tests` is an xUnit test project targeting `net10.0`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
 
