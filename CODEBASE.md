@@ -350,20 +350,20 @@ dotnet run
 
 ## Target Runtime And Packages
 
-The current package version is `3.5.0` (stable), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
+The current package version is `3.5.1-preview.1` (prerelease), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
 
 The main library currently targets:
 
 - .NET `net10.0`
 - C# `14.0`
 - Nullable disabled
-- `Microsoft.Azure.Cosmos` `3.62.1`
-- `Microsoft.Data.Sqlite` `10.0.11`
+- `Microsoft.Azure.Cosmos` `3.63.2`
+- `Microsoft.Data.Sqlite` `10.0.13`
 - `Newtonsoft.Json` `13.0.4`
 - `SQLitePCLRaw.bundle_e_sqlite3` `3.0.5`
 - `SQLitePCLRaw.core` `3.0.5`
 
-`Universe.Tests` is an xUnit test project targeting `net10.0`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
+`Universe.Tests` is an xUnit test project targeting `net10.0`, using `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3` `3.2.2`, and `xunit.runner.visualstudio` `3.1.5`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
 
 ## Public API Map
 
