@@ -12,7 +12,7 @@ public sealed class DocumentCacheTests
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1000, cloneDocuments: true));
 
-        DocumentCacheKey key = cache.CreatePointKey(
+        DocumentCacheKey key = cache.CreatePointKey("client",
             database: "db-secret",
             container: "container-secret",
             sourceType: typeof(CacheEntity),
@@ -31,7 +31,7 @@ public sealed class DocumentCacheTests
     public void TryGet_ReturnsFalseAfterExpiration()
     {
         DocumentCache cache = new(new(TimeSpan.FromMilliseconds(1), 1000, cloneDocuments: true));
-        DocumentCacheKey key = cache.CreatePointKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
+        DocumentCacheKey key = cache.CreatePointKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
 
         cache.Set(key, DocumentCacheOperation.PointRead, scopeHash: "scope", new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "cached" });
         Thread.Sleep(20);
@@ -46,7 +46,7 @@ public sealed class DocumentCacheTests
     public void TryGet_ClonesCachedValueByDefault()
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1000, cloneDocuments: true));
-        DocumentCacheKey key = cache.CreatePointKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
+        DocumentCacheKey key = cache.CreatePointKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
 
         cache.Set(key, DocumentCacheOperation.PointRead, scopeHash: "scope", new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "cached" });
 
@@ -62,7 +62,7 @@ public sealed class DocumentCacheTests
     public void TryGet_ReturnsSameInstanceWhenCloningDisabled()
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1000, cloneDocuments: false));
-        DocumentCacheKey key = cache.CreatePointKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
+        DocumentCacheKey key = cache.CreatePointKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
         CacheEntity entity = new() { id = "id-1", TenantId = "tenant-1", Name = "cached" };
 
         cache.Set(key, DocumentCacheOperation.PointRead, scopeHash: "scope", entity);
@@ -77,8 +77,8 @@ public sealed class DocumentCacheTests
     public void Set_EvictsOldestEntryWhenMaxEntriesExceeded()
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1, cloneDocuments: true));
-        DocumentCacheKey firstKey = cache.CreatePointKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
-        DocumentCacheKey secondKey = cache.CreatePointKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-2", ["tenant-1"]);
+        DocumentCacheKey firstKey = cache.CreatePointKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
+        DocumentCacheKey secondKey = cache.CreatePointKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-2", ["tenant-1"]);
 
         cache.Set(firstKey, DocumentCacheOperation.PointRead, scopeHash: "scope", new CacheEntity { id = "id-1", TenantId = "tenant-1" });
         cache.Set(secondKey, DocumentCacheOperation.PointRead, scopeHash: "scope", new CacheEntity { id = "id-2", TenantId = "tenant-1" });
@@ -92,10 +92,10 @@ public sealed class DocumentCacheTests
     public void ClearQueries_RemovesOnlyQueryEntriesForScope()
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1000, cloneDocuments: true));
-        DocumentCacheKey queryKey = cache.CreateQueryKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "SELECT * FROM c", []);
-        DocumentCacheKey pointKey = cache.CreatePointKey("db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
+        DocumentCacheKey queryKey = cache.CreateQueryKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "SELECT * FROM c", []);
+        DocumentCacheKey pointKey = cache.CreatePointKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), "id-1", ["tenant-1"]);
 
-        string scopeHash = cache.CreateScopeHash("db", "container", typeof(CacheEntity));
+        string scopeHash = cache.CreateScopeHash("client", "db", "container", typeof(CacheEntity));
         cache.Set(queryKey, DocumentCacheOperation.SingleQuery, scopeHash, new CacheEntity { id = "id-1", TenantId = "tenant-1" });
         cache.Set(pointKey, DocumentCacheOperation.PointRead, scopeHash, new CacheEntity { id = "id-1", TenantId = "tenant-1" });
 
@@ -110,14 +110,14 @@ public sealed class DocumentCacheTests
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1000, cloneDocuments: true));
 
-        DocumentCacheKey first = cache.CreateQueryKey(
+        DocumentCacheKey first = cache.CreateQueryKey("client",
             "db",
             "container",
             typeof(CacheEntity),
             typeof(CacheEntity),
             "SELECT * FROM c WHERE c[\"name\"] = @name018f1",
             [("@name018f1", "value")]);
-        DocumentCacheKey second = cache.CreateQueryKey(
+        DocumentCacheKey second = cache.CreateQueryKey("client",
             "db",
             "container",
             typeof(CacheEntity),

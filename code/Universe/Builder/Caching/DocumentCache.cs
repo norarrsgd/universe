@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -28,11 +29,16 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
 
     private readonly ConcurrentDictionary<DocumentCacheKey, DocumentCacheEntry> _entries = [];
     private readonly ConcurrentQueue<DocumentCacheKey> _insertionOrder = [];
+    private readonly ConditionalWeakTable<CosmosClient, string> _clientNamespaces = new();
 
-    internal string CreateScopeHash(string database, string container, Type sourceType)
-        => HashParts(["scope", database, container, sourceType.AssemblyQualifiedName]);
+    internal string GetClientNamespace(CosmosClient client)
+        => _clientNamespaces.GetValue(client, static _ => Guid.NewGuid().ToString("N"));
+
+    internal string CreateScopeHash(string clientNamespace, string database, string container, Type sourceType)
+        => HashParts(["scope", clientNamespace, database, container, sourceType.AssemblyQualifiedName]);
 
     internal DocumentCacheKey CreatePointKey(
+        string clientNamespace,
         string database,
         string container,
         Type sourceType,
@@ -41,6 +47,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         IReadOnlyList<string> partitionKeys)
         => new(HashParts([
             "point",
+            clientNamespace,
             database,
             container,
             sourceType.AssemblyQualifiedName,
@@ -50,6 +57,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         ]));
 
     internal DocumentCacheKey CreateQueryKey(
+        string clientNamespace,
         string database,
         string container,
         Type sourceType,
@@ -61,6 +69,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         List<string> parts =
         [
             "query",
+            clientNamespace,
             database,
             container,
             sourceType.AssemblyQualifiedName,

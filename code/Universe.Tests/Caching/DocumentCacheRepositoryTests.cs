@@ -1,22 +1,126 @@
-using System.Collections;
 using System.Net;
 using System.Reflection;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Scripts;
 using Universe.Attributes;
 using Universe.Extensions;
 using Universe.Interfaces;
 using Universe.Response;
+using Universe.Tests.Helpers;
 using Xunit;
 
 namespace Universe.Tests.Caching;
 
 public sealed class DocumentCacheRepositoryTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task PointGet_DifferentClients_DoNotShareDocumentsOrETags(bool differentAccount, bool arrayPartitionKey)
+    {
+        using CosmosClient firstClient = CreateClient();
+        using CosmosClient secondClient = CreateClient(differentAccount ? "https://other-account:8081" : "https://localhost:8081");
+        UniverseOptions options = new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache();
+        QueryTestContainer firstContainer = new() { ReadItemResult = Entity("private-first"), ETag = "first-etag" };
+        QueryTestContainer secondContainer = new() { ReadItemResult = Entity("private-second"), ETag = "second-etag" };
+        using TestGalaxy first = new(firstContainer, options, client: firstClient);
+        using TestGalaxy second = new(secondContainer, options, client: secondClient);
+
+        await first.PointGet("id-1", "tenant-1");
+        (Gravity gravity, CacheEntity result) = arrayPartitionKey
+            ? await second.PointGetArray("id-1", ["tenant-1"])
+            : await second.PointGet("id-1", "tenant-1");
+
+        Assert.Equal("private-second", result.Name);
+        Assert.Equal("second-etag", gravity.ETag);
+        Assert.Equal(9.5, gravity.RU);
+        Assert.Equal(1, secondContainer.ReadItemCalls);
+    }
+
+    [Fact]
+    public async Task PointGet_DifferentClient_StillEnforcesContainerAuthorization()
+    {
+        UniverseOptions options = new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache();
+        using TestGalaxy first = new(new() { ReadItemResult = Entity("private") }, options);
+        QueryTestContainer denied = new() { ReadException = new CosmosException("Forbidden", HttpStatusCode.Forbidden, 0, "test", 0) };
+        using TestGalaxy second = new(denied, options);
+        await first.PointGet("id-1", "tenant-1");
+
+        var exception = await Assert.ThrowsAsync<Universe.Exception.UniverseException>(() => second.PointGet("id-1", "tenant-1"));
+
+        Assert.IsType<CosmosException>(exception.InnerException);
+        Assert.Equal(1, denied.ReadItemCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueryGet_DifferentClients_DoNotShareResults(bool projected)
+    {
+        UniverseOptions options = new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache();
+        QueryTestContainer firstContainer = new() { QueryItems = projected ? [new CacheProjection { Name = "first" }] : [Entity("first")] };
+        QueryTestContainer secondContainer = new() { QueryItems = projected ? [new CacheProjection { Name = "second" }] : [Entity("second")] };
+        using TestGalaxy first = new(firstContainer, options);
+        using TestGalaxy second = new(secondContainer, options);
+
+        if (projected)
+        {
+            await first.QueryGetProjection();
+            (Gravity gravity, CacheProjection result) = await second.QueryGetProjection();
+            Assert.Equal("second", result.Name);
+            Assert.Equal(7.25, gravity.RU);
+        }
+        else
+        {
+            await first.QueryGet("same-name");
+            (Gravity gravity, CacheEntity result) = await second.QueryGet("same-name");
+            Assert.Equal("second", result.Name);
+            Assert.Equal(7.25, gravity.RU);
+        }
+
+        Assert.Equal(1, secondContainer.QueryCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Modify_ScopesSharedHitsAndInvalidationToClient(bool sameClient)
+    {
+        using CosmosClient firstClient = CreateClient();
+        using CosmosClient otherClient = CreateClient();
+        UniverseOptions options = new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache();
+        QueryTestContainer firstContainer = new() { ReadItemResult = Entity("first"), QueryItems = [Entity("first")], ReplaceItemResult = Entity("updated") };
+        QueryTestContainer secondContainer = new() { ReadItemResult = Entity("second"), QueryItems = [Entity("second")] };
+        using TestGalaxy first = new(firstContainer, options, client: firstClient);
+        using TestGalaxy second = new(secondContainer, options, client: sameClient ? firstClient : otherClient);
+        await first.PointGet("id-1", "tenant-1");
+        await first.QueryGet("same-name");
+        await second.PointGet("id-1", "tenant-1");
+        await second.QueryGet("same-name");
+        Assert.Equal(sameClient ? 0 : 1, secondContainer.ReadItemCalls);
+        Assert.Equal(sameClient ? 0 : 1, secondContainer.QueryCalls);
+
+        await first.ModifyEntity(Entity("updated"));
+        secondContainer.QueryItems = [Entity("query-after-write")];
+        (Gravity pointGravity, CacheEntity point) = await second.PointGet("id-1", "tenant-1");
+        (Gravity queryGravity, CacheEntity query) = await second.QueryGet("same-name");
+
+        Assert.Equal(sameClient ? "updated" : "second", point.Name);
+        Assert.Equal(0, pointGravity.RU);
+        Assert.Equal(sameClient ? "query-after-write" : "second", query.Name);
+        Assert.Equal(sameClient ? 7.25 : 0, queryGravity.RU);
+    }
+
+    private static CacheEntity Entity(string name) => new() { id = "id-1", TenantId = "tenant-1", Name = name };
+
+    private static CosmosClient CreateClient(string endpoint = "https://localhost:8081")
+        => new(endpoint, Convert.ToBase64String(new byte[64]), new CosmosClientOptions { AllowBulkExecution = true });
+
     [Fact]
     public async Task PointGet_CacheDisabled_ReadsContainerEveryTime()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             ReadItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "from-cosmos" }
         };
@@ -33,7 +137,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task PointGet_CacheEnabled_ReturnsSecondReadFromCache()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             ReadItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "from-cosmos" }
         };
@@ -52,7 +156,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task PointGet_CacheEnabled_PreservesETag()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             ReadItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "from-cosmos" }
         };
@@ -68,7 +172,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task QueryGet_CacheEnabled_UsesStableKeyAcrossGeneratedCatalystIds()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             QueryItems = [new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "from-cosmos" }]
         };
@@ -87,7 +191,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task QueryGet_CacheHit_PreservesRecordedQueryDetails()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             QueryItems = [new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "from-cosmos" }]
         };
@@ -105,7 +209,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task Modify_UpdatesPointReadCache()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             ReadItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "before" },
             ReplaceItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "after" }
@@ -124,7 +228,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task Modify_ClearsSingleQueryCacheForRepositoryScope()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             QueryItems = [new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "before" }],
             ReplaceItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "after" }
@@ -144,7 +248,7 @@ public sealed class DocumentCacheRepositoryTests
     [Fact]
     public async Task Remove_InvalidatesPointReadCache()
     {
-        FakeContainer container = new()
+        QueryTestContainer container = new()
         {
             ReadItemResult = new CacheEntity { id = "id-1", TenantId = "tenant-1", Name = "before" }
         };
@@ -161,8 +265,8 @@ public sealed class DocumentCacheRepositoryTests
 
     private sealed class TestGalaxy : Galaxy<CacheEntity>
     {
-        public TestGalaxy(FakeContainer container, UniverseOptions options, bool recordQueries = false)
-            : base(CreateClient(), "database", "container", typeof(CacheEntity).BuildPartitionKey(), options, recordQueries)
+        public TestGalaxy(QueryTestContainer container, UniverseOptions options, bool recordQueries = false, CosmosClient client = null)
+            : base(client ?? CreateClient(), "database", "container", typeof(CacheEntity).BuildPartitionKey(), options, recordQueries)
         {
             typeof(GalaxyCore)
                 .GetField("_container", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -171,6 +275,12 @@ public sealed class DocumentCacheRepositoryTests
 
         public Task<(Gravity, CacheEntity)> PointGet(string id, string tenantId)
             => ((IGalaxyBasic<CacheEntity>)this).Get(id, tenantId);
+
+        public Task<(Gravity, CacheEntity)> PointGetArray(string id, string[] partitionKeys)
+            => ((IGalaxyBasic<CacheEntity>)this).Get(id, partitionKeys);
+
+        public Task<(Gravity, CacheProjection)> QueryGetProjection()
+            => ((IGalaxy<CacheEntity>)this).Get<CacheProjection>(null, ["Name"]);
 
         public Task<(Gravity, CacheEntity)> QueryGet(string name)
             => ((IGalaxy<CacheEntity>)this).Get([new([new("Name", name)])]);
@@ -181,11 +291,11 @@ public sealed class DocumentCacheRepositoryTests
         public Task<Gravity> RemoveEntity(string id, string tenantId)
             => ((IGalaxyBasic<CacheEntity>)this).Remove(id, tenantId);
 
-        private static CosmosClient CreateClient()
-            => new(
-                "https://localhost:8081",
-                Convert.ToBase64String(new byte[64]),
-                new CosmosClientOptions { AllowBulkExecution = true });
+    }
+
+    private sealed record CacheProjection
+    {
+        public string Name { get; set; }
     }
 
     private sealed record CacheEntity : CosmicEntity
@@ -194,115 +304,6 @@ public sealed class DocumentCacheRepositoryTests
         public string TenantId { get; set; }
 
         public string Name { get; set; }
-    }
-
-    private sealed class FakeContainer : Container
-    {
-        public CacheEntity ReadItemResult { get; set; }
-        public CacheEntity ReplaceItemResult { get; set; }
-        public IReadOnlyList<CacheEntity> QueryItems { get; set; } = [];
-        public int ReadItemCalls { get; private set; }
-        public int QueryCalls { get; private set; }
-
-        public override string Id => "container";
-        public override Database Database => throw new NotSupportedException();
-        public override Conflicts Conflicts => throw new NotSupportedException();
-        public override Scripts Scripts => throw new NotSupportedException();
-
-        public override Task<ItemResponse<T>> ReadItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
-        {
-            ReadItemCalls++;
-            return Task.FromResult<ItemResponse<T>>(new FakeItemResponse<T>((T)(object)ReadItemResult, 9.5));
-        }
-
-        public override Task<ItemResponse<T>> ReplaceItemAsync<T>(T item, string id, PartitionKey? partitionKey = null, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<ItemResponse<T>>(new FakeItemResponse<T>((T)(object)ReplaceItemResult, 6.5));
-
-        public override Task<ItemResponse<T>> DeleteItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<ItemResponse<T>>(new FakeItemResponse<T>(default, 4.5));
-
-        public override FeedIterator<T> GetItemQueryIterator<T>(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
-        {
-            QueryCalls++;
-            return new FakeFeedIterator<T>(QueryItems.Cast<T>().ToArray(), 7.25);
-        }
-
-        public override Task<ItemResponse<T>> CreateItemAsync<T>(T item, PartitionKey? partitionKey = null, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<ItemResponse<T>>(new FakeItemResponse<T>(item, 5.5));
-
-        public override TransactionalBatch CreateTransactionalBatch(PartitionKey partitionKey)
-            => throw new NotSupportedException();
-
-        public override Task<ContainerResponse> ReadContainerAsync(ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> ReadContainerStreamAsync(ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ContainerResponse> ReplaceContainerAsync(ContainerProperties containerProperties, ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> ReplaceContainerStreamAsync(ContainerProperties containerProperties, ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ContainerResponse> DeleteContainerAsync(ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> DeleteContainerStreamAsync(ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<int?> ReadThroughputAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ThroughputResponse> ReadThroughputAsync(RequestOptions requestOptions, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ThroughputResponse> ReplaceThroughputAsync(int throughput, RequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ThroughputResponse> ReplaceThroughputAsync(ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> CreateItemStreamAsync(Stream streamPayload, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> ReadItemStreamAsync(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> UpsertItemStreamAsync(Stream streamPayload, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ItemResponse<T>> UpsertItemAsync<T>(T item, PartitionKey? partitionKey = null, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> ReplaceItemStreamAsync(Stream streamPayload, string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<FeedResponse<T>> ReadManyItemsAsync<T>(IReadOnlyList<(string id, PartitionKey partitionKey)> items, ReadManyRequestOptions readManyRequestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> ReadManyItemsStreamAsync(IReadOnlyList<(string id, PartitionKey partitionKey)> items, ReadManyRequestOptions readManyRequestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ItemResponse<T>> PatchItemAsync<T>(string id, PartitionKey partitionKey, IReadOnlyList<PatchOperation> patchOperations, PatchItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> PatchItemStreamAsync(string id, PartitionKey partitionKey, IReadOnlyList<PatchOperation> patchOperations, PatchItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override Task<ResponseMessage> DeleteItemStreamAsync(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override FeedIterator GetItemQueryStreamIterator(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null) => throw new NotSupportedException();
-        public override FeedIterator GetItemQueryStreamIterator(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null) => throw new NotSupportedException();
-        public override FeedIterator<T> GetItemQueryIterator<T>(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null) => throw new NotSupportedException();
-        public override FeedIterator GetItemQueryStreamIterator(FeedRange feedRange, QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null) => throw new NotSupportedException();
-        public override FeedIterator<T> GetItemQueryIterator<T>(FeedRange feedRange, QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null) => throw new NotSupportedException();
-        public override IOrderedQueryable<T> GetItemLinqQueryable<T>(bool allowSynchronousQueryExecution = false, string continuationToken = null, QueryRequestOptions requestOptions = null, CosmosLinqSerializerOptions linqSerializerOptions = null) => throw new NotSupportedException();
-        public override ChangeFeedProcessorBuilder GetChangeFeedProcessorBuilder<T>(string processorName, ChangesHandler<T> onChangesDelegate) => throw new NotSupportedException();
-        public override ChangeFeedProcessorBuilder GetChangeFeedEstimatorBuilder(string processorName, ChangesEstimationHandler estimationDelegate, TimeSpan? estimationPeriod = null) => throw new NotSupportedException();
-        public override ChangeFeedEstimator GetChangeFeedEstimator(string processorName, Container leaseContainer) => throw new NotSupportedException();
-        public override Task<IReadOnlyList<FeedRange>> GetFeedRangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public override FeedIterator GetChangeFeedStreamIterator(ChangeFeedStartFrom changeFeedStartFrom, ChangeFeedMode changeFeedMode, ChangeFeedRequestOptions changeFeedRequestOptions = null) => throw new NotSupportedException();
-        public override FeedIterator<T> GetChangeFeedIterator<T>(ChangeFeedStartFrom changeFeedStartFrom, ChangeFeedMode changeFeedMode, ChangeFeedRequestOptions changeFeedRequestOptions = null) => throw new NotSupportedException();
-        public override ChangeFeedProcessorBuilder GetChangeFeedProcessorBuilder<T>(string processorName, ChangeFeedHandler<T> onChangesDelegate) => throw new NotSupportedException();
-        public override ChangeFeedProcessorBuilder GetChangeFeedProcessorBuilderWithManualCheckpoint<T>(string processorName, ChangeFeedHandlerWithManualCheckpoint<T> onChangesDelegate) => throw new NotSupportedException();
-        public override ChangeFeedProcessorBuilder GetChangeFeedProcessorBuilder(string processorName, ChangeFeedStreamHandler onChangesDelegate) => throw new NotSupportedException();
-        public override ChangeFeedProcessorBuilder GetChangeFeedProcessorBuilderWithManualCheckpoint(string processorName, ChangeFeedStreamHandlerWithManualCheckpoint onChangesDelegate) => throw new NotSupportedException();
-    }
-
-    private sealed class FakeItemResponse<T>(T resource, double requestCharge) : ItemResponse<T>
-    {
-        public override T Resource => resource;
-        public override double RequestCharge => requestCharge;
-        public override string ETag => "fake-etag";
-        public override HttpStatusCode StatusCode => HttpStatusCode.OK;
-    }
-
-    private sealed class FakeFeedIterator<T>(IReadOnlyList<T> items, double requestCharge) : FeedIterator<T>
-    {
-        private bool _hasMoreResults = true;
-
-        public override bool HasMoreResults => _hasMoreResults;
-
-        public override Task<FeedResponse<T>> ReadNextAsync(CancellationToken cancellationToken = default)
-        {
-            _hasMoreResults = false;
-            return Task.FromResult<FeedResponse<T>>(new FakeFeedResponse<T>(items, requestCharge));
-        }
-    }
-
-    private sealed class FakeFeedResponse<T>(IReadOnlyList<T> items, double requestCharge) : FeedResponse<T>
-    {
-        public override string ContinuationToken => null;
-        public override int Count => items.Count;
-        public override string IndexMetrics => string.Empty;
-        public override Headers Headers => null;
-        public override IEnumerable<T> Resource => items;
-        public override HttpStatusCode StatusCode => HttpStatusCode.OK;
-        public override CosmosDiagnostics Diagnostics => null;
-        public override double RequestCharge => requestCharge;
-        public override IEnumerator<T> GetEnumerator() => items.GetEnumerator();
     }
 
 }

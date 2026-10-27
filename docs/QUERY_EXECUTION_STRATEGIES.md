@@ -14,19 +14,27 @@ The query execution strategies system automatically selects the optimal executio
 ## Key Features
 
 ### 1. Automatic Strategy Selection
-- **Direct Strategy**: Optimized for simple queries with unlimited parallelism
-- **Gateway Strategy**: Conservative approach for complex queries and fallback scenarios  
-- **Vector Search Strategy**: Specialized optimization for vector similarity searches
+- **Direct Strategy**: Executes scalar, ordinary full-text predicate, and join queries with CPU-core-limited concurrency by default
+- **Gateway Strategy**: Executes grouped queries and provides a conservative fallback
+- **Vector Search Strategy**: Executes vector, full-text ranking, and hybrid searches
 
 ### 2. Query Type Detection
-The system automatically detects query types:
+The builder derives query types and ranking/grouping flags from validated catalysts and query options. Property names, aliases, and parameter names containing operator text such as `VectorDistance` or `FullTextScore` do not activate those operations.
+
+The system detects these query types:
 - `Simple`: Basic queries without complex operations
 - `Aggregation`: Queries with GROUP BY, COUNT, SUM operations
 - `VectorSearch`: Vector similarity search queries
 - `FullTextSearch`: Full-text search queries
 - `HybridSearch`: Combined vector and full-text search
 - `Join`: Queries with JOIN operations
-- `Complex`: Queries with multiple operations or RRF
+- `Complex`: Remaining scalar queries whose generated SQL exceeds the existing 20-token threshold
+
+### Single-document execution
+
+Query-based `Get` and `Get<TProjection>`, including fluent `GetAsync` calls, generate `TOP 1`. All three strategies read through empty pages until the first document arrives or the iterator is exhausted, retain at most one result, and dispose the iterator before returning. Single-result execution forces page and buffer sizes to one after hint merging, so tuning recommendations cannot enlarge them. Returned RU includes every page actually read.
+
+List execution continues through all pages. A page-size hint of one does not limit the total number of list results. Single-document reads can still require substantial server work when no document matches.
 
 ### 3. Performance Tuning (v3.2.0+)
 - **Adaptive Learning**: Tracks execution statistics and learns from query patterns

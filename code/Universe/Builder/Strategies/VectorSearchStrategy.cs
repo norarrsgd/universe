@@ -13,13 +13,7 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
     public int Priority => 200; // High priority for vector queries
 
     bool IQueryExecutionStrategy.CanHandle(QueryDefinition query, QueryContext context)
-    {
-        string queryText = query.QueryText.ToUpperInvariant();
-
-        return context.Type is QueryType.VectorSearch or QueryType.HybridSearch ||
-               queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) ||
-               queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant());
-    }
+        => context.HasRankOperations || context.Type is QueryType.VectorSearch or QueryType.HybridSearch;
 
     async Task<(Gravity gravity, IList<T> results)> IQueryExecutionStrategy.ExecuteAsync<T>(
         Container container,
@@ -58,13 +52,21 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
                     requestOptions.EnableOptimisticDirectExecution = optimistic.ToBool();
             }
 
+            if (context.SingleResult)
+            {
+                requestOptions.MaxItemCount = 1;
+                requestOptions.MaxBufferedItemCount = 1;
+            }
+
             using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);
 
             while (queryResponse.HasMoreResults)
             {
                 FeedResponse<T> next = await queryResponse.ReadNextAsync();
-                collection.AddRange(next);
+                collection.AddRange(context.SingleResult ? next.Take(1) : next);
                 requestCharge += next.RequestCharge;
+                if (context.SingleResult && collection.Count > 0)
+                    break;
             }
 
             stopwatch.Stop();
