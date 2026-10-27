@@ -134,4 +134,3 @@ internal sealed class FakeFeedResponse<T>(IReadOnlyList<T> items, double request
     public override double RequestCharge => requestCharge;
     public override IEnumerator<T> GetEnumerator() => items.GetEnumerator();
 }
-
