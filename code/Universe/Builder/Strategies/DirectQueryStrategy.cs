@@ -13,16 +13,8 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
     public int Priority => 100; // High priority for simple queries
 
     bool IQueryExecutionStrategy.CanHandle(QueryDefinition query, QueryContext context)
-    {
-        // Handle simple queries without complex operations
-        string queryText = query.QueryText.ToUpperInvariant();
-
-        return context.Type is QueryType.Simple ||
-               (!queryText.Contains("RRF") &&
-                !queryText.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant()) &&
-                !queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant()) &&
-                !queryText.Contains("GROUP BY"));
-    }
+        => !context.HasRankOperations && !context.HasGrouping &&
+           context.Type is not QueryType.VectorSearch and not QueryType.HybridSearch;
 
     async Task<(Gravity gravity, IList<T> results)> IQueryExecutionStrategy.ExecuteAsync<T>(
         Container container,
@@ -62,13 +54,21 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
                     requestOptions.ResponseContinuationTokenLimitInKb = tokenLimit.ToInt();
             }
 
+            if (context.SingleResult)
+            {
+                requestOptions.MaxItemCount = 1;
+                requestOptions.MaxBufferedItemCount = 1;
+            }
+
             using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);
 
             while (queryResponse.HasMoreResults)
             {
                 FeedResponse<T> next = await queryResponse.ReadNextAsync();
-                collection.AddRange(next);
+                collection.AddRange(context.SingleResult ? next.Take(1) : next);
                 requestCharge += next.RequestCharge;
+                if (context.SingleResult && collection.Count > 0)
+                    break;
             }
 
             stopwatch.Stop();

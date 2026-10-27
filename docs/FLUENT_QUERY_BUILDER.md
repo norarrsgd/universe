@@ -462,6 +462,8 @@ Every fluent chain must end with a terminal operation that executes or generates
 
 All terminal operations return the same `Gravity` response object with RU consumption, continuation tokens, and optional query debug info.
 
+`GetAsync()` and `GetAsync<TS>()` execute with `TOP 1` and stop after the first document, reading through empty pages when necessary. They use filters and selected columns; list-shaping options such as a caller-specified `Top`, grouping, joins, sorting, and hints are not applied. Rank catalysts use the implicit `TOP 1`. `GenerateQuery()` describes the configured query shape and does not automatically add the single-result bound.
+
 ### Type Projection
 
 Project results to a different type. The projection target can be any type — classes, records, structs, or record structs. No `ICosmicEntity` constraint required.

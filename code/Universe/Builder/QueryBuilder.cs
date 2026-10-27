@@ -56,6 +56,9 @@ internal class UniverseBuilder : IDisposable
     public void Dispose() => _queryTuner?.Dispose();
 
     internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
+        => CreateQuery(clusters, out _, columnOptions, sorting, groups);
+
+    internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, out QueryContext context, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
     {
         // Sanitize and validate input identifiers
         SanitizeInputs(clusters, columnOptions, sorting, groups);
@@ -233,12 +236,13 @@ internal class UniverseBuilder : IDisposable
                     queryBuilder.Append($" {cluster.Where.Value()} (");
 
                 // Where Clause Builder
+                bool firstCondition = true;
                 foreach (Catalyst catalyst in cluster.Catalysts.Where(c => c.Operator is not Q.Operator.VectorDistance && c.Operator is not Q.Operator.FTScore))
                 {
-                    if (cluster.Catalysts.ToList().IndexOf(catalyst) == 0)
-                        queryBuilder.Append(WhereClauseBuilder(catalyst));
-                    else
-                        queryBuilder.Append($" {catalyst.Where.Value()} {WhereClauseBuilder(catalyst)}");
+                    if (!firstCondition)
+                        queryBuilder.Append($" {catalyst.Where.Value()} ");
+                    queryBuilder.Append(WhereClauseBuilder(catalyst));
+                    firstCondition = false;
                 }
 
                 queryBuilder.Append(')');
@@ -366,6 +370,7 @@ internal class UniverseBuilder : IDisposable
             }
         }
 
+        context = QueryTypeDetector.CreateContext(clusters, columnOptions, groups, query.QueryText);
         return query;
     }
 
@@ -642,10 +647,9 @@ internal class UniverseBuilder : IDisposable
         return result.ToString();
     }
 
-    internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
+    internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext context)
     {
-        context ??= InferQueryContext(query);
-        QueryContext singleContext = context.Value with { MaxItemCount = 1 };
+        QueryContext singleContext = context with { MaxItemCount = 1, SingleResult = true };
 
         IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, singleContext);
         (Gravity gravity, IList<T> results) = await strategy.ExecuteAsync<T>(container, query, singleContext, _recordQueries, _queryTuner);
@@ -653,15 +657,11 @@ internal class UniverseBuilder : IDisposable
         return (gravity, result);
     }
 
-    internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query, QueryContext? context = null)
+    internal async Task<(Gravity, IList<T>)> GetListFromQuery<T>(Container container, QueryDefinition query, QueryContext context)
     {
-        context ??= InferQueryContext(query);
-        IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context.Value);
-        return await strategy.ExecuteAsync<T>(container, query, context.Value, _recordQueries, _queryTuner);
+        IQueryExecutionStrategy strategy = _strategySelector.SelectStrategy(query, context);
+        return await strategy.ExecuteAsync<T>(container, query, context, _recordQueries, _queryTuner);
     }
 
     internal QueryTuningRecommendations GetQueryRecommendations(QueryType queryType) => _queryTuner.GetRecommendations(queryType);
-
-    private static QueryContext InferQueryContext(QueryDefinition query)
-        => new(QueryTypeDetector.Infer(query));
 }

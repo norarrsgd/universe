@@ -3,7 +3,10 @@ namespace Universe.Builder.Strategies;
 internal readonly record struct QueryContext(
     QueryType Type,
     int? MaxItemCount = null,
-    IReadOnlyDictionary<string, object> Hints = null);
+    IReadOnlyDictionary<string, object> Hints = null,
+    bool SingleResult = false,
+    bool HasRankOperations = false,
+    bool HasGrouping = false);
 
 /// <summary>
 /// Types of queries supported in Universe

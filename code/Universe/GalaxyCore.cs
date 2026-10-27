@@ -16,6 +16,7 @@ public abstract class GalaxyCore : IDisposable
     internal readonly string _databaseName;
     internal readonly string _containerName;
     internal readonly DocumentCacheOptions _documentCacheOptions;
+    internal readonly string _documentCacheNamespace;
 
     /// <summary>
     /// Initialize Galaxy core with Cosmos DB connection.
@@ -73,6 +74,7 @@ public abstract class GalaxyCore : IDisposable
         _databaseName = database;
         _containerName = container;
         _documentCacheOptions = documentCacheOptions;
+        _documentCacheNamespace = DocumentCache?.GetClientNamespace(client);
         if (client.ClientOptions is not null)
         {
             _allowBulk = client.ClientOptions.AllowBulkExecution;
@@ -96,7 +98,7 @@ public abstract class GalaxyCore : IDisposable
     internal DocumentCache DocumentCache => _documentCacheOptions?.Cache;
 
     internal string DocumentCacheScopeHash(Type sourceType)
-        => DocumentCache.CreateScopeHash(_databaseName, _containerName, sourceType);
+        => DocumentCache.CreateScopeHash(_documentCacheNamespace, _databaseName, _containerName, sourceType);
 
     #region Dispose Pattern
 
