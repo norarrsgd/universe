@@ -15,6 +15,39 @@ namespace Universe.Tests.Batch;
 
 public sealed class BatchExecutionTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task BatchReplace_UpdatesOnlyMatchingClientCache(bool bulk, bool sameClient)
+    {
+        using CosmosClient firstClient = new("https://localhost:8081", Convert.ToBase64String(new byte[64]));
+        using CosmosClient otherClient = new("https://localhost:8081", Convert.ToBase64String(new byte[64]));
+        UniverseOptions options = new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache();
+        InMemoryCosmosContainer<BatchEntity> firstContainer = new();
+        firstContainer.Seed(Entity("id", "tenant-1", 1, "first"));
+        InMemoryCosmosContainer<BatchEntity> secondContainer = firstContainer;
+        if (!sameClient)
+        {
+            secondContainer = new();
+            secondContainer.Seed(Entity("id", "tenant-1", 2, "second"));
+        }
+        using TestGalaxy first = new(firstContainer, options, firstClient);
+        using TestGalaxy second = new(secondContainer, options, sameClient ? firstClient : otherClient);
+        await second.PointGet("id", "tenant-1");
+        BatchEntity replacement = Entity("id", "tenant-1", 9, "updated");
+
+        if (bulk)
+            Assert.True((await first.Bulk().Replace(replacement).ExecuteAsync(cancellationToken: TestContext.Current.CancellationToken)).Succeeded);
+        else
+            Assert.True((await first.Atomic("tenant-1").Replace(replacement).ExecuteAsync(TestContext.Current.CancellationToken)).Succeeded);
+
+        (Gravity gravity, BatchEntity result) = await second.PointGet("id", "tenant-1");
+        Assert.Equal(sameClient ? 9 : 2, result.Quantity);
+        Assert.Equal(0, gravity.RU);
+    }
+
     [Fact]
     public async Task Atomic_MixedOperationsCommitInOrderAndUpdateCache()
     {
@@ -242,8 +275,8 @@ public sealed class BatchExecutionTests
 
     private sealed class TestGalaxy : Galaxy<BatchEntity>
     {
-        public TestGalaxy(InMemoryCosmosContainer<BatchEntity> container, UniverseOptions options)
-            : base(CreateClient(), "database", "container", typeof(BatchEntity).BuildPartitionKey(), options)
+        public TestGalaxy(InMemoryCosmosContainer<BatchEntity> container, UniverseOptions options, CosmosClient client = null)
+            : base(client ?? CreateClient(), "database", "container", typeof(BatchEntity).BuildPartitionKey(), options)
         {
             FieldInfo containerField = typeof(GalaxyCore)
                 .GetField("_container", BindingFlags.Instance | BindingFlags.NonPublic)

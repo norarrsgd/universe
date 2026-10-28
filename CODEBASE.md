@@ -173,7 +173,7 @@ File responsibilities:
 - `Builder/Strategies/QueryExecutionStatistics.cs`: recorded performance/statistics model.
 - `Builder/Strategies/QueryStrategySelector.cs`: strategy selection and hint merging.
 - `Builder/Strategies/QueryTuner.cs`: in-memory statistics window, persistence coordination, and hint recommendation logic.
-- `Builder/Strategies/QueryTypeDetector.cs`: shared generated-SQL classifier used by strategy selection and hint-aware list execution.
+- `Builder/Strategies/QueryTypeDetector.cs`: derives query type and ranking/grouping flags from validated catalysts, column options, and final grouping; retains the scalar SQL token-count complexity threshold.
 - `Builder/Strategies/Storage/IQueryStatisticsStorage.cs`: storage abstraction.
 - `Builder/Strategies/Storage/InMemoryStatisticsStorage.cs`: volatile statistics storage.
 - `Builder/Strategies/Storage/FileStatisticsStorage.cs`: JSON statistics persistence.
@@ -350,20 +350,20 @@ dotnet run
 
 ## Target Runtime And Packages
 
-The current package version is `3.5.0` (stable), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
+The current package version is `3.5.1` (stable), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
 
 The main library currently targets:
 
 - .NET `net10.0`
 - C# `14.0`
 - Nullable disabled
-- `Microsoft.Azure.Cosmos` `3.62.1`
-- `Microsoft.Data.Sqlite` `10.0.11`
+- `Microsoft.Azure.Cosmos` `3.63.2`
+- `Microsoft.Data.Sqlite` `10.0.13`
 - `Newtonsoft.Json` `13.0.4`
 - `SQLitePCLRaw.bundle_e_sqlite3` `3.0.5`
 - `SQLitePCLRaw.core` `3.0.5`
 
-`Universe.Tests` is an xUnit test project targeting `net10.0`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
+`Universe.Tests` is an xUnit test project targeting `net10.0`, using `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3` `3.2.2`, and `xunit.runner.visualstudio` `3.1.5`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
 
 ## Public API Map
 
@@ -489,9 +489,9 @@ When `UniverseOptions.WithDocumentCache(...)` is configured, direct id reads are
 
 `Galaxy<T>.Get(...)`:
 
-- Builds a query with optional selected columns.
+- Builds a `TOP 1` query with optional selected columns, including for rank catalysts.
 - Executes through `QBuilder.GetOneFromQuery`.
-- Internally forces `MaxItemCount = 1` in the `QueryContext`.
+- Marks the `QueryContext` for single-result execution. All strategies force page and buffer sizes to one after hint merging, read past empty pages, retain only the first document, and dispose the iterator without reading further pages.
 - Returns first result or `default`.
 - When document caching is enabled, generated SQL and ordered parameter values are normalized into a hashed cache key before execution. Random catalyst ids in parameter names are normalized so equivalent query shapes can hit the same cache entry.
 
@@ -499,7 +499,7 @@ When `UniverseOptions.WithDocumentCache(...)` is configured, direct id reads are
 
 - Builds full query shape.
 - Uses `QBuilder.GetListFromQuery`.
-- With hints, constructs `QueryContext` using inferred query type and `hints.ToContextHints()`.
+- Uses the builder's structured `QueryContext`; explicit hints are attached without losing ranking/grouping or execution flags.
 
 `Galaxy<T>.Paged(...)`:
 
@@ -579,6 +579,7 @@ Where behavior:
 - Each non-empty cluster becomes a parenthesized group.
 - The cluster's `Where` value connects clusters.
 - Inside a cluster, the first catalyst's `Where` value is ignored; subsequent catalyst `Where` values connect conditions.
+- Scalar predicates use a first-emitted-condition flag, so repeated catalysts and leading rank catalysts preserve valid connectors without repeated collection copies or searches.
 - Rank-only clusters (`VectorDistance` / `FTScore`) do not add a `WHERE` clause.
 - `Defined` / `NotDefined` operators do not bind a value.
 
@@ -743,15 +744,17 @@ Catalyst rule validation:
 - `VectorSearchStrategy`: preferred for vector and hybrid queries, optimistic direct execution disabled.
 - `EnhancedContextStrategy`: wraps the chosen strategy with merged recommendation/user hints.
 - `QueryStrategySelector`: chooses the highest-priority strategy that can handle the query, honoring `ForceStrategy` when valid.
-- `QueryContext`: carries query type, max item count, and hints.
+- `QueryContext`: carries query type, max item count, hints, single-result mode, and ranking/grouping flags.
 
-Query type inference is string-based against the generated SQL text. Keep this in mind when adding new query keywords or operators.
+Query types and strategy eligibility use structured builder metadata rather than operator-name substrings in SQL. Include new operators in `QueryTypeDetector` when they affect routing. The remaining scalar complexity fallback retains the existing generated-SQL threshold of more than 20 space-separated tokens.
 
 Strategy defaults:
 
 - Direct: `MaxItemCount` defaults to `Q.Limits.MaxItems` (`1000`), `EnableOptimisticDirectExecution = true`, `MaxConcurrency = Environment.ProcessorCount`.
 - Gateway: `MaxItemCount` defaults to `Q.Limits.MaxItems`, `EnableOptimisticDirectExecution = false`, `MaxConcurrency = 1`, `ResponseContinuationTokenLimitInKb = 1`.
 - Vector: `EnableOptimisticDirectExecution = false`, `MaxConcurrency = Environment.ProcessorCount`; `MaxItemCount` is applied only when hints include it.
+
+Single-result execution overrides page and buffer sizes to one in every strategy after hints are applied. List execution remains exhaustive, regardless of its page size.
 
 Statistics recording:
 
@@ -846,7 +849,9 @@ Invalidation behavior:
 - Bulk create and bulk modify update known submitted point entries and clear same-repository query entries after all batches succeed.
 - External writers are not observed; they rely on cache time-to-live expiration.
 
-Cache keys are SHA-256 hashes built from operation kind, database, container, source entity type, result type, and operation inputs. Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with `System.Text.Json` settings aligned with `UniverseSerializer`; clone failures skip or evict the affected cache entry.
+Cache keys are SHA-256 hashes built from an opaque Cosmos client namespace, operation kind, database, container, source entity type, result type, and operation inputs. A cache-owned `ConditionalWeakTable<CosmosClient, string>` assigns namespaces by exact client-instance identity without retaining credentials or preventing client collection. Point keys, query keys, and invalidation scopes all include that namespace. Repositories sharing the same client and cache options can share matching entries; different client instances are isolated even at the same endpoint. A client must represent one stable authorization context; recreate it or disable caching when its authority changes.
+
+Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with `System.Text.Json` settings aligned with `UniverseSerializer`; clone failures skip or evict the affected cache entry. Writes through another client namespace rely on TTL expiry for visibility.
 
 ## Data Model And Serialization
 
@@ -976,7 +981,9 @@ Example sequencing:
 - `Builder/OrbitQueryTests.cs`: fluent API mirrors declarative API.
 - `Builder/NamingPolicyQueryTests.cs`: naming policy effects on SQL columns and aliases.
 - `Builder/ProjectionSelectTests.cs`: type-based projection column extraction.
-- `Builder/QueryTypeDetectorTests.cs`: generated-query classification for aggregation, full-text, vector, and hybrid strategy selection.
+- `Builder/QueryTypeDetectorTests.cs`: structured query classification and strategy selection, including operator-named properties and parameters.
+- `Builder/QueryExecutionTests.cs`: bounded single-result reads across all strategies, empty/error pages, disposal, RU/statistics, hints, and repository SQL/cache behavior.
+- `Builder/ScalarFilterTests.cs`: scalar predicate connectors, mixed ranking, repeated catalysts, and deterministic linear collection traversal.
 - `Extensions/PartitionKeyExtensionTests.cs`: partition-key path and runtime value ordering, explicit key names, duplicate sequence validation, and max-level validation.
 - `Storage/FileStatisticsStorageTests.cs`: JSON statistics storage behavior.
 - `Storage/InMemoryStatisticsStorageTests.cs`: in-memory storage behavior.
@@ -989,6 +996,7 @@ Example sequencing:
 - `Tuner/QueryTunerTests.cs`: recommendation and persistence behavior.
 - `Tuner/QueryTunerPerformanceTests.cs`: tuner performance checks.
 - `Helpers/TestStatisticsFactory.cs`: shared test statistics builders.
+- `Helpers/QueryTestContainer.cs`: scripted Cosmos read/query responses shared by cache and execution tests, with request capture and iterator lifecycle counters.
 
 When adding tests:
 

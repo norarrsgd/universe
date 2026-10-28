@@ -19,6 +19,8 @@ This API is still fully supported for compatibility and advanced scenarios where
 );
 ```
 
+`Get` and `Get<TProjection>` generate `TOP 1` and stop reading after the first document, skipping empty pages as needed. They return the default value when no document matches. Rank catalysts use the implicit `TOP 1`; list queries still require an explicit valid `ColumnOptions.Top` for ranking.
+
 ## Complex Queries with Multiple Conditions
 
 ```csharp

@@ -51,11 +51,11 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
     {
         try
         {
-            QueryDefinition query = QBuilder.CreateQuery(clusters, columnOptions: columns is null || !columns.Any() ? null : new(columns));
+            QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, columnOptions: new(columns, Top: 1));
             if (TryGetQueryCache(query, out TArgType cached, out IReadOnlyList<(string, object)> cacheParameters))
                 return (new(0, null, _recordQuery ? (query.QueryText, cacheParameters) : default), cached);
 
-            (Gravity gravity, TArgType result) = await QBuilder.GetOneFromQuery<TArgType>(_container, query);
+            (Gravity gravity, TArgType result) = await QBuilder.GetOneFromQuery<TArgType>(_container, query, context);
             SetQueryCache(query, result);
             return (gravity, result);
         }
@@ -73,8 +73,8 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
     {
         try
         {
-            QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
-            return await QBuilder.GetListFromQuery<TArgType>(_container, query);
+            QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, columnOptions, sorting, group);
+            return await QBuilder.GetListFromQuery<TArgType>(_container, query, context);
         }
         catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
         {
@@ -160,7 +160,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         try
         {
             parameters = query.GetQueryParameters();
-            key = cache.CreateQueryKey(_databaseName, _containerName, typeof(T), typeof(TArgType), query.QueryText, parameters);
+            key = cache.CreateQueryKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(TArgType), query.QueryText, parameters);
             return true;
         }
         catch (SystemException)
@@ -173,12 +173,8 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
     {
         try
         {
-            QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
-
-            QueryContext context = new(
-                Type: InferQueryType(query),
-                Hints: hints?.ToContextHints()
-            );
+            QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, columnOptions, sorting, group);
+            context = context with { Hints = hints?.ToContextHints() };
 
             return await QBuilder.GetListFromQuery<TArgType>(_container, query, context);
         }
@@ -187,7 +183,4 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
             throw;
         }
     }
-
-    private static QueryType InferQueryType(QueryDefinition query)
-        => QueryTypeDetector.Infer(query);
 }

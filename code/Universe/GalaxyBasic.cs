@@ -464,7 +464,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         if (cache is null)
             return false;
 
-        DocumentCacheKey key = cache.CreatePointKey(_databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
+        DocumentCacheKey key = cache.CreatePointKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
         return cache.TryGet(key, out value, out eTag);
     }
 
@@ -483,7 +483,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         if (cache is null || model is null)
             return;
 
-        DocumentCacheKey key = cache.CreatePointKey(_databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
+        DocumentCacheKey key = cache.CreatePointKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
         cache.Set(key, DocumentCacheOperation.PointRead, DocumentCacheScopeHash(typeof(T)), model, eTag);
     }
 
@@ -493,7 +493,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         if (cache is null)
             return;
 
-        DocumentCacheKey key = cache.CreatePointKey(_databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
+        DocumentCacheKey key = cache.CreatePointKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
         cache.Remove(key);
     }
 

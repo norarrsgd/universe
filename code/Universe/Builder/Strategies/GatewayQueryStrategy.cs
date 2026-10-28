@@ -51,13 +51,21 @@ internal sealed class GatewayQueryStrategy : IQueryExecutionStrategy
                     requestOptions.ResponseContinuationTokenLimitInKb = tokenLimit.ToInt();
             }
 
+            if (context.SingleResult)
+            {
+                requestOptions.MaxItemCount = 1;
+                requestOptions.MaxBufferedItemCount = 1;
+            }
+
             using FeedIterator<T> queryResponse = container.GetItemQueryIterator<T>(query, requestOptions: requestOptions);
 
             while (queryResponse.HasMoreResults)
             {
                 FeedResponse<T> next = await queryResponse.ReadNextAsync();
-                collection.AddRange(next);
+                collection.AddRange(context.SingleResult ? next.Take(1) : next);
                 requestCharge += next.RequestCharge;
+                if (context.SingleResult && collection.Count > 0)
+                    break;
             }
 
             stopwatch.Stop();

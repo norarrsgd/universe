@@ -2,43 +2,42 @@ namespace Universe.Builder.Strategies;
 
 internal static class QueryTypeDetector
 {
-    public static QueryType Infer(QueryDefinition query)
-        => Infer(query.QueryText);
-
-    public static QueryType Infer(string queryText)
+    internal static QueryContext CreateContext(
+        IReadOnlyList<Cluster> clusters,
+        ColumnOptions? columnOptions,
+        IReadOnlyList<string> groups,
+        string queryText)
     {
-        string normalized = queryText.ToUpperInvariant();
+        bool hasVectorSearch = false;
+        bool hasFullTextSearch = false;
+        bool hasRankOperations = false;
+        foreach (Cluster cluster in clusters ?? [])
+        {
+            foreach (Catalyst catalyst in cluster.Catalysts)
+            {
+                hasVectorSearch |= catalyst.Operator is Q.Operator.VectorDistance;
+                hasRankOperations |= catalyst.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore;
+                hasFullTextSearch |= catalyst.Operator is Q.Operator.FTScore
+                    or Q.Operator.FTContains or Q.Operator.NotFTContains
+                    or Q.Operator.FTContainsAll or Q.Operator.NotFTContainsAll
+                    or Q.Operator.FTContainsAny or Q.Operator.NotFTContainsAny;
+            }
+        }
 
-        bool hasVectorSearch = normalized.Contains(Q.Operator.VectorDistance.Value().ToUpperInvariant());
-        bool hasFullTextSearch = ContainsFullTextOperator(normalized);
+        bool hasGrouping = groups is { Count: > 0 };
+        bool hasAggregates = columnOptions?.Aggregates is { Count: > 0 }
+            || columnOptions?.Join?.Aggregates is { Count: > 0 };
+        QueryType type = (hasVectorSearch, hasFullTextSearch) switch
+        {
+            (true, true) => QueryType.HybridSearch,
+            (true, false) => QueryType.VectorSearch,
+            (false, true) => QueryType.FullTextSearch,
+            _ when hasGrouping || hasAggregates => QueryType.Aggregation,
+            _ when columnOptions?.Join is not null => QueryType.Join,
+            _ when queryText.Split(' ').Length > 20 => QueryType.Complex,
+            _ => QueryType.Simple
+        };
 
-        if (hasVectorSearch && hasFullTextSearch)
-            return QueryType.HybridSearch;
-        if (hasVectorSearch)
-            return QueryType.VectorSearch;
-        if (hasFullTextSearch)
-            return QueryType.FullTextSearch;
-        if (ContainsAggregateOperator(normalized))
-            return QueryType.Aggregation;
-        if (normalized.Contains("JOIN"))
-            return QueryType.Join;
-        if (normalized.Contains("RRF") || normalized.Split(' ').Length > 20)
-            return QueryType.Complex;
-
-        return QueryType.Simple;
+        return new(type, HasRankOperations: hasRankOperations, HasGrouping: hasGrouping);
     }
-
-    private static bool ContainsFullTextOperator(string queryText)
-        => queryText.Contains(Q.Operator.FTScore.Value().ToUpperInvariant())
-           || queryText.Contains(Q.Operator.FTContains.Value().ToUpperInvariant())
-           || queryText.Contains(Q.Operator.FTContainsAll.Value().ToUpperInvariant())
-           || queryText.Contains(Q.Operator.FTContainsAny.Value().ToUpperInvariant());
-
-    private static bool ContainsAggregateOperator(string queryText)
-        => queryText.Contains("GROUP BY")
-           || queryText.Contains("COUNT(")
-           || queryText.Contains("SUM(")
-           || queryText.Contains("MIN(")
-           || queryText.Contains("MAX(")
-           || queryText.Contains("AVG(");
 }
