@@ -21,7 +21,7 @@
 		<RepositoryType>Git</RepositoryType>
 		<Authors>norarrsgd</Authors>
 		<Product>Universe</Product>
-		<Version>3.5.1-preview.2</Version>
+		<Version>3.5.1</Version>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageReleaseNotes>
 			View release on
