@@ -337,7 +337,7 @@
             <summary></summary>
         </member>
         <member name="M:Universe.Builder.Options.CatalystExtension.ParameterName(Universe.Builder.Options.Catalyst)">
-            <summary></summary>
+            <summary>Returns an opaque, SQL-safe parameter name derived from the column and catalyst id.</summary>
         </member>
         <member name="T:Universe.Builder.Options.QueryExecutionStrategy">
             <summary>
@@ -678,6 +678,18 @@
             Weight values should be comma-separated decimal numbers, optionally bracket-wrapped (e.g., "0.7, 0.3").
             </summary>
         </member>
+        <member name="M:Universe.Builder.QueryParameterNormalizer.ParameterPattern">
+            <remarks>
+            Pattern:<br/>
+            <code>\\G@\\w+</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match if at the start position.<br/>
+            ○ Match '@'.<br/>
+            ○ Match a word character atomically at least once.<br/>
+            </code>
+            </remarks>
+        </member>
         <member name="T:Universe.Builder.Strategies.DirectQueryStrategy">
             <summary>
             Direct execution strategy for simple queries
@@ -813,17 +825,6 @@
             <summary>
             Provides query tuning recommendations based on query type and historical performance
             </summary>
-        </member>
-        <member name="M:Universe.Builder.Strategies.QueryTuner.ParameterNamePattern">
-            <remarks>
-            Pattern:<br/>
-            <code>@\\w+</code><br/>
-            Explanation:<br/>
-            <code>
-            ○ Match '@'.<br/>
-            ○ Match a word character atomically at least once.<br/>
-            </code>
-            </remarks>
         </member>
         <member name="M:Universe.Builder.Strategies.QueryTuner.RecordExecution(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>
@@ -1613,34 +1614,34 @@
             <param name="flushIntervalSeconds">Interval in seconds between automatic flushes. Default is 5 seconds.</param>
             <returns>UniverseOptions configured for SQLite persistence</returns>
         </member>
-        <member name="T:System.Text.RegularExpressions.Generated.ParameterNamePattern_0">
-            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the ParameterNamePattern method.</summary>
+        <member name="T:System.Text.RegularExpressions.Generated.ParameterPattern_0">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the ParameterPattern method.</summary>
         </member>
-        <member name="F:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.Instance">
+        <member name="F:System.Text.RegularExpressions.Generated.ParameterPattern_0.Instance">
             <summary>Cached, thread-safe singleton instance.</summary>
         </member>
-        <member name="M:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.#ctor">
+        <member name="M:System.Text.RegularExpressions.Generated.ParameterPattern_0.#ctor">
             <summary>Initializes the instance.</summary>
         </member>
-        <member name="T:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.RunnerFactory">
+        <member name="T:System.Text.RegularExpressions.Generated.ParameterPattern_0.RunnerFactory">
             <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
         </member>
-        <member name="M:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.RunnerFactory.CreateInstance">
+        <member name="M:System.Text.RegularExpressions.Generated.ParameterPattern_0.RunnerFactory.CreateInstance">
             <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
         </member>
-        <member name="T:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.RunnerFactory.Runner">
+        <member name="T:System.Text.RegularExpressions.Generated.ParameterPattern_0.RunnerFactory.Runner">
             <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
         </member>
-        <member name="M:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+        <member name="M:System.Text.RegularExpressions.Generated.ParameterPattern_0.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
             <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
             <param name="inputSpan">The text being scanned by the regular expression.</param>
         </member>
-        <member name="M:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+        <member name="M:System.Text.RegularExpressions.Generated.ParameterPattern_0.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
             <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
             <param name="inputSpan">The text being scanned by the regular expression.</param>
             <returns>true if a possible match was found; false if no more matches are possible.</returns>
         </member>
-        <member name="M:System.Text.RegularExpressions.Generated.ParameterNamePattern_0.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+        <member name="M:System.Text.RegularExpressions.Generated.ParameterPattern_0.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
             <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
             <param name="inputSpan">The text being scanned by the regular expression.</param>
             <returns>true if the regular expression matches at the current position; otherwise, false.</returns>

@@ -12,6 +12,22 @@ namespace Universe.Tests.Caching;
 
 public sealed class DocumentCacheRepositoryTests
 {
+    [Fact]
+    public async Task QueryGet_QuotedAtFields_ExecuteDifferentPredicates()
+    {
+        QueryTestContainer container = new() { QueryItems = [Entity("first")] };
+        using TestGalaxy repo = new(container, new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache());
+        IGalaxy<CacheEntity> galaxy = repo;
+        await galaxy.Get([new([new("access@a", true)])]);
+        container.QueryItems = [Entity("second")];
+
+        (Gravity gravity, CacheEntity result) = await galaxy.Get([new([new("access@b", true)])]);
+
+        Assert.Equal("second", result.Name);
+        Assert.Equal(7.25, gravity.RU);
+        Assert.Equal(2, container.QueryCalls);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

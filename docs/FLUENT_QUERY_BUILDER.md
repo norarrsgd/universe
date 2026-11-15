@@ -404,6 +404,8 @@ galaxy.Query()
 
 Supported aggregation functions: `Count`, `Sum`, `Min`, `Max`, `Avg`.
 
+`GroupBy` accepts property paths, including nested paths such as `metadata.category`. Each segment uses the configured naming policy and is quoted as a JSON property name in both wildcard projections and `GROUP BY`. SQL expressions are not accepted as executable grouping fragments.
+
 ## Pagination
 
 ```csharp

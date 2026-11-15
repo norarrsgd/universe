@@ -8,10 +8,5 @@
 *.md        @norarrsgd
 /.github/    @norarrsgd
 
-# API Codes General
-/functions/        @norarrsgd
-
-# Mobile and Web Apps
-/app_portal/     @norarrsgd
-/app_store/     @norarrsgd
-/web_admin/     @norarrsgd
+# Library, tests, and example harness
+/code/        @norarrsgd

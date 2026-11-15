@@ -1,8 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Universe.Builder.Caching;
 
@@ -16,8 +14,6 @@ internal enum DocumentCacheOperation
 
 internal sealed class DocumentCache(DocumentCacheOptions options)
 {
-    private static readonly Regex ParameterNamePattern = new(@"@\w+", RegexOptions.Compiled);
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -27,8 +23,9 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         IgnoreReadOnlyProperties = true
     };
 
-    private readonly ConcurrentDictionary<DocumentCacheKey, DocumentCacheEntry> _entries = [];
-    private readonly ConcurrentQueue<DocumentCacheKey> _insertionOrder = [];
+    private readonly object _sync = new();
+    private readonly Dictionary<DocumentCacheKey, LinkedListNode<DocumentCacheEntry>> _entries = [];
+    private readonly LinkedList<DocumentCacheEntry> _insertionOrder = [];
     private readonly ConditionalWeakTable<CosmosClient, string> _clientNamespaces = new();
 
     internal string GetClientNamespace(CosmosClient client)
@@ -65,7 +62,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         string queryText,
         IReadOnlyList<(string Name, object Value)> parameters)
     {
-        string normalizedQuery = ParameterNamePattern.Replace(queryText, "@p");
+        (string normalizedQuery, IReadOnlyList<string> parameterNames) = QueryParameterNormalizer.Normalize(queryText);
         List<string> parts =
         [
             "query",
@@ -77,8 +74,13 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
             normalizedQuery
         ];
 
-        foreach ((_, object value) in parameters)
+        Dictionary<string, object> bindings = parameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Value, StringComparer.Ordinal);
+        foreach (string name in parameterNames)
+        {
+            if (!bindings.TryGetValue(name, out object value))
+                throw new InvalidOperationException("Cannot cache a query with an unresolved parameter binding.");
             parts.Add(SerializeForKey(value));
+        }
 
         return new(HashParts(parts));
     }
@@ -91,13 +93,18 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         value = default;
         eTag = null;
 
-        if (!_entries.TryGetValue(key, out DocumentCacheEntry entry))
-            return false;
-
-        if (DateTimeOffset.UtcNow - entry.CreatedOn >= options.TimeToLive)
+        DocumentCacheEntry entry;
+        lock (_sync)
         {
-            _entries.TryRemove(key, out _);
-            return false;
+            if (!_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node))
+                return false;
+
+            entry = node.Value;
+            if (DateTimeOffset.UtcNow - entry.CreatedOn >= options.TimeToLive)
+            {
+                RemoveNode(node);
+                return false;
+            }
         }
 
         try
@@ -108,7 +115,11 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         }
         catch (SystemException)
         {
-            _entries.TryRemove(key, out _);
+            lock (_sync)
+            {
+                if (_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node) && ReferenceEquals(node.Value, entry))
+                    RemoveNode(node);
+            }
             value = default;
             return false;
         }
@@ -126,26 +137,47 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
             return;
         }
 
-        _entries[key] = new(valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag);
-        _insertionOrder.Enqueue(key);
-        EnforceMaxEntries();
-    }
-
-    internal void Remove(DocumentCacheKey key) => _entries.TryRemove(key, out _);
-
-    internal void ClearQueries(string scopeHash)
-    {
-        foreach (KeyValuePair<DocumentCacheKey, DocumentCacheEntry> entry in _entries)
+        lock (_sync)
         {
-            if (entry.Value.ScopeHash == scopeHash && entry.Value.Operation is DocumentCacheOperation.SingleQuery)
-                _entries.TryRemove(entry.Key, out _);
+            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag);
+            if (_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node))
+                node.Value = entry;
+            else
+                _entries.Add(key, _insertionOrder.AddLast(entry));
+
+            while (_entries.Count > options.MaxEntries)
+                RemoveNode(_insertionOrder.First!);
         }
     }
 
-    private void EnforceMaxEntries()
+    internal void Remove(DocumentCacheKey key)
     {
-        while (_entries.Count > options.MaxEntries && _insertionOrder.TryDequeue(out DocumentCacheKey key))
-            _entries.TryRemove(key, out _);
+        lock (_sync)
+        {
+            if (_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node))
+                RemoveNode(node);
+        }
+    }
+
+    internal void ClearQueries(string scopeHash)
+    {
+        lock (_sync)
+        {
+            LinkedListNode<DocumentCacheEntry> node = _insertionOrder.First;
+            while (node is not null)
+            {
+                LinkedListNode<DocumentCacheEntry> next = node.Next;
+                if (node.Value.ScopeHash == scopeHash && node.Value.Operation is DocumentCacheOperation.SingleQuery)
+                    RemoveNode(node);
+                node = next;
+            }
+        }
+    }
+
+    private void RemoveNode(LinkedListNode<DocumentCacheEntry> node)
+    {
+        _entries.Remove(node.Value.Key);
+        _insertionOrder.Remove(node);
     }
 
     private T CloneIfNeeded<T>(object value)
@@ -174,6 +206,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
     }
 
     private sealed record DocumentCacheEntry(
+        DocumentCacheKey Key,
         object Value,
         DateTimeOffset CreatedOn,
         DocumentCacheOperation Operation,

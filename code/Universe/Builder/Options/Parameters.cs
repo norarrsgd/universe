@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Universe.Builder.Options;
 
@@ -102,6 +103,10 @@ public readonly record struct Catalyst(
 /// <summary></summary>
 public static class CatalystExtension
 {
-    /// <summary></summary>
-    public static string ParameterName(this Catalyst catalyst) => $"{Regex.Replace(catalyst.Column, "[^\\w\\d]", string.Empty)}{catalyst.CatalystId}";
+    /// <summary>Returns an opaque, SQL-safe parameter name derived from the column and catalyst id.</summary>
+    public static string ParameterName(this Catalyst catalyst)
+    {
+        string identity = JsonSerializer.Serialize(new string[] { catalyst.Column, catalyst.CatalystId });
+        return $"p_{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))).ToLowerInvariant()}";
+    }
 }

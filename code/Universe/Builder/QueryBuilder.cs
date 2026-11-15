@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.CompilerServices;
 using Universe.Response;
 using Universe.Builder.Strategies;
 
@@ -6,6 +7,14 @@ namespace Universe.Builder;
 
 internal class UniverseBuilder : IDisposable
 {
+    // CLR value equality can merge distinct Cosmos values, such as timestamps with different offsets.
+    private static readonly IEqualityComparer<Catalyst> ParameterCatalystComparer = EqualityComparer<Catalyst>.Create(
+        (left, right) => left.Column == right.Column && left.CatalystId == right.CatalystId
+            && left.Where == right.Where && left.Operator == right.Operator && left.Alias == right.Alias
+            && ReferenceEquals(left.Value, right.Value),
+        catalyst => HashCode.Combine(catalyst.Column, catalyst.CatalystId, catalyst.Where, catalyst.Operator,
+            catalyst.Alias, RuntimeHelpers.GetHashCode(catalyst.Value)));
+
     private static readonly HashSet<string> ReservedAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         "AND",
@@ -62,6 +71,8 @@ internal class UniverseBuilder : IDisposable
     {
         // Sanitize and validate input identifiers
         SanitizeInputs(clusters, columnOptions, sorting, groups);
+        Dictionary<Catalyst, string> parameterNames = CreateParameterNames(clusters);
+        List<string> formattedGroups = groups is null ? [] : [.. groups.Select(group => FormatProperty("c", group)).Distinct()];
 
         // Column Options Builder
         string columnsInQuery = "*";
@@ -81,13 +92,7 @@ internal class UniverseBuilder : IDisposable
                 if (columnOptions.Value.Names is null || !columnOptions.Value.Names.Any())
                     throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
 
-                groups ??= [];
-                List<string> formattedGroup = [];
-                formattedGroup.AddRange(groups.Select(group => FormatProperty("c", group)));
-
-                groups = [.. formattedGroup.Distinct()];
-
-                groups = [.. groups.Concat(columnOptions.Value.Names.Select(n => FormatProperty("c", n))).Distinct()];
+                formattedGroups = [.. formattedGroups.Concat(columnOptions.Value.Names.Select(n => FormatProperty("c", n))).Distinct()];
 
                 if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
                     throw new UniverseException("Aggregate columns must not be null or empty.");
@@ -113,7 +118,6 @@ internal class UniverseBuilder : IDisposable
                         : $"{columnsInQuery}, {toAppend}";
                 }
 
-                groups = [.. groups.Distinct()];
             }
         }
 
@@ -128,22 +132,22 @@ internal class UniverseBuilder : IDisposable
                     columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
                     {
                         string alias = catalyst.Alias ?? "c";
-                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {BuildVectorScoreAlias(catalyst, vectorDistanceCatalysts.IndexOf(catalyst))}";
+                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst, vectorDistanceCatalysts.IndexOf(catalyst))}";
                     });
                     break;
                 case 1:
                     {
                         Catalyst catalyst = vectorDistanceCatalysts.First();
                         string alias = catalyst.Alias ?? "c";
-                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{catalyst.ParameterName()}) AS {BuildVectorScoreAlias(catalyst)}";
+                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst)}";
                         break;
                     }
             }
         }
 
         // Update Columns Builder with Group By
-        if (columnsInQuery.Contains('*') && groups is not null && groups.Any())
-            columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", groups));
+        if (columnsInQuery.Contains('*') && formattedGroups.Count > 0)
+            columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", formattedGroups));
 
         // nosemgrep: sql-injection -- columnsInQuery is built from validated identifiers only:
         // column names pass through ValidateIdentifier() (rejects ;, --, /*, */, ", ], control chars)
@@ -170,8 +174,6 @@ internal class UniverseBuilder : IDisposable
             // Handle join aggregates
             if (join.Aggregates?.Any() == true)
             {
-                groups ??= [];
-
                 foreach (AggregationOption aggregate in join.Aggregates)
                 {
                     string aliasBase = BuildSqlAliasBase(aggregate.Column);
@@ -192,7 +194,7 @@ internal class UniverseBuilder : IDisposable
 
                 // Add join columns to GROUP BY
                 if (join.Columns?.Any() == true)
-                    groups = [.. groups.Concat(join.Columns.Distinct().Select(col => FormatProperty(join.Alias, col)))];
+                    formattedGroups = [.. formattedGroups.Concat(join.Columns.Select(col => FormatProperty(join.Alias, col))).Distinct()];
 
                 // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
@@ -241,7 +243,7 @@ internal class UniverseBuilder : IDisposable
                 {
                     if (!firstCondition)
                         queryBuilder.Append($" {catalyst.Where.Value()} ");
-                    queryBuilder.Append(WhereClauseBuilder(catalyst));
+                    queryBuilder.Append(WhereClauseBuilder(catalyst, parameterNames[catalyst]));
                     firstCondition = false;
                 }
 
@@ -274,14 +276,14 @@ internal class UniverseBuilder : IDisposable
                         queryBuilder.Append(", ");
 
                     if (catalyst.Operator is Q.Operator.VectorDistance)
-                        queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{catalyst.ParameterName()})");
+                        queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{parameterNames[catalyst]})");
                     else if (catalyst.Operator is Q.Operator.FTScore)
                     {
                         queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
                         if (catalyst.Value is IEnumerable<string> stringVals)
                         {
                             string[] vals = stringVals.ToArray();
-                            queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{catalyst.ParameterName()}_ft{i}")));
+                            queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{parameterNames[catalyst]}_ft{i}")));
                         }
                         else
                             throw new UniverseException("FullTextScore operator requires a string[] value.");
@@ -320,28 +322,20 @@ internal class UniverseBuilder : IDisposable
                     if (catalyst.Value is IEnumerable<string> stringVals)
                     {
                         string[] vals = stringVals.ToArray();
-                        queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{catalyst.ParameterName()}_ft{i}")));
+                        queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{parameterNames[catalyst]}_ft{i}")));
                     }
 
                     queryBuilder.Append(')');
                 }
                 else
-                    queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{catalyst.ParameterName()})");
+                    queryBuilder.Append($" ORDER BY {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, @{parameterNames[catalyst]})");
             }
         }
 
         // Group By Builder
-        if (groups is not null && groups.Any())
+        if (formattedGroups.Count > 0)
         {
-            // Groups pre-formatted by the aggregate path already contain bracket notation (e.g., c["category"]).
-            // Raw groups (GROUP BY without aggregates) need FormatProperty applied.
-            IReadOnlyList<string> formattedGroups = groups[0].Contains('[')
-                ? groups
-                : [.. groups.Select(g => FormatProperty("c", g)).Distinct()];
-
-            queryBuilder.Append($" GROUP BY {formattedGroups[0]}");
-            foreach (string group in formattedGroups.Where(g => g != formattedGroups[0]))
-                queryBuilder.Append($", {group}");
+            queryBuilder.Append($" GROUP BY {string.Join(", ", formattedGroups)}");
         }
 
         // This error blocks code execution since this is not yet supported by CosmosDb
@@ -353,24 +347,24 @@ internal class UniverseBuilder : IDisposable
 
         if (clusters is not null && clusters.Any())
         {
-            foreach (Catalyst catalyst in clusters.SelectMany(cluster => cluster.Catalysts))
+            foreach ((Catalyst catalyst, string parameterName) in parameterNames)
             {
                 if (catalyst.Operator is Q.Operator.FTScore && catalyst.Value is IEnumerable<string> ftValues)
                 {
                     string[] vals = ftValues.ToArray();
                     for (int i = 0; i < vals.Length; i++)
                     {
-                        query = query.WithParameter($"@{catalyst.ParameterName()}_ft{i}", vals[i]);
+                        query = query.WithParameter($"@{parameterName}_ft{i}", vals[i]);
                     }
                 }
                 else
                 {
-                    query = query.WithParameter($"@{catalyst.ParameterName()}", catalyst.Value);
+                    query = query.WithParameter($"@{parameterName}", catalyst.Value);
                 }
             }
         }
 
-        context = QueryTypeDetector.CreateContext(clusters, columnOptions, groups, query.QueryText);
+        context = QueryTypeDetector.CreateContext(clusters, columnOptions, formattedGroups, query.QueryText);
         return query;
     }
 
@@ -606,17 +600,39 @@ internal class UniverseBuilder : IDisposable
         return $"{BuildSqlAliasBase(catalyst.Column)}Score{suffix}";
     }
 
-    private string WhereClauseBuilder(Catalyst catalyst)
+    private static Dictionary<Catalyst, string> CreateParameterNames(IReadOnlyList<Cluster> clusters)
+    {
+        Dictionary<Catalyst, string> names = new(ParameterCatalystComparer);
+        HashSet<string> usedNames = new(StringComparer.Ordinal);
+        foreach (Cluster cluster in clusters ?? [])
+        {
+            foreach (Catalyst catalyst in cluster.Catalysts ?? [])
+            {
+                if (names.ContainsKey(catalyst))
+                    continue;
+
+                string baseName = catalyst.ParameterName();
+                string name = baseName;
+                int suffix = 0;
+                while (!usedNames.Add(name))
+                    name = $"{baseName}_{++suffix}";
+                names.Add(catalyst, name);
+            }
+        }
+        return names;
+    }
+
+    private string WhereClauseBuilder(Catalyst catalyst, string parameterName)
     {
         string alias = catalyst.Alias ?? "c";
         string formattedProperty = FormatProperty(alias, catalyst.Column);
         return catalyst.Operator switch
         {
             Q.Operator.In or
-                Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
+                Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{parameterName})",
             Q.Operator.Contains or
-                Q.Operator.NotContains => $"{catalyst.Operator.Value()}(@{catalyst.ParameterName()}, {formattedProperty})",
-            Q.Operator.Len => $"{catalyst.Operator.Value()}({formattedProperty}) = @{catalyst.ParameterName()}",
+                Q.Operator.NotContains => $"{catalyst.Operator.Value()}(@{parameterName}, {formattedProperty})",
+            Q.Operator.Len => $"{catalyst.Operator.Value()}({formattedProperty}) = @{parameterName}",
             Q.Operator.Defined or
                 Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({formattedProperty})",
             Q.Operator.FTContains or
@@ -624,8 +640,8 @@ internal class UniverseBuilder : IDisposable
                 Q.Operator.FTContainsAll or
                 Q.Operator.NotFTContainsAll or
                 Q.Operator.FTContainsAny or
-                Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({formattedProperty}, @{catalyst.ParameterName()})",
-            _ => $"{formattedProperty} {catalyst.Operator.Value()} @{catalyst.ParameterName()}",
+                Q.Operator.NotFTContainsAny => $"{catalyst.Operator.Value()}({formattedProperty}, @{parameterName})",
+            _ => $"{formattedProperty} {catalyst.Operator.Value()} @{parameterName}",
         };
     }
 
@@ -641,7 +657,7 @@ internal class UniverseBuilder : IDisposable
         foreach (string segment in segments)
         {
             if (!string.IsNullOrWhiteSpace(segment))
-                result.Append($"[\"{ConvertName(segment)}\"]");
+                result.Append($"[{JsonSerializer.Serialize(ConvertName(segment))}]");
         }
 
         return result.ToString();

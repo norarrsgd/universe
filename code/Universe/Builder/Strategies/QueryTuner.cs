@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
 using Universe.Builder.Strategies.Storage;
 
 namespace Universe.Builder.Strategies;
@@ -16,9 +15,6 @@ internal sealed partial class QueryTuner : IDisposable
     private int _totalCount;
     private const int MaxStoredExecutions = 1000;
     private const int MinSampleSizeForRecommendations = 10;
-
-    [GeneratedRegex(@"@\w+")]
-    private static partial Regex ParameterNamePattern();
 
     public QueryTuner(IQueryStatisticsStorage storage = null)
     {
@@ -137,7 +133,7 @@ internal sealed partial class QueryTuner : IDisposable
         // Normalize parameter names to produce consistent hashes for structurally identical queries.
         // Parameter names contain dynamic CatalystIds (GUIDs) that vary per instance,
         // so identical logical queries would otherwise get different hashes.
-        string normalizedQuery = ParameterNamePattern().Replace(queryText, "@p");
+        (string normalizedQuery, _) = QueryParameterNormalizer.Normalize(queryText);
         string signature = $"{context.Type}|{normalizedQuery}";
         byte[] bytes = Encoding.UTF8.GetBytes(signature);
         byte[] hash = SHA256.HashData(bytes);

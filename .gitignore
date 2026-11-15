@@ -364,3 +364,4 @@ netcore/obj/
 *.vscode
 
 .codegraph/
+.worktrees/

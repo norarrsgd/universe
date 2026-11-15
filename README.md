@@ -111,11 +111,15 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
 
 The cache is process-local memory. Repositories share entries only when they use the same `CosmosClient` instance and cache options, with matching database, container, and entity types. Different client instances are isolated even when they connect to the same endpoint. Use separate clients for different authorization contexts; if a client's authority changes, recreate it or disable document caching.
 
+`maxEntries` bounds both retained documents and eviction records. Eviction follows first-insertion order; overwrites refresh the value, ETag, and TTL without changing that order. Query-cache keys preserve quoted field names and associate each SQL parameter occurrence with its bound value.
+
 Successful create, modify, remove, atomic batch, and bulk batch commits update or invalidate entries within that client and repository scope. Changes made through other client instances or processes are visible after the configured cache time-to-live expires.
 
 5. Inject your `IGalaxy<MyModel>` dependency into your classes and enjoy a simpler way to query CosmosDb
 
 ## Understanding the Gravity Object
+
+Generated parameter names are opaque and may change between versions. `Catalyst.ParameterName()` returns a safe hash-derived base name, including for custom catalyst IDs; the query builder adds suffixes when distinct catalysts would otherwise share a binding. Use the actual names returned in `Gravity.Query.Parameters` to inspect generated queries. Public method signatures and result aliases are unchanged.
 
 The `Gravity` object is returned by all operations and contains valuable information:
 

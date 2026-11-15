@@ -278,6 +278,19 @@ public sealed class QueryTunerTests
     #region ComputeQueryHash
 
     [Fact]
+    public void ComputeQueryHash_PreservesQuotedIdentifiersAndLegacyOrdinaryHash()
+    {
+        QueryContext context = new(QueryType.Simple);
+
+        Assert.NotEqual(
+            QueryTuner.ComputeQueryHash(context, "SELECT * FROM c WHERE c[\"access@a\"] = @a"),
+            QueryTuner.ComputeQueryHash(context, "SELECT * FROM c WHERE c[\"access@b\"] = @b"));
+        byte[] legacyBytes = System.Text.Encoding.UTF8.GetBytes("Simple|SELECT * FROM c WHERE c.id = @p");
+        string legacyHash = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(legacyBytes))[..16];
+        Assert.Equal(legacyHash, QueryTuner.ComputeQueryHash(context, "SELECT * FROM c WHERE c.id = @oldName"));
+    }
+
+    [Fact]
     public void ComputeQueryHash_Deterministic()
     {
         QueryContext context = new QueryContext(QueryType.Simple);

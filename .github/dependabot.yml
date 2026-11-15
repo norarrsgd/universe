@@ -6,6 +6,14 @@
 version: 2
 updates:
   - package-ecosystem: "nuget"
-    directory: "./functions/"
+    directory: "/code/Universe"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "nuget"
+    directory: "/code/Universe.Tests"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "nuget"
+    directory: "/code/DarkMatter"
     schedule:
       interval: "daily"

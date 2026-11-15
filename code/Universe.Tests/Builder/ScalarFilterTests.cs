@@ -16,7 +16,7 @@ public sealed class ScalarFilterTests
 
         QueryDefinition query = builder.CreateQuery([new([catalyst, catalyst])]);
 
-        Assert.Equal("SELECT * FROM c WHERE (c[\"name\"] = @namea OR c[\"name\"] = @namea)", query.QueryText);
+        Assert.Equal("SELECT * FROM c WHERE (c[\"name\"] = @p_9594e71c2dff3a38d84ff4ffd98d1a5b56c651cd585a828749f37001c53e7ae5 OR c[\"name\"] = @p_9594e71c2dff3a38d84ff4ffd98d1a5b56c651cd585a828749f37001c53e7ae5)", query.QueryText);
         Assert.Equal("test", Assert.Single(query.GetQueryParameters()).Value);
     }
 
@@ -31,7 +31,7 @@ public sealed class ScalarFilterTests
 
         QueryDefinition query = builder.CreateQuery([new([rank, first, second]), new([third], Q.Where.Or)], new(null, Top: 5));
 
-        Assert.Contains(" WHERE (c[\"active\"] = @activea OR c[\"price\"] > @priceb) OR (c[\"name\"] = @namec)", query.QueryText);
+        Assert.Contains(" WHERE (c[\"active\"] = @p_b8d146b12f7e230987b7a0c0e4b3aeecd0b33b8b690960f6af9455ee57aafc9f OR c[\"price\"] > @p_99d9a6d1e66435617ce63d6e3b82e22023a26659c6967b798f75b1eb0a2d7481) OR (c[\"name\"] = @p_dff3a0168a62effdb15776ecfc445c0cabce7b73e94e5c8303e80907cb0c54a7)", query.QueryText);
         Assert.Equal(4, query.GetQueryParameters().Count);
     }
 

@@ -155,6 +155,7 @@ File responsibilities:
 - `Builder/ClusterBuilder.cs`: fluent builder for one `Cluster`. It stores catalysts in order and tracks the next intra-cluster `AND` / `OR` connector.
 - `Builder/Orbit.cs`: public fluent query builder. It accumulates clusters, selected columns, sort options, aggregates, group-by columns, pagination, joins, hints, and execution mode.
 - `Builder/QueryBuilder.cs`: internal SQL-generation and query-dispatch core. Treat as security-sensitive.
+- `Builder/QueryParameterNormalizer.cs`: shared quote-aware SQL parameter normalization for cache signatures and statistics hashes. Returns token names in SQL occurrence order, including repeats.
 - `Builder/Options/AggregationOption.cs`: record struct pairing a column with a `Q.Aggregate` enum.
 - `Builder/Options/ColumnOptions.cs`: record struct for selected columns, `DISTINCT`, `TOP`, aggregates, and joins.
 - `Builder/Options/JoinOptions.cs`: record for Cosmos array `JOIN` configuration.
@@ -316,8 +317,8 @@ Nuances:
 - CI test command excludes tests tagged `Category=Performance`.
 - `nuget-publish.yml` runs on pushes to `prod` and `beta`, builds, packs `code/Universe/UniverseQuery.csproj`, and pushes to NuGet with `NUGET_KEY`.
 - Semgrep runs on PRs and on pushes to `dev` and `prod`.
-- `dependabot.yml` currently points NuGet updates at `./functions/`, which does not match this repo's active `code/Universe` and `code/Universe.Tests` project layout.
-- `CODEOWNERS` includes several paths from a different layout (`/functions/`, `/app_portal/`, `/app_store/`, `/web_admin/`); review before relying on it for ownership enforcement.
+- `dependabot.yml` schedules daily NuGet updates for `code/Universe`, `code/Universe.Tests`, and `code/DarkMatter`.
+- `CODEOWNERS` covers the active `/code/` tree, Markdown documentation, and `.github/` configuration.
 
 ## Build And Test
 
@@ -350,7 +351,7 @@ dotnet run
 
 ## Target Runtime And Packages
 
-The current package version is `3.5.1` (stable), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
+The current package version is `3.5.2-preview.1` (prerelease), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
 
 The main library currently targets:
 
@@ -493,7 +494,7 @@ When `UniverseOptions.WithDocumentCache(...)` is configured, direct id reads are
 - Executes through `QBuilder.GetOneFromQuery`.
 - Marks the `QueryContext` for single-result execution. All strategies force page and buffer sizes to one after hint merging, read past empty pages, retain only the first document, and dispose the iterator without reading further pages.
 - Returns first result or `default`.
-- When document caching is enabled, generated SQL and ordered parameter values are normalized into a hashed cache key before execution. Random catalyst ids in parameter names are normalized so equivalent query shapes can hit the same cache entry.
+- When document caching is enabled, actual SQL parameter tokens outside quoted strings/property names are normalized into a hashed cache key. Bound values follow SQL occurrence order, including repeats; unresolved bindings bypass caching. Equivalent queries with newly generated catalyst ids can still share entries, while fields such as `access@a` and `access@b` remain distinct.
 
 `Galaxy<T>.List(...)`:
 
@@ -593,16 +594,17 @@ Ranking behavior:
 
 Parameter binding:
 
-- Normal catalysts bind `@{catalyst.ParameterName()}`.
-- `FTScore` binds each term as `@{ParameterName}_ft{i}`.
-- `Catalyst.ParameterName()` removes non-word/digit characters from the column and appends a GUID-derived catalyst id.
+- `Catalyst.ParameterName()` returns `p_` plus the lowercase SHA-256 hash of JSON `[Column, CatalystId]`. It accepts custom ids, distinguishes null from empty, and never inserts id text into SQL.
+- A query-local map reuses bindings only when catalyst metadata matches and the value object is the same instance; distinct boxed/reference values get numeric suffixes when they share a base name. This preserves timestamp offsets and other values whose CLR equality differs from their serialized representation. All SQL rendering and parameter binding use this map.
+- `FTScore` binds each term as `@{allocatedName}_ft{i}`. Aggregate/vector-score aliases are unchanged. Parameter names are opaque; consumers should inspect the actual names returned by `Gravity.Query.Parameters`.
 
 ### Identifier Formatting And Validation
 
 Identifier handling has two pieces:
 
 - `ValidateIdentifier(...)` validates the raw identifier before query text is built.
-- `FormatProperty(alias, column)` splits the column on dots and renders each non-empty segment as `["segment"]`.
+- `FormatProperty(alias, column)` splits the column on dots and JSON-quotes each non-empty segment after applying the naming policy, escaping backslashes and policy-generated quotes.
+- Raw grouping paths are kept separate from formatted SQL. The same formatted group list supplies wildcard projections and `GROUP BY`, retaining deduplication and root/join aliases without inferring formatting from bracket characters.
 
 Validation currently rejects:
 
@@ -852,6 +854,10 @@ Invalidation behavior:
 Cache keys are SHA-256 hashes built from an opaque Cosmos client namespace, operation kind, database, container, source entity type, result type, and operation inputs. A cache-owned `ConditionalWeakTable<CosmosClient, string>` assigns namespaces by exact client-instance identity without retaining credentials or preventing client collection. Point keys, query keys, and invalidation scopes all include that namespace. Repositories sharing the same client and cache options can share matching entries; different client instances are isolated even at the same endpoint. A client must represent one stable authorization context; recreate it or disable caching when its authority changes.
 
 Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with `System.Text.Json` settings aligned with `UniverseSerializer`; clone failures skip or evict the affected cache entry. Writes through another client namespace rely on TTL expiry for visibility.
+
+The cache holds one linked-list node per dictionary entry under a short structural lock, so `MaxEntries` bounds eviction metadata as well as documents. Overwrites refresh TTL/value/ETag in their original FIFO position; remove/reinsert joins the tail. Reads take an entry snapshot under the lock and clone outside it. A clone failure removes only that exact snapshot, never a concurrent replacement. Expiration, explicit removal, and query invalidation remove their list nodes too.
+
+The query tuner uses the same quote-aware normalizer while retaining the existing `@p` substitution for ordinary query hashes. Existing JSON/SQLite statistics and their schemas are retained; only hashes for previously misnormalized quoted text can change.
 
 ## Data Model And Serialization
 

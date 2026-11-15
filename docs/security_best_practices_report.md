@@ -4,6 +4,28 @@ Date: 2026-05-22
 
 Scope: static review of the `UniverseQuery` library, example harness, documentation, and GitHub workflow configuration for blue-team assessment.
 
+## Remediation status — 2026-11-16
+
+The findings below preserve the historical 2026-05-22 assessment and its original line references. They do not describe every current behavior. The follow-up source audit reviewed commit `0488e867e6458710030b63f4c31ded12d8f20760`; the remediation changes address these four probe items:
+
+- **SP-001 — query-cache predicate collision:** query signatures now normalize actual parameter tokens outside quoted text and associate values in SQL occurrence order, including repeated bindings. Regression coverage distinguishes `access@a` from `access@b`, reordered bindings, repeated values, and the repository cache-return path.
+- **SP-002 — unbounded cache eviction records:** one list node is retained per dictionary entry. Tests cover overwrites, FIFO eviction, removal/reinsertion, expiration, scoped invalidation, concurrent mutations, and a clone failure racing with a replacement.
+- **SP-003 — caller-controlled parameter-id syntax:** custom ids remain accepted but become opaque ASCII hash-derived names. A query-local map prevents distinct catalysts from overwriting shared bindings. Scalar, vector, full-text, and RRF tests verify consistent rendering/binding. The historical lead's acceptance by Cosmos was not established; these changes remove the unsafe source construction without claiming an observed exploit.
+- **SP-004 — raw grouping fragments:** a separate formatted group list supplies projections and `GROUP BY`; no bracket-content heuristic remains. Tests cover expression-shaped property names, nested paths, naming-policy escaping, deduplication, aggregates, and join aliases. Practical exploitation of the previous path remains unverified against Cosmos.
+
+Release build and the non-performance unit suite passed, and local packaging completed with the project's API compatibility validation enabled against `3.4.1`. No scanner, example program, emulator, configured Cosmos endpoint, or deployed service was run/contacted during remediation. These checks establish local behavior and API compatibility, not deployment or exploit verification.
+
+Historical finding disposition:
+
+- **H-001:** current strict raw-alias validation and sanitized generated aliases address the reported raw-alias construction; the follow-up parameter/group paths are covered separately above.
+- **M-001:** current `Top`, page-size, and public hint validation bound those inputs. List queries still intentionally read all matching pages unless a query limit is specified; these limits are not a per-request RU budget.
+- **M-002:** `WithAutoProvisioning(false)` supports existing-container runtime access. Production identity permissions depend on consumer configuration and were not verified.
+- **M-003:** stored-procedure bodies remain a documented trusted administrative capability. No public route exposing them was established; consuming applications must enforce administrative authorization.
+- **L-001:** query recording defaults off and remains documented debugging behavior; production log/API exposure was not assessed.
+- **L-002:** custom persistence paths remain trusted configuration. Host filesystem ownership, ACLs, and symlink isolation were not assessed; no path sandbox was added.
+- **L-003:** the example harness still contains placeholder credentials, not real secrets. Switching its setup to environment variables remains outside this remediation.
+- **L-004:** Dependabot now covers all three active projects, and CODEOWNERS covers `/code/`. Live GitHub scheduling and branch-protection enforcement were not checked.
+
 ## Executive Summary
 
 The codebase has a strong baseline for Cosmos SQL value parameterization: query values are bound through `QueryDefinition.WithParameter`, and many identifier inputs are validated before SQL text is constructed. The highest-risk issue is that the identifier validator is used for both bracketed property paths and raw SQL identifier positions, but it does not enforce a strict SQL-identifier shape. That leaves raw alias and generated `AS` alias positions able to receive whitespace and punctuation that can corrupt generated SQL and may undermine the library's stated injection-protection guarantee when column/alias names are derived from untrusted request input.
