@@ -315,7 +315,7 @@ Nuances:
 - `dotnet-ci.yml` runs on every push and has restore, build, and test jobs.
 - CI uses `.NET 10.x` preview via `actions/setup-dotnet`.
 - CI test command excludes tests tagged `Category=Performance`.
-- `nuget-publish.yml` runs on pushes to `prod` and `beta`, builds, packs `code/Universe/UniverseQuery.csproj`, and pushes to NuGet with `NUGET_KEY`.
+- `nuget-publish.yml` runs on pushes to `prod` and `beta`, builds, tests, packs `code/Universe/UniverseQuery.csproj`, and pushes to NuGet using OIDC Trusted Publishing through `NuGet/login` as nuget.org user `kuromukira`. The publish job requires `id-token: write`. Configure a nuget.org Trusted Publishing policy for GitHub owner `norarrsgd`, repository `universe`, workflow filename `nuget-publish.yml`, and package `UniverseQuery`; leave the policy environment empty because the workflow does not use one. The temporary API key is requested immediately before publishing; `NUGET_KEY` is no longer used.
 - Semgrep runs on PRs and on pushes to `dev` and `prod`.
 - `dependabot.yml` schedules daily NuGet updates for `code/Universe`, `code/Universe.Tests`, and `code/DarkMatter`.
 - `CODEOWNERS` covers the active `/code/` tree, Markdown documentation, and `.github/` configuration.
