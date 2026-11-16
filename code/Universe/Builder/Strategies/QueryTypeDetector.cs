@@ -26,7 +26,8 @@ internal static class QueryTypeDetector
 
         bool hasGrouping = groups is { Count: > 0 };
         bool hasAggregates = columnOptions?.Aggregates is { Count: > 0 }
-            || columnOptions?.Join?.Aggregates is { Count: > 0 };
+            || columnOptions?.Join?.Aggregates is { Count: > 0 }
+            || columnOptions?.Projection?.HasAggregates == true;
         QueryType type = (hasVectorSearch, hasFullTextSearch) switch
         {
             (true, true) => QueryType.HybridSearch,

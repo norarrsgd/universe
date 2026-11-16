@@ -5,6 +5,11 @@ namespace Universe.Interfaces;
 /// <summary></summary>
 public interface IGalaxyBasic<T> where T : ICosmicEntity
 {
+    /// <summary>Read a document with per-operation consistency.</summary>
+    Task<(Gravity g, T T)> Get(string id, string[] partitionKey, ReadOptions readOptions)
+        => readOptions?.ConsistencyLevel is null ? Get(id, partitionKey)
+            : throw new NotSupportedException("This IGalaxyBasic implementation does not support per-operation consistency.");
+
     /// <summary>
     /// Starts an atomic transactional batch for one logical partition.
     /// </summary>

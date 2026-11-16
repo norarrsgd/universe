@@ -358,15 +358,27 @@ The main library currently targets:
 - .NET `net10.0`
 - C# `14.0`
 - Nullable disabled
-- `Microsoft.Azure.Cosmos` `3.63.2`
-- `Microsoft.Data.Sqlite` `10.0.13`
+- `Microsoft.Azure.Cosmos` `3.64.0`
+- `Microsoft.Data.Sqlite` `11.0.0`
 - `Newtonsoft.Json` `13.0.4`
 - `SQLitePCLRaw.bundle_e_sqlite3` `3.0.5`
 - `SQLitePCLRaw.core` `3.0.5`
 
-`Universe.Tests` is an xUnit test project targeting `net10.0`, using `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3` `3.2.2`, and `xunit.runner.visualstudio` `3.1.5`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
+`Universe.Tests` is an xUnit test project targeting `net10.0`, using `Microsoft.NET.Test.Sdk` `18.12.0`, `xunit.v3` `4.0.3`, and `xunit.runner.visualstudio` `4.0.1`. The tests are local unit tests for query generation, storage, and tuning behavior; they do not require Cosmos DB unless a new test explicitly adds that dependency.
 
 ## Public API Map
+
+### Extended Query And Read Capabilities
+
+- `QueryOperand` is a closed immutable comparison operand with Field, ArrayLength, and Parameter factories. `Catalyst.Compare` and `ClusterBuilder.Compare` support the six equality/ordering comparisons; the right operand can be a parameter, field, or array length. Identifiers on both sides use normal validation/naming policy. Existing Len remains equality against a parameter.
+- Catalyst adds IgnoreCase for StartsWith/StringContains/StringEquals and PartialMatch for In/NotIn. IsNull/IsString are unary and bind no values. Partial-object patterns are bound whole; Contains retains caller-collection membership. Existing operator numeric values and positional constructors/deconstruction are preserved.
+- `ProjectionBuilder` builds immutable `QueryProjection` snapshots using Field, Object, Aggregate, and Build. `ColumnOptions.Projection` and `Orbit.Project` add explicit output shapes without raw SQL. Output names are exact; source paths use naming policy. The partial `QueryProjectionRenderer` owns nested rendering, rendered-name collision checks, aggregate-derived grouping, and preserved root aggregate/vector-score outputs with existing naming-policy aliases. Grouped/aggregate projections reject ordering/ranking. QueryTypeDetector recognizes nested aggregates.
+- Projected GetAsync honors the full shape and hints, retains explicit TOP or defaults to TOP 1, and uses bounded single-result execution. Projected GetAsync rejects Paged. Without Project, GetAsync retains its legacy limited shaping behavior.
+- `ReadOptions` and `Orbit.WithConsistency` flow through point reads, full-shape query Get/List, every strategy's typed QueryContext, and the direct paging path. Any explicit level bypasses document-cache reads and writes without changing existing entries. Default reads retain TTL behavior. Invalid enum values and overrides conflicting with a client ReadConsistencyStrategy fail before cache access; Strong requires account support and has no downgrade fallback.
+- Existing interface signatures remain; required-argument overloads accept ReadOptions, with default interface methods forwarding only representable legacy calls and rejecting unsupported new capabilities. No shared client/request-options mutation occurs.
+- ExtendedPredicateTests, StructuredProjectionTests, and ReadConsistencyTests cover generated SQL, validation, naming, projection composition/classification, execution/options, cache policy, and call isolation. LegacyInterfaceCompatibilityTests also covers old IGalaxy implementations.
+- Run `dotnet run --project code/DarkMatter -- --query-capabilities` for a credential-free SQL-only example. It disables provisioning and never executes a Cosmos read.
+- `code/global.json` selects Microsoft.Testing.Platform; launch `dotnet test` from `code` to load that setting. A root-directory VSTest invocation does not load it. When restricted environments block MSBuild/test discovery sockets, build with `--disable-build-servers -m:1 -nr:false`, then run `dotnet code/Universe.Tests/bin/Debug/net10.0/Universe.Tests.dll -trait- "Category=Performance"` from the repository root for equivalent non-performance validation. No runner/dependency changes are required.
 
 Primary consumer entry points:
 
@@ -665,7 +677,7 @@ Fluent API:
 - `Orbit<T>` is created with `galaxy.Query()`.
 - `ClusterBuilder` exposes the operator helpers used inside `.Cluster(c => ...)`.
 - `Select<TProjection>()` extracts public projection properties, excluding `[JsonIgnore]`.
-- `GetAsync()` applies only filters and selected columns. It intentionally ignores `Top`, `Distinct`, `Aggregate`, `GroupBy`, sorting, joins, paging, and hints.
+- Without `Project`, `GetAsync()` applies only filters and selected columns and ignores `Top`, `Distinct`, `Aggregate`, `GroupBy`, sorting, joins, paging, and hints. With `Project`, it applies the full shape and rejects paging.
 - `ToListAsync()` applies the full list query shape.
 - `Paged()` and `WithHints()` are mutually exclusive in the fluent API.
 
@@ -1070,7 +1082,7 @@ coderabbit review
 - `DarkMatter` examples intentionally use debug-style logging and should not define production logging standards.
 - `Paged()` stops after the first non-empty page except for `GROUP BY`, where continuation token behavior is different.
 - Query hints are not accepted with fluent paged queries.
-- `GetAsync()` does not apply most list-shaping options.
+- `GetAsync()` without `Project` does not apply most list-shaping options.
 - `ColumnOptions.Top` is required for rank/vector operators.
 - Cosmos DB column names are case-sensitive.
 - `PartitionKey` attribute sequence matters for multi-level partition keys.

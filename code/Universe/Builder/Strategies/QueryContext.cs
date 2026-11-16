@@ -6,7 +6,8 @@ internal readonly record struct QueryContext(
     IReadOnlyDictionary<string, object> Hints = null,
     bool SingleResult = false,
     bool HasRankOperations = false,
-    bool HasGrouping = false);
+    bool HasGrouping = false,
+    ConsistencyLevel? ConsistencyLevel = null);
 
 /// <summary>
 /// Types of queries supported in Universe

@@ -16,6 +16,10 @@ internal sealed class QueryTestContainer : Container
     public int? ThrowOnQueryPage { get; set; }
     public QueryDefinition LastQuery { get; private set; }
     public QueryRequestOptions LastQueryOptions { get; private set; }
+    public ItemRequestOptions LastItemOptions { get; private set; }
+    public string LastContinuationToken { get; private set; }
+    public List<QueryRequestOptions> QueryOptionsHistory { get; } = [];
+    public Task QueryReadGate { get; set; } = Task.CompletedTask;
     public string ETag { get; set; } = "fake-etag";
     public CosmosException ReadException { get; set; }
     public int ReadItemCalls { get; private set; }
@@ -29,6 +33,7 @@ internal sealed class QueryTestContainer : Container
     public override Task<ItemResponse<T>> ReadItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
     {
         ReadItemCalls++;
+        LastItemOptions = requestOptions;
         if (ReadException is not null)
             throw ReadException;
         return Task.FromResult<ItemResponse<T>>(new FakeItemResponse<T>((T)ReadItemResult, 9.5, ETag));
@@ -45,6 +50,8 @@ internal sealed class QueryTestContainer : Container
         QueryCalls++;
         LastQuery = queryDefinition;
         LastQueryOptions = requestOptions;
+        LastContinuationToken = continuationToken;
+        QueryOptionsHistory.Add(requestOptions);
         return new FakeFeedIterator<T>(QueryPages ?? [QueryItems], this);
     }
 
@@ -97,13 +104,14 @@ internal sealed class QueryTestContainer : Container
 
         public override bool HasMoreResults => _page < pages.Count;
 
-        public override Task<FeedResponse<T>> ReadNextAsync(CancellationToken cancellationToken = default)
+        public override async Task<FeedResponse<T>> ReadNextAsync(CancellationToken cancellationToken = default)
         {
             container.QueryPageReads++;
             if (container.ThrowOnQueryPage == container.QueryPageReads)
                 throw new InvalidOperationException("Scripted query failure");
 
-            return Task.FromResult<FeedResponse<T>>(new FakeFeedResponse<T>(pages[_page++].Cast<T>().ToArray(), 7.25));
+            await container.QueryReadGate;
+            return new FakeFeedResponse<T>(pages[_page++].Cast<T>().ToArray(), 7.25);
         }
 
         protected override void Dispose(bool disposing)

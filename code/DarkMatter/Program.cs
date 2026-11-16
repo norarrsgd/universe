@@ -14,6 +14,12 @@ class Program
 {
     static async Task Main(string[] args)
     {
+        if (args.Contains("--query-capabilities", StringComparer.Ordinal))
+        {
+            Example18_QueryCapabilities.Run();
+            return;
+        }
+
         // Database connection details
         string CosmosDbUri = "<FROM AZURE PORTAL>";
         string CosmosDbPrimaryKey = "<FROM AZURE PORTAL>";

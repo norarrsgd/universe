@@ -23,17 +23,48 @@ public readonly record struct Catalyst(
     /// </summary>
     public string CatalystId { get; init; } = Guid.CreateVersion7().ToString().Replace("-", string.Empty);
 
+    /// <summary>Ignore case for StartsWith, StringContains, or StringEquals.</summary>
+    public bool IgnoreCase { get; init; }
+    /// <summary>Match a subset of object properties for In or NotIn.</summary>
+    public bool PartialMatch { get; init; }
+    internal QueryOperand LeftOperand { get; init; }
+    internal QueryOperand RightOperand { get; init; }
+
+    /// <summary>Compare fields, array lengths, or a right-hand parameter.</summary>
+    public static Catalyst Compare(QueryOperand left, Q.Operator comparison, QueryOperand right, Q.Where where = Q.Where.And)
+    {
+        if (left is null || right is null || left.Kind == QueryOperand.OperandKind.Parameter)
+            throw new UniverseException("A comparison requires a field or array length on the left and a non-null right operand.");
+        if (comparison is not (Q.Operator.Eq or Q.Operator.NotEq or Q.Operator.Gt or Q.Operator.Gte or Q.Operator.Lt or Q.Operator.Lte))
+            throw new UniverseException("Operands support only equality and ordering comparisons.");
+        return new(left.Path, right.Value, where, comparison, left.Alias) { LeftOperand = left, RightOperand = right };
+    }
+
+    internal bool BindsValue => Operator is not (Q.Operator.IsNull or Q.Operator.IsString)
+        && (RightOperand is null || RightOperand.Kind == QueryOperand.OperandKind.Parameter);
+
     /// <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
     public IEnumerable<string> RuleViolations()
     {
         List<string> violations = [];
+
+        bool unary = Operator is Q.Operator.Defined or Q.Operator.NotDefined or Q.Operator.IsNull or Q.Operator.IsString;
+        bool stringOperator = Operator is Q.Operator.StartsWith or Q.Operator.StringContains or Q.Operator.StringEquals;
+        if (IgnoreCase && !stringOperator)
+            violations.Add("IgnoreCase is supported only for string predicates.");
+        if (PartialMatch && Operator is not (Q.Operator.In or Q.Operator.NotIn))
+            violations.Add("PartialMatch is supported only for In and NotIn.");
+        if (stringOperator && Value is not string)
+            violations.Add("String predicates require a non-null string value.");
+        if (LeftOperand is not null && Operator is not (Q.Operator.Eq or Q.Operator.NotEq or Q.Operator.Gt or Q.Operator.Gte or Q.Operator.Lt or Q.Operator.Lte))
+            violations.Add("Operands support only equality and ordering comparisons.");
 
         // Column name cannot be null or empty
         if (string.IsNullOrWhiteSpace(Column))
             violations.Add("Column name is required");
 
         // Value should be null if using IS_DEFINED or NOT IS_DEFINED operators
-        if (Value is not null && Operator is Q.Operator.Defined or Q.Operator.NotDefined)
+        if (Value is not null && unary)
             violations.Add("Value should not be supplied when using the Defined or NotDefined operators");
 
         // Value should have wildcard for Like and Not Like operators
@@ -93,7 +124,7 @@ public readonly record struct Catalyst(
         }
 
         // Value is required for all other operators
-        if (Value is null && Operator is not Q.Operator.Defined and not Q.Operator.NotDefined)
+        if (Value is null && !unary && RightOperand is null)
             violations.Add("Value is required for all operators except Defined and NotDefined");
 
         return violations;

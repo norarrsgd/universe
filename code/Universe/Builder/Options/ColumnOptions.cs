@@ -14,4 +14,8 @@ public record struct ColumnOptions(
     bool IsDistinct = false,
     int Top = 0,
     IReadOnlyList<AggregationOption> Aggregates = null,
-    JoinOptions Join = null);
+    JoinOptions Join = null)
+{
+    /// <summary>Additional structured fields and nested objects in the SELECT clause.</summary>
+    public QueryProjection Projection { get; init; }
+}
