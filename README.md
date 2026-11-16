@@ -1,6 +1,31 @@
 # Universe
 A simpler way of querying a CosmosDb Namespace
 
+## Structured queries and per-request consistency
+
+```csharp
+(Gravity gravity, IList<TicketSummary> tickets) = await galaxy.Query()
+    .Cluster(c => c.StartsWith("pk", "tenant:")
+        .StringContains("data.name", search, ignoreCase: true)
+        .ArrayContains("data.shares", new { key = userId }, partialMatch: true)
+        .Compare(QueryOperand.ArrayLength("data.shareEvents"), Q.Operator.Gt,
+            QueryOperand.Field("data.auditQueued")))
+    .Project(p => p.Field("id", "id").Object("data", data => data
+        .Field("owner", "data.owner").Field("ticketId", "data.ticketId")))
+    .WithConsistency(ConsistencyLevel.Strong)
+    .ToListAsync<TicketSummary>();
+```
+
+`TicketSummary` should match the projected JSON, including its nested `data` object. String predicates also include `StringEquals`; `IsNull` and `IsString` distinguish JSON value types. Existing `Contains` remains collection membership. Values, including partial-object patterns, are parameterized.
+
+Every explicit consistency override bypasses document-cache reads and writes. Strong requires a Strong-configured Cosmos account; unsupported requests fail without downgrading. Calls without an override retain the existing SDK defaults and opt-in TTL cache, including previously cached values. Clients configured with `ReadConsistencyStrategy` cannot be used with an explicit `WithConsistency` override.
+
+See the [fluent query guide](docs/FLUENT_QUERY_BUILDER.md) and [declarative query guide](docs/DECLARATIVE_QUERY_SYNTAX.md) for projection composition, read overloads, and compatibility details. Generate a synthetic example without credentials or Cosmos requests:
+
+```bash
+dotnet run --project code/DarkMatter -- --query-capabilities
+```
+
 ## Installation
 
 ```

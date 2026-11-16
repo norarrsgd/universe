@@ -17,6 +17,7 @@ public abstract class GalaxyCore : IDisposable
     internal readonly string _containerName;
     internal readonly DocumentCacheOptions _documentCacheOptions;
     internal readonly string _documentCacheNamespace;
+    private readonly bool _hasReadConsistencyStrategy;
 
     /// <summary>
     /// Initialize Galaxy core with Cosmos DB connection.
@@ -78,6 +79,7 @@ public abstract class GalaxyCore : IDisposable
         if (client.ClientOptions is not null)
         {
             _allowBulk = client.ClientOptions.AllowBulkExecution;
+            _hasReadConsistencyStrategy = client.ClientOptions.ReadConsistencyStrategy.HasValue;
             if (client.ClientOptions.Serializer is UniverseSerializer universeSerializer)
                 _namingPolicy = universeSerializer.NamingPolicy;
         }
@@ -96,6 +98,15 @@ public abstract class GalaxyCore : IDisposable
     }
 
     internal DocumentCache DocumentCache => _documentCacheOptions?.Cache;
+
+    internal bool ValidateReadOptions(ReadOptions options)
+    {
+        options?.Validate();
+        bool hasOverride = options?.ConsistencyLevel is not null;
+        if (hasOverride && _hasReadConsistencyStrategy)
+            throw new UniverseException("An explicit ConsistencyLevel cannot override a client ReadConsistencyStrategy. Use a client without ReadConsistencyStrategy.");
+        return hasOverride;
+    }
 
     internal string DocumentCacheScopeHash(Type sourceType)
         => DocumentCache.CreateScopeHash(_documentCacheNamespace, _databaseName, _containerName, sourceType);

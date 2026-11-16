@@ -127,4 +127,39 @@ public sealed class ClusterBuilder
 
     internal Cluster Build(Q.Where where)
         => new(_catalysts, where);
+
+    /// <summary>Match a literal string prefix.</summary>
+    public ClusterBuilder StartsWith(string column, string value, bool ignoreCase = false, string alias = "c")
+        => StringPredicate(column, value, Q.Operator.StartsWith, ignoreCase, alias);
+    /// <summary>Match a literal substring.</summary>
+    public ClusterBuilder StringContains(string column, string value, bool ignoreCase = false, string alias = "c")
+        => StringPredicate(column, value, Q.Operator.StringContains, ignoreCase, alias);
+    /// <summary>Compare strings with explicit case sensitivity.</summary>
+    public ClusterBuilder StringEquals(string column, string value, bool ignoreCase = false, string alias = "c")
+        => StringPredicate(column, value, Q.Operator.StringEquals, ignoreCase, alias);
+    /// <summary>Check for an explicit JSON null.</summary>
+    public ClusterBuilder IsNull(string column, string alias = "c") => Catalyst(column, null, Q.Operator.IsNull, alias);
+    /// <summary>Check for a string value.</summary>
+    public ClusterBuilder IsString(string column, string alias = "c") => Catalyst(column, null, Q.Operator.IsString, alias);
+    /// <summary>Match an array element, optionally matching only supplied object properties.</summary>
+    public ClusterBuilder ArrayContains(string column, object value, bool partialMatch = false, string alias = "c")
+    {
+        _catalysts.Add(new(column, value, _nextWhere, Q.Operator.In, alias) { PartialMatch = partialMatch });
+        _nextWhere = Q.Where.And;
+        return this;
+    }
+    /// <summary>Compare fields, array lengths, or a right-hand parameter.</summary>
+    public ClusterBuilder Compare(QueryOperand left, Q.Operator comparison, QueryOperand right)
+    {
+        _catalysts.Add(Options.Catalyst.Compare(left, comparison, right, _nextWhere));
+        _nextWhere = Q.Where.And;
+        return this;
+    }
+
+    private ClusterBuilder StringPredicate(string column, string value, Q.Operator op, bool ignoreCase, string alias)
+    {
+        _catalysts.Add(new(column, value, _nextWhere, op, alias) { IgnoreCase = ignoreCase });
+        _nextWhere = Q.Where.And;
+        return this;
+    }
 }

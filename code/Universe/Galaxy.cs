@@ -48,15 +48,42 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         => await InternalPaged<TS>(page, clusters, columnOptions, sorting, group);
 
     private async Task<(Gravity g, TArgType S)> InternalGet<TArgType>(IReadOnlyList<Cluster> clusters, IReadOnlyList<string> columns)
+        => await InternalGetFull<TArgType>(clusters, new(columns, Top: 1), null, null, null, null);
+
+    Task<(Gravity g, T T)> IGalaxy<T>.Get(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints, ReadOptions readOptions)
+        => InternalGetFull<T>(clusters, columnOptions, sorting, group, hints, readOptions);
+
+    Task<(Gravity g, IList<T> T)> IGalaxy<T>.List(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints, ReadOptions readOptions)
+        => InternalListWithHints<T>(clusters, columnOptions, sorting, group, hints, readOptions);
+
+    Task<(Gravity g, IList<T> T)> IGalaxy<T>.Paged(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, ReadOptions readOptions)
+        => InternalPaged<T>(page, clusters, columnOptions, sorting, group, readOptions);
+
+    Task<(Gravity g, TS T)> IGalaxy<T>.Get<TS>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints, ReadOptions readOptions)
+        => InternalGetFull<TS>(clusters, columnOptions, sorting, group, hints, readOptions);
+
+    Task<(Gravity g, IList<TS> T)> IGalaxy<T>.List<TS>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints, ReadOptions readOptions)
+        => InternalListWithHints<TS>(clusters, columnOptions, sorting, group, hints, readOptions);
+
+    Task<(Gravity g, IList<TS> T)> IGalaxy<T>.Paged<TS>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, ReadOptions readOptions)
+        => InternalPaged<TS>(page, clusters, columnOptions, sorting, group, readOptions);
+
+    private async Task<(Gravity g, TArgType S)> InternalGetFull<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints, ReadOptions readOptions)
     {
+        bool bypassCache = ValidateReadOptions(readOptions);
         try
         {
-            QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, columnOptions: new(columns, Top: 1));
-            if (TryGetQueryCache(query, out TArgType cached, out IReadOnlyList<(string, object)> cacheParameters))
+            ColumnOptions options = columnOptions ?? new(null);
+            if (options.Top == 0)
+                options = options with { Top = 1 };
+            QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, options, sorting, group);
+            context = context with { Hints = hints?.ToContextHints(), ConsistencyLevel = readOptions?.ConsistencyLevel };
+            if (!bypassCache && TryGetQueryCache(query, out TArgType cached, out IReadOnlyList<(string, object)> cacheParameters))
                 return (new(0, null, _recordQuery ? (query.QueryText, cacheParameters) : default), cached);
 
             (Gravity gravity, TArgType result) = await QBuilder.GetOneFromQuery<TArgType>(_container, query, context);
-            SetQueryCache(query, result);
+            if (!bypassCache)
+                SetQueryCache(query, result);
             return (gravity, result);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -82,8 +109,9 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         }
     }
 
-    private async Task<(Gravity g, IList<TArgType> T)> InternalPaged<TArgType>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group)
+    private async Task<(Gravity g, IList<TArgType> T)> InternalPaged<TArgType>(Q.Page page, IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, ReadOptions readOptions = null)
     {
+        ValidateReadOptions(readOptions);
         try
         {
             QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
@@ -92,7 +120,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
             string continuationToken = string.Empty;
             List<TArgType> collection = [];
             using FeedIterator<TArgType> queryResponse = _container.GetItemQueryIterator<TArgType>(query,
-                requestOptions: new() { MaxItemCount = page.Size },
+                requestOptions: new() { MaxItemCount = page.Size, ConsistencyLevel = readOptions?.ConsistencyLevel },
                 continuationToken: string.IsNullOrWhiteSpace(page.ContinuationToken) ? null : page.ContinuationToken
             );
             while (queryResponse.HasMoreResults)
@@ -169,12 +197,13 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         }
     }
 
-    private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints)
+    private async Task<(Gravity g, IList<TArgType> T)> InternalListWithHints<TArgType>(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> group, QueryHints? hints, ReadOptions readOptions = null)
     {
+        ValidateReadOptions(readOptions);
         try
         {
             QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, columnOptions, sorting, group);
-            context = context with { Hints = hints?.ToContextHints() };
+            context = context with { Hints = hints?.ToContextHints(), ConsistencyLevel = readOptions?.ConsistencyLevel };
 
             return await QBuilder.GetListFromQuery<TArgType>(_container, query, context);
         }

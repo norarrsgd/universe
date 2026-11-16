@@ -32,6 +32,7 @@ internal sealed class VectorSearchStrategy : IQueryExecutionStrategy
         {
             QueryRequestOptions requestOptions = new()
             {
+                ConsistencyLevel = context.ConsistencyLevel,
                 EnableOptimisticDirectExecution = false,
                 MaxConcurrency = Environment.ProcessorCount // CPU-bound operations
             };

@@ -33,6 +33,7 @@ internal sealed class DirectQueryStrategy : IQueryExecutionStrategy
         {
             QueryRequestOptions requestOptions = new()
             {
+                ConsistencyLevel = context.ConsistencyLevel,
                 MaxItemCount = context.MaxItemCount ?? Q.Limits.MaxItems,
                 EnableOptimisticDirectExecution = true,
                 MaxConcurrency = Environment.ProcessorCount

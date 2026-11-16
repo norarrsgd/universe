@@ -5,12 +5,14 @@ using Universe.Builder.Strategies;
 
 namespace Universe.Builder;
 
-internal class UniverseBuilder : IDisposable
+internal partial class UniverseBuilder : IDisposable
 {
     // CLR value equality can merge distinct Cosmos values, such as timestamps with different offsets.
     private static readonly IEqualityComparer<Catalyst> ParameterCatalystComparer = EqualityComparer<Catalyst>.Create(
         (left, right) => left.Column == right.Column && left.CatalystId == right.CatalystId
             && left.Where == right.Where && left.Operator == right.Operator && left.Alias == right.Alias
+            && left.IgnoreCase == right.IgnoreCase && left.PartialMatch == right.PartialMatch
+            && left.LeftOperand == right.LeftOperand && left.RightOperand == right.RightOperand
             && ReferenceEquals(left.Value, right.Value),
         catalyst => HashCode.Combine(catalyst.Column, catalyst.CatalystId, catalyst.Where, catalyst.Operator,
             catalyst.Alias, RuntimeHelpers.GetHashCode(catalyst.Value)));
@@ -76,130 +78,142 @@ internal class UniverseBuilder : IDisposable
 
         // Column Options Builder
         string columnsInQuery = "*";
-        if (columnOptions is not null)
+        StringBuilder queryBuilder;
+        if (columnOptions?.Projection is not null)
         {
-            if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
-                columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => FormatProperty("c", c)));
-
-            if (columnOptions.Value.Top > 0)
-                columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
-
-            if (columnOptions.Value is { IsDistinct: true, Names.Count: > 0 })
-                columnsInQuery = $"DISTINCT {columnsInQuery}";
-
-            if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Any())
-            {
-                if (columnOptions.Value.Names is null || !columnOptions.Value.Names.Any())
-                    throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
-
-                formattedGroups = [.. formattedGroups.Concat(columnOptions.Value.Names.Select(n => FormatProperty("c", n))).Distinct()];
-
-                if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
-                    throw new UniverseException("Aggregate columns must not be null or empty.");
-
-                foreach (AggregationOption aggregate in columnOptions.Value.Aggregates)
-                {
-                    string aliasBase = BuildSqlAliasBase(aggregate.Column);
-                    string toAppend = aggregate.Aggregate switch
-                    {
-                        Q.Aggregate.Count => $"COUNT(1) AS {BuildSqlAliasBase(nameof(ICosmicEntity.CountAggregate))}",
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aliasBase),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aliasBase),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aliasBase),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aliasBase),
-                        _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
-                    };
-
-                    if (columnsInQuery.Contains(toAppend))
-                        continue;
-
-                    columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery)
-                        ? toAppend
-                        : $"{columnsInQuery}, {toAppend}";
-                }
-
-            }
+            columnsInQuery = BuildProjectionColumns(columnOptions.Value, formattedGroups, clusters, parameterNames, sorting);
+            queryBuilder = new($"SELECT {columnsInQuery} FROM c");
+            if (columnOptions.Value.Join is JoinOptions projectedJoin)
+                queryBuilder.Append($" JOIN {projectedJoin.Alias} IN {FormatProperty("c", projectedJoin.ArrayPath)}");
         }
-
-        // Append VectorDistance to columnsInQuery if present
-        if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
+        else
         {
-            List<Catalyst> vectorDistanceCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance)];
-
-            switch (vectorDistanceCatalysts.Count)
+            if (columnOptions is not null)
             {
-                case > 1:
-                    columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
+                if (columnOptions.Value.Names is not null && columnOptions.Value.Names.Count > 0)
+                    columnsInQuery = string.Join(", ", columnOptions.Value.Names.Select(c => FormatProperty("c", c)));
+
+                if (columnOptions.Value.Top > 0)
+                    columnsInQuery = $"TOP {columnOptions.Value.Top} {columnsInQuery}";
+
+                if (columnOptions.Value is { IsDistinct: true, Names.Count: > 0 })
+                    columnsInQuery = $"DISTINCT {columnsInQuery}";
+
+                if (columnOptions.Value.Aggregates is not null && columnOptions.Value.Aggregates.Any())
+                {
+                    if (columnOptions.Value.Names is null || !columnOptions.Value.Names.Any())
+                        throw new UniverseException("ColumnOption.Names must not be null or empty when using aggregates.");
+
+                    formattedGroups = [.. formattedGroups.Concat(columnOptions.Value.Names.Select(n => FormatProperty("c", n))).Distinct()];
+
+                    if (columnOptions.Value.Aggregates.Any(ag => string.IsNullOrWhiteSpace(ag.Column)))
+                        throw new UniverseException("Aggregate columns must not be null or empty.");
+
+                    foreach (AggregationOption aggregate in columnOptions.Value.Aggregates)
                     {
-                        string alias = catalyst.Alias ?? "c";
-                        return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst, vectorDistanceCatalysts.IndexOf(catalyst))}";
-                    });
-                    break;
-                case 1:
-                    {
-                        Catalyst catalyst = vectorDistanceCatalysts.First();
-                        string alias = catalyst.Alias ?? "c";
-                        columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst)}";
-                        break;
+                        string aliasBase = BuildSqlAliasBase(aggregate.Column);
+                        string toAppend = aggregate.Aggregate switch
+                        {
+                            Q.Aggregate.Count => $"COUNT(1) AS {BuildSqlAliasBase(nameof(ICosmicEntity.CountAggregate))}",
+                            Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                            Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                            Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                            Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty("c", aggregate.Column), aliasBase),
+                            _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
+                        };
+
+                        if (columnsInQuery.Contains(toAppend))
+                            continue;
+
+                        columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery)
+                            ? toAppend
+                            : $"{columnsInQuery}, {toAppend}";
                     }
+
+                }
             }
-        }
 
-        // Update Columns Builder with Group By
-        if (columnsInQuery.Contains('*') && formattedGroups.Count > 0)
-            columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", formattedGroups));
+            // Append VectorDistance to columnsInQuery if present
+            if (clusters is not null && clusters.Any(c => c.Catalysts.Any(cat => cat.Operator is Q.Operator.VectorDistance)))
+            {
+                List<Catalyst> vectorDistanceCatalysts = [.. clusters.SelectMany(cluster => cluster.Catalysts).Where(catalyst => catalyst.Operator is Q.Operator.VectorDistance)];
 
-        // nosemgrep: sql-injection -- columnsInQuery is built from validated identifiers only:
-        // column names pass through ValidateIdentifier() (rejects ;, --, /*, */, ", ], control chars)
-        // and FormatProperty() (bracket-wraps segments); Top is an int; aggregates use enum values
-        StringBuilder queryBuilder = new($"SELECT {columnsInQuery} FROM c");
+                switch (vectorDistanceCatalysts.Count)
+                {
+                    case > 1:
+                        columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
+                        {
+                            string alias = catalyst.Alias ?? "c";
+                            return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst, vectorDistanceCatalysts.IndexOf(catalyst))}";
+                        });
+                        break;
+                    case 1:
+                        {
+                            Catalyst catalyst = vectorDistanceCatalysts.First();
+                            string alias = catalyst.Alias ?? "c";
+                            columnsInQuery += $", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst)}";
+                            break;
+                        }
+                }
+            }
 
-        if (columnOptions?.Join is not null)
-        {
-            // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
-            // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
-            JoinOptions join = columnOptions.Value.Join;
-            queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
+            // Update Columns Builder with Group By
+            if (columnsInQuery.Contains('*') && formattedGroups.Count > 0)
+                columnsInQuery = columnsInQuery.Replace("*", string.Join(", ", formattedGroups));
 
-            // Add join columns to the select if specified
-            if (join.Columns?.Any() == true)
+            // nosemgrep: sql-injection -- columnsInQuery is built from validated identifiers only:
+            // column names pass through ValidateIdentifier() (rejects ;, --, /*, */, ", ], control chars)
+            // and FormatProperty() (bracket-wraps segments); Top is an int; aggregates use enum values
+            queryBuilder = new($"SELECT {columnsInQuery} FROM c");
+
+            if (columnOptions?.Join is not null)
             {
                 // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
                 // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
-                string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
-                columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
+                JoinOptions join = columnOptions.Value.Join;
                 queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
-            }
 
-            // Handle join aggregates
-            if (join.Aggregates?.Any() == true)
-            {
-                foreach (AggregationOption aggregate in join.Aggregates)
+                // Add join columns to the select if specified
+                if (join.Columns?.Any() == true)
                 {
-                    string aliasBase = BuildSqlAliasBase(aggregate.Column);
-                    string toAppend = aggregate.Aggregate switch
-                    {
-                        Q.Aggregate.Count => $"COUNT(1) AS {BuildSqlAliasBase(nameof(ICosmicEntity.CountAggregate))}",
-                        Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
-                        Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
-                        Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
-                        Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
-                        _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
-                    };
-
-                    // Only add if not already present
-                    if (!columnsInQuery.Contains(toAppend))
-                        columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery) ? toAppend : $"{columnsInQuery}, {toAppend}";
+                    // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
+                    // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
+                    string joinColumns = string.Join(", ", join.Columns.Select(col => FormatProperty(join.Alias, col)));
+                    columnsInQuery = columnsInQuery == "*" ? $"c.*, {joinColumns}" : $"{columnsInQuery}, {joinColumns}";
+                    queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
                 }
 
-                // Add join columns to GROUP BY
-                if (join.Columns?.Any() == true)
-                    formattedGroups = [.. formattedGroups.Concat(join.Columns.Select(col => FormatProperty(join.Alias, col))).Distinct()];
+                // Handle join aggregates
+                if (join.Aggregates?.Any() == true)
+                {
+                    foreach (AggregationOption aggregate in join.Aggregates)
+                    {
+                        string aliasBase = BuildSqlAliasBase(aggregate.Column);
+                        string toAppend = aggregate.Aggregate switch
+                        {
+                            Q.Aggregate.Count => $"COUNT(1) AS {BuildSqlAliasBase(nameof(ICosmicEntity.CountAggregate))}",
+                            Q.Aggregate.Sum => string.Format(Q.Aggregate.Sum.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                            Q.Aggregate.Min => string.Format(Q.Aggregate.Min.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                            Q.Aggregate.Max => string.Format(Q.Aggregate.Max.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                            Q.Aggregate.Avg => string.Format(Q.Aggregate.Avg.Value(), FormatProperty(join.Alias, aggregate.Column), aliasBase),
+                            _ => throw new UniverseException($"Unrecognized aggregate function: {aggregate.Aggregate}")
+                        };
 
-                // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
-                // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
-                queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
+                        // Only add if not already present
+                        if (!columnsInQuery.Contains(toAppend))
+                            columnsInQuery = string.IsNullOrWhiteSpace(columnsInQuery) ? toAppend : $"{columnsInQuery}, {toAppend}";
+                    }
+
+                    // Add join columns to GROUP BY
+                    if (join.Columns?.Any() == true)
+                        formattedGroups = [.. formattedGroups.Concat(join.Columns.Select(col => FormatProperty(join.Alias, col))).Distinct()];
+
+                    // SQL Injection mitigation: join.Alias and join.ArrayPath are validated by SanitizeInputs() at line 24
+                    // ValidateIdentifier() rejects SQL keywords (;, --, /*, */), brackets (]), quotes ("), and control characters
+                    queryBuilder = new($"SELECT {columnsInQuery} FROM c JOIN {join.Alias} IN {FormatProperty("c", join.ArrayPath)}");
+                }
             }
+
         }
 
         // Validate Clusters
@@ -349,6 +363,8 @@ internal class UniverseBuilder : IDisposable
         {
             foreach ((Catalyst catalyst, string parameterName) in parameterNames)
             {
+                if (!catalyst.BindsValue)
+                    continue;
                 if (catalyst.Operator is Q.Operator.FTScore && catalyst.Value is IEnumerable<string> ftValues)
                 {
                     string[] vals = ftValues.ToArray();
@@ -417,6 +433,13 @@ internal class UniverseBuilder : IDisposable
                     ValidateIdentifier(catalyst.Column, "Catalyst.Column");
                     if (!string.IsNullOrWhiteSpace(catalyst.Alias))
                         ValidateSqlAlias(catalyst.Alias, "Catalyst.Alias");
+                    foreach (QueryOperand operand in new[] { catalyst.LeftOperand, catalyst.RightOperand })
+                    {
+                        if (operand is null || operand.Kind == QueryOperand.OperandKind.Parameter)
+                            continue;
+                        ValidateIdentifier(operand.Path, "QueryOperand.Path");
+                        ValidateSqlAlias(operand.Alias, "QueryOperand.Alias");
+                    }
                 }
             }
         }
@@ -626,15 +649,19 @@ internal class UniverseBuilder : IDisposable
     {
         string alias = catalyst.Alias ?? "c";
         string formattedProperty = FormatProperty(alias, catalyst.Column);
+        if (catalyst.LeftOperand is not null)
+            return $"{RenderOperand(catalyst.LeftOperand, parameterName)} {catalyst.Operator.Value()} {RenderOperand(catalyst.RightOperand, parameterName)}";
         return catalyst.Operator switch
         {
             Q.Operator.In or
-                Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{parameterName})",
+                Q.Operator.NotIn => $"{catalyst.Operator.Value()}({formattedProperty}, @{parameterName}{(catalyst.PartialMatch ? ", true" : "")})",
             Q.Operator.Contains or
                 Q.Operator.NotContains => $"{catalyst.Operator.Value()}(@{parameterName}, {formattedProperty})",
             Q.Operator.Len => $"{catalyst.Operator.Value()}({formattedProperty}) = @{parameterName}",
             Q.Operator.Defined or
-                Q.Operator.NotDefined => $"{catalyst.Operator.Value()}({formattedProperty})",
+                Q.Operator.NotDefined or Q.Operator.IsNull or Q.Operator.IsString => $"{catalyst.Operator.Value()}({formattedProperty})",
+            Q.Operator.StartsWith or Q.Operator.StringContains or Q.Operator.StringEquals
+                => $"{catalyst.Operator.Value()}({formattedProperty}, @{parameterName}{(catalyst.IgnoreCase ? ", true" : "")})",
             Q.Operator.FTContains or
                 Q.Operator.NotFTContains or
                 Q.Operator.FTContainsAll or
@@ -662,6 +689,13 @@ internal class UniverseBuilder : IDisposable
 
         return result.ToString();
     }
+
+    private string RenderOperand(QueryOperand operand, string parameterName) => operand.Kind switch
+    {
+        QueryOperand.OperandKind.Field => FormatProperty(operand.Alias, operand.Path),
+        QueryOperand.OperandKind.ArrayLength => $"ARRAY_LENGTH({FormatProperty(operand.Alias, operand.Path)})",
+        _ => $"@{parameterName}"
+    };
 
     internal async Task<(Gravity, T)> GetOneFromQuery<T>(Container container, QueryDefinition query, QueryContext context)
     {

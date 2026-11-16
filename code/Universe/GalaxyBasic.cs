@@ -252,36 +252,26 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         }
     }
 
-    async Task<(Gravity g, T T)> IGalaxyBasic<T>.Get(string id, params string[] partitionKey)
+    Task<(Gravity g, T T)> IGalaxyBasic<T>.Get(string id, params string[] partitionKey)
+        => InternalPointGet(id, BuildPartitionKey(partitionKey), partitionKey, null);
+
+    Task<(Gravity g, T T)> IGalaxyBasic<T>.Get(string id, string partitionKey)
+        => InternalPointGet(id, new(partitionKey), [partitionKey], null);
+
+    Task<(Gravity g, T T)> IGalaxyBasic<T>.Get(string id, string[] partitionKey, ReadOptions readOptions)
+        => InternalPointGet(id, BuildPartitionKey(partitionKey), partitionKey, readOptions);
+
+    private async Task<(Gravity g, T T)> InternalPointGet(string id, PartitionKey key, string[] partitionKey, ReadOptions readOptions)
     {
+        bool bypassCache = ValidateReadOptions(readOptions);
         try
         {
-            if (TryGetPointCache(id, partitionKey, out T cached, out string cachedETag))
+            if (!bypassCache && TryGetPointCache(id, partitionKey, out T cached, out string cachedETag))
                 return (new(0, null) { ETag = cachedETag }, cached);
 
-            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, BuildPartitionKey(partitionKey));
-            SetPointCache(id, partitionKey, response.Resource, response.ETag);
-            return (new(response.RequestCharge, null) { ETag = response.ETag }, response.Resource);
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
-            throw new UniverseException($"{typeof(T).Name} does not exist.");
-        }
-        catch (CosmosException ex) when (ex.StatusCode != HttpStatusCode.NotFound)
-        {
-            throw new UniverseException($"A Cosmos DB error occurred. Status: {(int)ex.StatusCode}", ex);
-        }
-    }
-
-    async Task<(Gravity, T)> IGalaxyBasic<T>.Get(string id, string partitionKey)
-    {
-        try
-        {
-            if (TryGetPointCache(id, [partitionKey], out T cached, out string cachedETag))
-                return (new(0, null) { ETag = cachedETag }, cached);
-
-            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new(partitionKey));
-            SetPointCache(id, [partitionKey], response.Resource, response.ETag);
+            ItemResponse<T> response = await _container.ReadItemAsync<T>(id, key, bypassCache ? new() { ConsistencyLevel = readOptions.ConsistencyLevel } : null);
+            if (!bypassCache)
+                SetPointCache(id, partitionKey, response.Resource, response.ETag);
             return (new(response.RequestCharge, null) { ETag = response.ETag }, response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)

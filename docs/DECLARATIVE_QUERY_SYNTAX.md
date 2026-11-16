@@ -1,5 +1,36 @@
 # Declarative Query Syntax Reference (Cluster / Catalyst)
 
+## Extended predicates, operands, projections, and read options
+
+String and type operators are `Q.Operator.StartsWith`, `StringContains`, `StringEquals`, `IsNull`, and `IsString`. Set `IgnoreCase = true` only on the string predicates. Unary type predicates accept no value. Missing and null properties remain distinct: use `NotDefined OR IsNull` when both should match. For partial-object array membership, use `In`/`NotIn` with `PartialMatch = true`; bind the object itself as the value. Existing Contains semantics do not change.
+
+```csharp
+IReadOnlyList<Cluster> filters = [new([
+    new Catalyst("pk", "tenant:", Operator: Q.Operator.StartsWith),
+    new Catalyst("data.name", search, Operator: Q.Operator.StringContains) { IgnoreCase = true },
+    new Catalyst("data.shares", new { key = userId }, Operator: Q.Operator.In) { PartialMatch = true },
+    Catalyst.Compare(QueryOperand.ArrayLength("data.shareEvents"), Q.Operator.Gt,
+        QueryOperand.Field("data.auditQueued"))
+])];
+
+ColumnOptions columns = new(null)
+{
+    Projection = new ProjectionBuilder()
+        .Field("id", "id")
+        .Object("data", p => p.Field("owner", "data.owner"))
+        .Build()
+};
+
+(Gravity gravity, IList<TicketSummary> tickets) = await galaxy.List<TicketSummary>(
+    filters, columns, null, null, null, new ReadOptions(ConsistencyLevel.Strong));
+```
+
+`ProjectionBuilder.Aggregate(name, column, Q.Aggregate, alias)` supports nested aggregates. Projection fields compose with legacy selected columns, joins, aggregate columns, and generated vector scores; duplicate outputs are rejected. Non-aggregate projected fields become grouping keys when aggregates exist. Explicit output names are preserved; source paths use the serializer naming policy. See the fluent guide for single-result and ranking restrictions.
+
+Existing public signatures remain available. Additional overloads require every argument: `Get(clusters, columnOptions, sorting, group, hints, readOptions)`, `List` with the same arguments, and `Paged(page, clusters, columnOptions, sorting, group, readOptions)`, with generic result variants. The new Get overload executes the full query shape and returns its first result. Point reads use `Get(id, string[] partitionKey, readOptions)`, preserving partition-key order.
+
+`ReadOptions.ConsistencyLevel` is nullable; null retains existing behavior. A non-null level bypasses local cache reads and writes and applies to the SDK request. Strong requires account-level Strong support and never falls back. Overrides do not update old cache entries. Clients with a configured `ReadConsistencyStrategy` reject explicit ConsistencyLevel overrides. Legacy interface implementations forward representable calls and throw `NotSupportedException` for new behavior they cannot honor.
+
 The declarative syntax is the original lower-level query construction API in Universe. It uses `Cluster` and `Catalyst` structs to build queries by composing filter conditions as data structures.
 
 This API is still fully supported for compatibility and advanced scenarios where callers already have query parts represented as data. For new application code and examples, prefer the [fluent Orbit API](FLUENT_QUERY_BUILDER.md), which provides the same query behavior through `galaxy.Query()`.
@@ -19,7 +50,7 @@ This API is still fully supported for compatibility and advanced scenarios where
 );
 ```
 
-`Get` and `Get<TProjection>` generate `TOP 1` and stop reading after the first document, skipping empty pages as needed. They return the default value when no document matches. Rank catalysts use the implicit `TOP 1`; list queries still require an explicit valid `ColumnOptions.Top` for ranking.
+The original `Get(clusters, columns)` and `Get<TProjection>(clusters, columns)` overloads generate `TOP 1` and stop reading after the first document, skipping empty pages as needed. They return the default value when no document matches. Rank catalysts use the implicit `TOP 1`; list queries still require an explicit valid `ColumnOptions.Top` for ranking. The new full-shape overloads also apply ColumnOptions, sorting, grouping, and hints and preserve an explicit TOP.
 
 ## Complex Queries with Multiple Conditions
 

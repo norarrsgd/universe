@@ -200,6 +200,27 @@
         <member name="M:Universe.Builder.ClusterBuilder.FTScore(System.String,System.String[],System.String)">
             <summary>Full-text relevance scoring</summary>
         </member>
+        <member name="M:Universe.Builder.ClusterBuilder.StartsWith(System.String,System.String,System.Boolean,System.String)">
+            <summary>Match a literal string prefix.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.StringContains(System.String,System.String,System.Boolean,System.String)">
+            <summary>Match a literal substring.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.StringEquals(System.String,System.String,System.Boolean,System.String)">
+            <summary>Compare strings with explicit case sensitivity.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.IsNull(System.String,System.String)">
+            <summary>Check for an explicit JSON null.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.IsString(System.String,System.String)">
+            <summary>Check for a string value.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.ArrayContains(System.String,System.Object,System.Boolean,System.String)">
+            <summary>Match an array element, optionally matching only supplied object properties.</summary>
+        </member>
+        <member name="M:Universe.Builder.ClusterBuilder.Compare(Universe.Builder.Options.QueryOperand,Universe.Builder.Options.Q.Operator,Universe.Builder.Options.QueryOperand)">
+            <summary>Compare fields, array lengths, or a right-hand parameter.</summary>
+        </member>
         <member name="T:Universe.Builder.Options.AggregationOption">
             <summary>
             Represents a column aggregation.
@@ -259,6 +280,9 @@
         </member>
         <member name="P:Universe.Builder.Options.ColumnOptions.Join">
             <summary>Options for joining a sub-collection.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.ColumnOptions.Projection">
+            <summary>Additional structured fields and nested objects in the SELECT clause.</summary>
         </member>
         <member name="T:Universe.Builder.Options.JoinOptions">
             <summary>
@@ -330,6 +354,15 @@
             Unique identifier for the catalyst, used to differentiate between multiple catalysts in a query.
             </summary>
         </member>
+        <member name="P:Universe.Builder.Options.Catalyst.IgnoreCase">
+            <summary>Ignore case for StartsWith, StringContains, or StringEquals.</summary>
+        </member>
+        <member name="P:Universe.Builder.Options.Catalyst.PartialMatch">
+            <summary>Match a subset of object properties for In or NotIn.</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.Catalyst.Compare(Universe.Builder.Options.QueryOperand,Universe.Builder.Options.Q.Operator,Universe.Builder.Options.QueryOperand,Universe.Builder.Options.Q.Where)">
+            <summary>Compare fields, array lengths, or a right-hand parameter.</summary>
+        </member>
         <member name="M:Universe.Builder.Options.Catalyst.RuleViolations">
             <summary>Creates a list of rule violations when creating a CosmosDb query catalyst</summary>
         </member>
@@ -377,6 +410,18 @@
             <summary>
             Convert to context hints dictionary
             </summary>
+        </member>
+        <member name="T:Universe.Builder.Options.QueryOperand">
+            <summary>A validated field, array length, or parameter used in a comparison.</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.QueryOperand.Field(System.String,System.String)">
+            <summary>Reference a document property.</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.QueryOperand.ArrayLength(System.String,System.String)">
+            <summary>Reference the length of a document array.</summary>
+        </member>
+        <member name="M:Universe.Builder.Options.QueryOperand.Parameter(System.Object)">
+            <summary>Bind a non-null value. Use IsNull for null checks.</summary>
         </member>
         <member name="T:Universe.Builder.Options.Q">
             <summary>Query Options</summary>
@@ -492,6 +537,21 @@
         <member name="F:Universe.Builder.Options.Q.Operator.FTScore">
             <summary>Full-text relevance scoring for ORDER BY RANK. Generates: FullTextScore(c.[Column], @param) in ORDER BY. Value: string[] of search terms. Requires ColumnOptions.Top.</summary>
         </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.StartsWith">
+            <summary>Literal string prefix, with optional case-insensitive matching.</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.StringContains">
+            <summary>Literal string substring, with optional case-insensitive matching.</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.StringEquals">
+            <summary>String equality, with optional case-insensitive matching.</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.IsNull">
+            <summary>Check for an explicit JSON null, distinct from an undefined property.</summary>
+        </member>
+        <member name="F:Universe.Builder.Options.Q.Operator.IsString">
+            <summary>Check whether a property contains a string.</summary>
+        </member>
         <member name="T:Universe.Builder.Options.Q.Aggregate">
             <summary>Aggregation functions</summary>
         </member>
@@ -527,6 +587,9 @@
         </member>
         <member name="M:Universe.Builder.Options.AggregateExtension.Value(Universe.Builder.Options.Q.Aggregate)">
             <summary></summary>
+        </member>
+        <member name="T:Universe.Builder.Options.QueryProjection">
+            <summary>An immutable snapshot of named fields, nested objects, and aggregates.</summary>
         </member>
         <member name="T:Universe.Builder.Options.Sorting">
             <summary></summary>
@@ -617,6 +680,9 @@
             This method is additive — it can be combined with <see cref="M:Universe.Builder.Orbit`1.Select(System.String[])"/> to include additional columns.
             </remarks>
         </member>
+        <member name="M:Universe.Builder.Orbit`1.Project(System.Action{Universe.Builder.ProjectionBuilder})">
+            <summary>Add named fields, nested objects, or aggregates to the query projection.</summary>
+        </member>
         <member name="M:Universe.Builder.Orbit`1.Distinct">
             <summary>Return only distinct results.</summary>
         </member>
@@ -649,6 +715,9 @@
         <member name="M:Universe.Builder.Orbit`1.WithHints(Universe.Builder.Options.QueryHints)">
             <summary>Provide query optimization hints.</summary>
         </member>
+        <member name="M:Universe.Builder.Orbit`1.WithConsistency(Microsoft.Azure.Cosmos.ConsistencyLevel)">
+            <summary>Read Cosmos directly at the requested consistency, bypassing document caching.</summary>
+        </member>
         <member name="M:Universe.Builder.Orbit`1.ToListAsync">
             <summary>Execute the query and return a list of results.</summary>
         </member>
@@ -658,19 +727,36 @@
         <member name="M:Universe.Builder.Orbit`1.GetAsync">
             <summary>Execute the query and return the first matching result.</summary>
             <remarks>
-            Only filter conditions (clusters) and column selection (Select) are applied.
+            With Project, the full query shape is applied; Project and Paged cannot be combined for GetAsync.
+            Otherwise only filter conditions (clusters) and column selection (Select) are applied.
             Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
             </remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.GetAsync``1">
             <summary>Execute the query and return the first matching result projected to a different type.</summary>
             <remarks>
-            Only filter conditions (clusters) and column selection (Select) are applied.
+            With Project, the full query shape is applied; Project and Paged cannot be combined for GetAsync.
+            Otherwise only filter conditions (clusters) and column selection (Select) are applied.
             Top, Distinct, Aggregate, GroupBy, sorting, Join, Paged, and WithHints options are ignored. Use ToListAsync for those features.
             </remarks>
         </member>
         <member name="M:Universe.Builder.Orbit`1.GenerateQuery">
             <summary>Generate the SQL query without executing it.</summary>
+        </member>
+        <member name="T:Universe.Builder.ProjectionBuilder">
+            <summary>Builds a structured JSON projection without accepting SQL fragments.</summary>
+        </member>
+        <member name="M:Universe.Builder.ProjectionBuilder.Field(System.String,System.String,System.String)">
+            <summary>Map a source property to an explicit output name.</summary>
+        </member>
+        <member name="M:Universe.Builder.ProjectionBuilder.Object(System.String,System.Action{Universe.Builder.ProjectionBuilder})">
+            <summary>Build a nested output object.</summary>
+        </member>
+        <member name="M:Universe.Builder.ProjectionBuilder.Aggregate(System.String,System.String,Universe.Builder.Options.Q.Aggregate,System.String)">
+            <summary>Map an aggregate to an explicit output name. Count uses COUNT(1).</summary>
+        </member>
+        <member name="M:Universe.Builder.ProjectionBuilder.Build">
+            <summary>Capture the current projection independently of later builder changes.</summary>
         </member>
         <member name="M:Universe.Builder.UniverseBuilder.ValidateWeightValue(System.String)">
             <summary>
@@ -1335,6 +1421,24 @@
         <member name="T:Universe.Interfaces.IGalaxy`1">
             <summary></summary>
         </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints},Universe.ReadOptions)">
+            <summary>Execute a full query shape and return its first result, with optional read consistency.</summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.List(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints},Universe.ReadOptions)">
+            <summary>Execute a list query with per-operation consistency.</summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged(Universe.Builder.Options.Q.Page,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},Universe.ReadOptions)">
+            <summary>Execute a paged query with per-operation consistency.</summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.Get``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints},Universe.ReadOptions)">
+            <summary>Execute a full query shape and return its first result, with optional read consistency.</summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.List``1(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},System.Nullable{Universe.Builder.Options.QueryHints},Universe.ReadOptions)">
+            <summary>Execute a list query with per-operation consistency.</summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxy`1.Paged``1(Universe.Builder.Options.Q.Page,System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Nullable{Universe.Builder.Options.ColumnOptions},System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Sorting.Option},System.Collections.Generic.IReadOnlyList{System.String},Universe.ReadOptions)">
+            <summary>Execute a paged query with per-operation consistency.</summary>
+        </member>
         <member name="M:Universe.Interfaces.IGalaxy`1.Get(System.Collections.Generic.IReadOnlyList{Universe.Builder.Options.Cluster},System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>
             Get one model from the database
@@ -1377,6 +1481,9 @@
         </member>
         <member name="T:Universe.Interfaces.IGalaxyBasic`1">
             <summary></summary>
+        </member>
+        <member name="M:Universe.Interfaces.IGalaxyBasic`1.Get(System.String,System.String[],Universe.ReadOptions)">
+            <summary>Read a document with per-operation consistency.</summary>
         </member>
         <member name="M:Universe.Interfaces.IGalaxyBasic`1.Atomic(System.String[])">
             <summary>
@@ -1484,6 +1591,12 @@
             <summary>
             List stored procedures (returns list of names)
             </summary>
+        </member>
+        <member name="T:Universe.ReadOptions">
+            <summary>Per-operation read consistency. An explicit level bypasses document caching.</summary>
+        </member>
+        <member name="M:Universe.ReadOptions.#ctor(System.Nullable{Microsoft.Azure.Cosmos.ConsistencyLevel})">
+            <summary>Per-operation read consistency. An explicit level bypasses document caching.</summary>
         </member>
         <member name="T:Universe.Response.Gravity">
             <summary>Query execution response</summary>

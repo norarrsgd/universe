@@ -1,5 +1,39 @@
 # Fluent Query Builder (Orbit)
 
+## String predicates, operands, structured projections, and consistency
+
+`StartsWith`, `StringContains`, and `StringEquals` accept a string value and optional `ignoreCase: true`; they perform literal matching, so `%` and `_` are not LIKE wildcards. Empty strings are allowed; null and non-string values are rejected. `IsNull` checks explicit JSON null, while `NotDefined` checks a missing property; combine them with `Or()` when both cases should match. `IsString` checks the JSON type.
+
+`ArrayContains("data.shares", new { key = userId }, partialMatch: true)` matches object elements that include the supplied properties. The whole pattern is one bound parameter. Without partial matching, the whole array element must match. Existing `In`/`NotIn` retain document-array membership, and `Contains`/`NotContains` retain caller-collection membership.
+
+```csharp
+galaxy.Query().Cluster(c => c.Compare(
+    QueryOperand.ArrayLength("data.shareEvents"), Q.Operator.Gt,
+    QueryOperand.Field("data.auditQueued")));
+```
+
+`Compare` supports Eq, NotEq, Gt, Gte, Lt, and Lte. Its left operand must be `Field` or `ArrayLength`; its right operand can also be a non-null `Parameter(value)`. Field operands accept an optional collection alias. Source paths use the configured serializer naming policy. Existing `Len` remains array-length equality against a parameter.
+
+```csharp
+galaxy.Query()
+    .Project(p => p.Field("id", "id").Object("data", data => data
+        .Field("owner", "data.owner")
+        .Object("metrics", metrics => metrics.Field("queued", "data.auditQueued"))))
+    .WithConsistency(ConsistencyLevel.Strong);
+```
+
+`Project` is additive with `Select`, `Select<TProjection>`, and repeated `Project` calls. Output names remain exactly as supplied; source paths follow the serializer naming policy. Root names must be valid SQL aliases; nested keys are JSON-escaped. Duplicate names within an object, root collisions with selected/generated fields, and empty root projections are rejected. Terminal generic type arguments control deserialization and should match the nested output shape.
+
+Projection builders also support `Aggregate(name, column, aggregate, alias)`. For example, `Object("data", p => p.Field("category", "category").Aggregate("total", "price", Q.Aggregate.Sum))` groups by category and returns the sum inside `data`. All non-aggregate projected/selected fields become grouping keys when aggregates exist; explicit grouping keys are retained. An aggregate-only projection is a global aggregate; Count uses COUNT(1). Explicit GROUP BY without aggregates must include every projected field.
+
+Projections compose with TOP, DISTINCT, joins, sorting, aggregation, and Cosmos-supported vector/full-text/hybrid queries. Grouped or aggregate projections reject ordering/ranking because Cosmos does not support those combinations. Existing aggregate and vector-score columns are still returned at the root; naming collisions fail. FullTextScore/RRF remain ranking expressions and cannot be selected as scalar scores. Cosmos feature/indexing requirements still apply.
+
+With `Project`, `GetAsync`/`GetAsync<T>` honor the full query shape and hints, preserve an explicit TOP (otherwise TOP 1), and stop after the first result. `Project(...).Paged(...).GetAsync()` is rejected; use `ToListAsync` for continuation-based paging. Without `Project`, single-result execution retains its existing filters/selected-columns-only behavior. `GenerateQuery` describes the configured shape and does not execute a consistency-controlled read.
+
+`WithConsistency(level)` applies to single reads, lists, projections, and pages independently of query hints. Every explicit override bypasses document-cache lookup and population; it does not refresh old entries. Default reads can still return earlier TTL-cached data. Strong requires account-level Strong support; Cosmos failures are surfaced without fallback. An injected client with `ReadConsistencyStrategy` rejects explicit `WithConsistency` overrides because that SDK setting otherwise takes precedence. Paging's existing restriction on `WithHints` remains.
+
+Custom implementations of the legacy Galaxy interfaces remain compatible. New read overloads have default implementations that forward only representable legacy operations; unsupported new capabilities throw `NotSupportedException` instead of dropping requested behavior.
+
 The `Orbit<T>` fluent query builder provides the recommended, chainable API for building Cosmos DB queries. It produces the same SQL as the lower-level declarative `Cluster`/`Catalyst` API while keeping query intent easier to read in application code.
 
 ## Quick Start
@@ -464,7 +498,7 @@ Every fluent chain must end with a terminal operation that executes or generates
 
 All terminal operations return the same `Gravity` response object with RU consumption, continuation tokens, and optional query debug info.
 
-`GetAsync()` and `GetAsync<TS>()` execute with `TOP 1` and stop after the first document, reading through empty pages when necessary. They use filters and selected columns; list-shaping options such as a caller-specified `Top`, grouping, joins, sorting, and hints are not applied. Rank catalysts use the implicit `TOP 1`. `GenerateQuery()` describes the configured query shape and does not automatically add the single-result bound.
+Without `Project`, `GetAsync()` and `GetAsync<TS>()` execute with `TOP 1` and stop after the first document, reading through empty pages when necessary. They use filters and selected columns; list-shaping options such as a caller-specified `Top`, grouping, joins, sorting, and hints are not applied. Rank catalysts use the implicit `TOP 1`. With `Project`, the full query shape and hints are applied, an explicit `Top` is preserved, and paging is rejected. `GenerateQuery()` describes the configured query shape and does not automatically add the single-result bound.
 
 ### Type Projection
 

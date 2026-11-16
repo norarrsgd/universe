@@ -32,6 +32,7 @@ internal sealed class GatewayQueryStrategy : IQueryExecutionStrategy
         {
             QueryRequestOptions requestOptions = new()
             {
+                ConsistencyLevel = context.ConsistencyLevel,
                 MaxItemCount = context.MaxItemCount ?? Q.Limits.MaxItems,
                 EnableOptimisticDirectExecution = false,
                 MaxConcurrency = 1, // Conservative for complex queries

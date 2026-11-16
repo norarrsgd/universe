@@ -126,7 +126,18 @@ public struct Q
         NotFTContainsAny,
 
         /// <summary>Full-text relevance scoring for ORDER BY RANK. Generates: FullTextScore(c.[Column], @param) in ORDER BY. Value: string[] of search terms. Requires ColumnOptions.Top.</summary>
-        FTScore
+        FTScore,
+
+        /// <summary>Literal string prefix, with optional case-insensitive matching.</summary>
+        StartsWith,
+        /// <summary>Literal string substring, with optional case-insensitive matching.</summary>
+        StringContains,
+        /// <summary>String equality, with optional case-insensitive matching.</summary>
+        StringEquals,
+        /// <summary>Check for an explicit JSON null, distinct from an undefined property.</summary>
+        IsNull,
+        /// <summary>Check whether a property contains a string.</summary>
+        IsString
     }
 
     /// <summary>Aggregation functions</summary>
@@ -190,6 +201,11 @@ public static class OperatorExtension
         Q.Operator.FTContainsAny => "FullTextContainsAny",
         Q.Operator.NotFTContainsAny => "NOT FullTextContainsAny",
         Q.Operator.FTScore => "FullTextScore",
+        Q.Operator.StartsWith => "STARTSWITH",
+        Q.Operator.StringContains => "CONTAINS",
+        Q.Operator.StringEquals => "STRINGEQUALS",
+        Q.Operator.IsNull => "IS_NULL",
+        Q.Operator.IsString => "IS_STRING",
         _ => throw new UniverseException("Unrecognized OPERATOR keyword")
     };
 }
