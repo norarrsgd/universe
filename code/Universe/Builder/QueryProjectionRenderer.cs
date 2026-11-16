@@ -45,6 +45,8 @@ internal partial class UniverseBuilder
         foreach (ProjectionItem item in options.Projection.Items)
         {
             ValidateSqlAlias(item.Name, "Projection.Name");
+            if (string.Equals(item.Name, "value", StringComparison.OrdinalIgnoreCase))
+                throw new UniverseException("Projection.Name cannot be the SQL keyword VALUE.");
             AddOutput(item.Name, RenderProjectionItem(item, scalarFields), true);
         }
 

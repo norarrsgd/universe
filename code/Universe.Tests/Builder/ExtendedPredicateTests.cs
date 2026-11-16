@@ -65,10 +65,11 @@ public sealed class ExtendedPredicateTests
     public void OperandParameter_IsBoundAndDoesNotMergeWithDifferentExpression()
     {
         using UniverseBuilder builder = new();
-        Catalyst first = Catalyst.Compare(QueryOperand.Field("value"), Q.Operator.Gt, QueryOperand.Parameter(5)) with { CatalystId = "same" };
-        Catalyst second = Catalyst.Compare(QueryOperand.ArrayLength("value"), Q.Operator.Gt, QueryOperand.Parameter(6)) with { CatalystId = "same" };
+        object shared = 5;
+        Catalyst first = Catalyst.Compare(QueryOperand.Field("value"), Q.Operator.Gt, QueryOperand.Parameter(shared)) with { CatalystId = "same" };
+        Catalyst second = Catalyst.Compare(QueryOperand.ArrayLength("value"), Q.Operator.Gt, QueryOperand.Parameter(shared)) with { CatalystId = "same" };
         QueryDefinition query = builder.CreateQuery([new([first, second])]);
-        Assert.Equal(2, query.GetQueryParameters().Count);
+        Assert.Equal(2, query.GetQueryParameters().Select(parameter => parameter.Name).Distinct().Count());
         Assert.Contains("ARRAY_LENGTH", query.QueryText);
     }
 

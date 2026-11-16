@@ -88,6 +88,8 @@ public sealed class StructuredProjectionTests
         [
             new ProjectionBuilder().Build(),
             new ProjectionBuilder().Field("bad;alias", "safe").Build(),
+            new ProjectionBuilder().Field("value", "id").Build(),
+            new ProjectionBuilder().Field("VALUE", "id").Build(),
             new ProjectionBuilder().Field("data", "bad\"];--").Build(),
             new ProjectionBuilder().Object("data", p => p.Field("same", "a").Field("same", "b")).Build(),
             new ProjectionBuilder().Field("id", "other").Build()
