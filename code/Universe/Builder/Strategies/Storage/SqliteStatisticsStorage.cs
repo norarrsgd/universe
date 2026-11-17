@@ -71,6 +71,11 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
             PlatformDetection.SetRestrictivePermissions(directory);
         }
 
+        // Create the primary database with mode 0600 before SQLite can expose it through a
+        // permissive umask. Existing files must pass the same type, ownership, and mode checks.
+        PlatformDetection.CreateOrSecureOwnerOnlyFile(_dbPath);
+        EnsureSqliteFilePermissions();
+
         // Create connection with WAL mode for better concurrency
         SqliteConnectionStringBuilder connectionBuilder = new()
         {
@@ -80,29 +85,40 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         };
 
         _connection = new SqliteConnection(connectionBuilder.ConnectionString);
-        _connection.Open();
+        try
+        {
+            _connection.Open();
 
-        // Enable WAL mode and other performance optimizations
-        ExecutePragmas();
+            // Enable WAL mode and other performance optimizations
+            ExecutePragmas();
 
-        // Run integrity check on startup
-        RunIntegrityCheck();
+            // Run integrity check on startup
+            RunIntegrityCheck();
 
-        // Initialize schema with versioning
-        InitializeSchema();
+            // Initialize schema with versioning
+            InitializeSchema();
 
-        // Prepare statements
-        PrepareStatements();
+            // Secure every sidecar materialized during WAL initialization before telemetry writes.
+            EnsureSqliteFilePermissions();
 
-        // Run initial cleanup
-        FireAndForget(CleanupOldRecordsAsync);
+            // Prepare statements
+            PrepareStatements();
 
-        // Start flush timer
-        _flushTimer = new Timer(
-            _ => FireAndForget(FlushAsync),
-            null,
-            _flushInterval,
-            _flushInterval);
+            // Run initial cleanup
+            FireAndForget(CleanupOldRecordsAsync);
+
+            // Start flush timer
+            _flushTimer = new Timer(
+                _ => FireAndForget(FlushAsync),
+                null,
+                _flushInterval,
+                _flushInterval);
+        }
+        catch
+        {
+            _connection.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -134,6 +150,17 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 			PRAGMA temp_store = MEMORY;
 			""";
         pragmaCommand.ExecuteNonQuery();
+    }
+
+    private void EnsureSqliteFilePermissions()
+    {
+        PlatformDetection.EnsureOwnerOnlyFile(_dbPath);
+
+        foreach (string sidecarPath in new[] { _dbPath + "-wal", _dbPath + "-shm" })
+        {
+            if (File.Exists(sidecarPath))
+                PlatformDetection.EnsureOwnerOnlyFile(sidecarPath);
+        }
     }
 
     private void RunIntegrityCheck()
@@ -412,6 +439,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         try
         {
             using SqliteTransaction transaction = _connection.BeginTransaction();
+            EnsureSqliteFilePermissions();
 
             foreach (QueryExecutionStatistics stat in toWrite)
             {
@@ -440,7 +468,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
             foreach (QueryExecutionStatistics stat in toWrite)
                 _retryCounts.TryRemove(stat, out _);
         }
-        catch (System.Exception ex) when (ex is SqliteException or IOException)
+        catch (System.Exception ex) when (ex is SqliteException or IOException or UniverseException)
         {
             Trace.TraceWarning($"[UniverseQuery] SQLite flush failed: {ex.Message}");
             RequeueWithRetryLimit(toWrite);
@@ -483,7 +511,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         {
             await action();
         }
-        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException)
+        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException or UniverseException)
         {
             Trace.TraceWarning($"[UniverseQuery] Background operation failed: {ex.Message}");
         }

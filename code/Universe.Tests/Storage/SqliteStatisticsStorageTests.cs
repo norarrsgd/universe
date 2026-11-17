@@ -7,6 +7,17 @@ namespace Universe.Tests.Storage;
 
 public sealed class SqliteStatisticsStorageTests : IDisposable
 {
+    private const UnixFileMode OwnerOnlyFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    private const UnixFileMode PermissiveFileMode = OwnerOnlyFileMode
+        | UnixFileMode.GroupRead
+        | UnixFileMode.GroupWrite
+        | UnixFileMode.OtherRead
+        | UnixFileMode.OtherWrite;
+    private const UnixFileMode PermissiveDirectoryMode = PermissiveFileMode
+        | UnixFileMode.UserExecute
+        | UnixFileMode.GroupExecute
+        | UnixFileMode.OtherExecute;
+
     private readonly string _dbPath;
     private readonly SqliteStatisticsStorage _storage;
 
@@ -254,6 +265,72 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     #endregion
 
     #region Validation
+
+    [Fact]
+    public async Task Constructor_UnixRestrictsDatabaseWalAndSharedMemoryFiles()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            return;
+
+        string directory = Path.Combine(AppContext.BaseDirectory, $"sqlite-permissions-{Guid.NewGuid()}");
+        string dbPath = Path.Combine(directory, "statistics.db");
+        Directory.CreateDirectory(directory);
+        File.SetUnixFileMode(directory, PermissiveDirectoryMode);
+        File.WriteAllBytes(dbPath, []);
+        File.SetUnixFileMode(dbPath, PermissiveFileMode);
+
+        try
+        {
+            using SqliteStatisticsStorage storage = new(dbPath, batchSize: 1, flushIntervalSeconds: 60);
+            await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "permissions"));
+            Assert.Single(await storage.LoadRecentAsync(1));
+
+            foreach (string sqliteFile in new[] { dbPath, dbPath + "-wal", dbPath + "-shm" })
+            {
+                Assert.True(File.Exists(sqliteFile));
+                Assert.Equal(OwnerOnlyFileMode, File.GetUnixFileMode(sqliteFile));
+            }
+        }
+        finally
+        {
+            TryDeleteFiles(dbPath);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("-wal")]
+    [InlineData("-shm")]
+    public void Constructor_UnixRejectsSymbolicLinkSqliteArtifacts(string suffix)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            return;
+
+        string directory = Path.Combine(AppContext.BaseDirectory, $"sqlite-symlink-{Guid.NewGuid()}");
+        string targetPath = Path.Combine(directory, "target.db");
+        string dbPath = Path.Combine(directory, "statistics.db");
+        string linkedPath = dbPath + suffix;
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(targetPath, "sentinel");
+        File.CreateSymbolicLink(linkedPath, targetPath);
+
+        try
+        {
+            Assert.Throws<Universe.Exception.UniverseException>(() =>
+                new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60));
+            Assert.Equal("sentinel", File.ReadAllText(targetPath));
+        }
+        finally
+        {
+            TryDeleteFiles(dbPath);
+            if (File.Exists(targetPath))
+                File.Delete(targetPath);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory);
+        }
+    }
 
     [Fact]
     public void CustomPath_IsAllowed()
