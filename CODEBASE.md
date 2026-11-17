@@ -831,6 +831,7 @@ Data-driven recommendations:
 
 Storage behavior:
 
+- `QueryTuner` persists through a bounded background queue; disposal waits up to 10 seconds for accepted writes. Tests inspecting persisted statistics must wait for that drain before asserting.
 - `FileStatisticsStorage` writes at most the 1000 most recent entries.
 - `FileStatisticsStorage` logs and returns empty data if the JSON file is corrupt.
 - `SqliteStatisticsStorage` queues writes, flushes on batch size or timer, and retries failed flushes up to 3 times.
