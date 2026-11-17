@@ -812,7 +812,7 @@ Path handling:
 - Defaults are platform-aware.
 - Azure App Service/Functions use local temp storage by default.
 - Custom paths must never come from untrusted input.
-- Unix-like systems attempt owner-only permissions on storage paths.
+- Unix-like systems attempt owner-only permissions on storage paths. SQLite additionally creates and verifies process-owned mode-0600 database files, checks WAL/SHM sidecars before inserts, and rejects symbolic-link artifacts.
 
 Rule-based recommendations:
 

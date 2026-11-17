@@ -1122,6 +1122,18 @@
             No-op on Windows where NTFS ACLs are used instead.
             </summary>
         </member>
+        <member name="M:Universe.Builder.Strategies.Storage.PlatformDetection.CreateOrSecureOwnerOnlyFile(System.String)">
+            <summary>
+            Creates a regular file with owner-only permissions when it does not already exist, then
+            verifies that the current process owns it and that no group or other permissions remain.
+            No-op on non-Unix platforms, where filesystem ACL inheritance remains authoritative.
+            </summary>
+        </member>
+        <member name="M:Universe.Builder.Strategies.Storage.PlatformDetection.EnsureOwnerOnlyFile(System.String)">
+            <summary>
+            Fails unless <paramref name="path"/> is a process-owned regular file with mode 0600.
+            </summary>
+        </member>
         <member name="T:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage">
             <summary>
             SQLite-based storage for query statistics with high-performance features:
