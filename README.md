@@ -33,7 +33,7 @@ public class MyRepository : Galaxy<MyModel>
     }
 }
 
-// If you want to see debug information such as the full Query text executed, use the format below:
+// For local development, enable query diagnostics with the format below:
 public class MyRepository : Galaxy<MyModel>
 {
     public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey, true)
@@ -41,6 +41,8 @@ public class MyRepository : Galaxy<MyModel>
     }
 }
 ```
+
+> **Warning:** Passing `true` enables `recordQueries`, which includes full query text and raw parameter values in `Gravity`. Use it only for local development, never enable it in production, and never write recorded values to logs.
 
 3. In your Startup.cs / Main method / Program.cs, configure the CosmosClient like so:
 ```csharp
@@ -125,6 +127,8 @@ Generated parameter names are opaque and may change between versions. `Catalyst.
 
 The `Gravity` object is returned by all operations and contains valuable information:
 
+Recorded parameters can contain PII, tenant identifiers, search terms, or secrets. Keep query recording disabled in production. The local-development example below logs query metadata without logging parameter values:
+
 ```csharp
 (Gravity gravity, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
 
@@ -138,13 +142,10 @@ string continuationToken = gravity.ContinuationToken;
 if (gravity.Query.HasValue)
 {
     string queryText = gravity.Query.Value.Text;
-    IEnumerable<(string, object)> parameters = gravity.Query.Value.Parameters;
+    IReadOnlyList<(string, object)> parameters = gravity.Query.Value.Parameters;
 
     Console.WriteLine($"Query: {queryText}");
-    foreach ((string name, object value) in parameters)
-    {
-        Console.WriteLine($"Parameter: {name} = {value}");
-    }
+    Console.WriteLine($"Parameter count: {parameters.Count}");
 }
 ```
 
@@ -421,7 +422,7 @@ catch (Exception ex)
 - **Bulk Operations**: Enable `AllowBulkExecution` in the CosmosClientOptions for efficient batch processing.
 - **RU Tracking**: The `Gravity` object provides RU consumption information for cost optimization.
 - **Column Selection**: Select only the columns you need to reduce data transfer.
-- **Debug Mode**: The debug mode (enabled by passing `true` to the Galaxy constructor) provides query details but adds overhead.
+- **Debug Mode**: Passing `true` to the Galaxy constructor exposes full query text and raw parameter values in `Gravity`. Use it only for local development, never in production, and never log raw recorded values.
 - **Partition Key**: Always consider your partition strategy for best performance.
 
 ## Documentation
