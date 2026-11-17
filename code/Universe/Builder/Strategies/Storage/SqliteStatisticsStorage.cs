@@ -294,7 +294,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         try
         {
             // Flush pending writes first to ensure consistency
-            await FlushAsync().ConfigureAwait(false);
+            await FlushRemainingAsync();
 
             if (!await _writeLock.WaitAsync(LockTimeout).ConfigureAwait(false))
                 throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
@@ -328,7 +328,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         try
         {
             // Flush pending writes first to ensure consistency
-            await FlushAsync().ConfigureAwait(false);
+            await FlushRemainingAsync();
 
             long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
 
@@ -428,20 +428,16 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     private async Task FlushAsync()
     {
         List<QueryExecutionStatistics> toWrite = [];
-        while (toWrite.Count < _batchSize * 2 && _writeQueue.TryDequeue(out QueryExecutionStatistics stat))
-        {
-            toWrite.Add(stat);
-        }
-
-        if (toWrite.Count == 0) return;
-
         if (!await _writeLock.WaitAsync(LockTimeout).ConfigureAwait(false))
-        {
-            RequeueWithRetryLimit(toWrite);
             throw new TimeoutException("Lock acquisition timed out in FlushAsync.");
-        }
         try
         {
+            // Keep dequeued batches visible to readers through the shared connection lock.
+            while (toWrite.Count < _batchSize * 2 && _writeQueue.TryDequeue(out QueryExecutionStatistics stat))
+                toWrite.Add(stat);
+
+            if (toWrite.Count == 0) return;
+
             using SqliteTransaction transaction = _connection.BeginTransaction();
 
             foreach (QueryExecutionStatistics stat in toWrite)

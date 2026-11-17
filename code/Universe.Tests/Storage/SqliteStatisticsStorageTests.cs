@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using Universe.Builder.Strategies;
 using Universe.Builder.Strategies.Storage;
@@ -168,6 +167,36 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 
     #region Batching
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Read_DrainsAllPendingBatchesWithoutBackgroundWriter(bool byHash)
+    {
+        string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-read-drain-{Guid.NewGuid()}.db");
+        using SqliteStatisticsStorage storage = new(dbPath, batchSize: 2, flushIntervalSeconds: 300);
+
+        try
+        {
+            // Hold background maintenance idle so the read must flush the entire backlog itself.
+            GetPrivateField<CancellationTokenSource>(storage, "_writerCancellation").Cancel();
+            await GetPrivateField<Task>(storage, "_writerTask").WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            for (int i = 0; i < 10; i++)
+                await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "read-drain"));
+
+            IList<QueryExecutionStatistics> loaded = byHash
+                ? await storage.GetByQueryHashAsync("read-drain", TimeSpan.FromHours(1))
+                : await storage.LoadRecentAsync(100);
+
+            Assert.Equal(10, loaded.Count);
+        }
+        finally
+        {
+            storage.Dispose();
+            TryDeleteFiles(dbPath);
+        }
+    }
+
     [Fact]
     public async Task BatchFlushing_DataPersistsCorrectly()
     {
@@ -238,8 +267,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-active-dispose-{Guid.NewGuid()}.db");
         SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 300);
         SemaphoreSlim writeLock = GetPrivateField<SemaphoreSlim>(storage, "_writeLock");
-        ConcurrentQueue<QueryExecutionStatistics> writeQueue =
-            GetPrivateField<ConcurrentQueue<QueryExecutionStatistics>>(storage, "_writeQueue");
+        SemaphoreSlim flushSignal = GetPrivateField<SemaphoreSlim>(storage, "_flushSignal");
         bool lockHeld = false;
 
         try
@@ -248,9 +276,9 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
             lockHeld = true;
 
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "active-dispose"));
-            await WaitUntilAsync(() => writeQueue.IsEmpty);
+            await WaitUntilAsync(() => flushSignal.CurrentCount == 0);
 
-            Task disposeTask = Task.Run(storage.Dispose);
+            Task disposeTask = Task.Run(storage.Dispose, TestContext.Current.CancellationToken);
             await WaitUntilAsync(() => GetPrivateField<int>(storage, "_disposeState") == 1);
 
             Assert.False(disposeTask.IsCompleted);
