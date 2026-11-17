@@ -113,6 +113,8 @@ The cache is process-local memory. Repositories share entries only when they use
 
 `maxEntries` bounds both retained documents and eviction records. Eviction follows first-insertion order; overwrites refresh the value, ETag, and TTL without changing that order. Query-cache keys preserve quoted field names and associate each SQL parameter occurrence with its bound value.
 
+Single-document queries are cached only when every bound parameter is null, a string, a boolean, or a built-in numeric value (`byte` through `ulong`, `float`, `double`, or `decimal`). Keys include each value's runtime type. Queries with objects (including anonymous partial-match filters), collections, or other parameter types execute normally and bypass cache reads and writes because their Cosmos serialization cannot be safely inferred. Point-read caching is unaffected.
+
 Successful create, modify, remove, atomic batch, and bulk batch commits update or invalidate entries within that client and repository scope. Changes made through other client instances or processes are visible after the configured cache time-to-live expires.
 
 5. Inject your `IGalaxy<MyModel>` dependency into your classes and enjoy a simpler way to query CosmosDb

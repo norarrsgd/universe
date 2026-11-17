@@ -507,6 +507,7 @@ When `UniverseOptions.WithDocumentCache(...)` is configured, direct id reads are
 - Marks the `QueryContext` for single-result execution. All strategies force page and buffer sizes to one after hint merging, read past empty pages, retain only the first document, and dispose the iterator without reading further pages.
 - Returns first result or `default`.
 - When document caching is enabled, actual SQL parameter tokens outside quoted strings/property names are normalized into a hashed cache key. Bound values follow SQL occurrence order, including repeats; unresolved bindings bypass caching. Equivalent queries with newly generated catalyst ids can still share entries, while fields such as `access@a` and `access@b` remain distinct.
+- Query keys include parameter runtime types and accept only null, string, boolean, and built-in numeric values (`byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`). Other values bypass both query-cache reads and writes through `Galaxy.TryCreateQueryCacheKey`; do not reuse document-cloning serialization for object-valued cache signatures.
 
 `Galaxy<T>.List(...)`:
 
@@ -866,6 +867,8 @@ Invalidation behavior:
 Cache keys are SHA-256 hashes built from an opaque Cosmos client namespace, operation kind, database, container, source entity type, result type, and operation inputs. A cache-owned `ConditionalWeakTable<CosmosClient, string>` assigns namespaces by exact client-instance identity without retaining credentials or preventing client collection. Point keys, query keys, and invalidation scopes all include that namespace. Repositories sharing the same client and cache options can share matching entries; different client instances are isolated even at the same endpoint. A client must represent one stable authorization context; recreate it or disable caching when its authority changes.
 
 Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with `System.Text.Json` settings aligned with `UniverseSerializer`; clone failures skip or evict the affected cache entry. Writes through another client namespace rely on TTL expiry for visibility.
+
+Query parameter signatures are restricted to null, string, boolean, and built-in numeric values and include runtime type identity. Object and collection parameters, including anonymous-object partial-match authorization filters, bypass query caching because the cache cannot guarantee equivalence with Cosmos parameter serialization. This prevents distinct filters from collapsing into the same key when document-cloning options omit getter-only properties, nulls, or serializer-specific members. Point reads retain their existing cache behavior.
 
 The cache holds one linked-list node per dictionary entry under a short structural lock, so `MaxEntries` bounds eviction metadata as well as documents. Overwrites refresh TTL/value/ETag in their original FIFO position; remove/reinsert joins the tail. Reads take an entry snapshot under the lock and clone outside it. A clone failure removes only that exact snapshot, never a concurrent replacement. Expiration, explicit removal, and query invalidation remove their list nodes too.
 

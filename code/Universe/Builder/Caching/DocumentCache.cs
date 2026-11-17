@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -79,6 +80,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         {
             if (!bindings.TryGetValue(name, out object value))
                 throw new InvalidOperationException("Cannot cache a query with an unresolved parameter binding.");
+            parts.Add(value?.GetType().AssemblyQualifiedName);
             parts.Add(SerializeForKey(value));
         }
 
@@ -194,6 +196,14 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
     {
         if (value is null)
             return "null";
+
+        // Preserve exact UTF-16 code units; JSON serialization replaces unpaired surrogates.
+        if (value is string text)
+            return Convert.ToHexString(MemoryMarshal.AsBytes(text.AsSpan()));
+
+        // Object/collection serialization can differ from Cosmos parameter serialization; bypass caching rather than risk a collision.
+        if (value is not (bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal))
+            throw new NotSupportedException("Query caching supports only null, string, boolean, and built-in numeric parameter values.");
 
         return JsonSerializer.Serialize(value, value.GetType(), JsonOptions);
     }

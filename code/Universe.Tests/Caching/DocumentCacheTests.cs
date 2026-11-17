@@ -214,6 +214,52 @@ public sealed class DocumentCacheTests
         => cache.CreateQueryKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), sql, parameters);
 
     [Fact]
+    public void QueryKey_ComplexValues_CannotProduceCacheEntries()
+    {
+        DocumentCache cache = new(new());
+        object[] values =
+        [
+            new { userId = "alice" },
+            new CacheEntity { Name = "alice" },
+            new[] { new { userId = "alice" } },
+            new Dictionary<string, object> { ["userId"] = "alice" },
+            JsonSerializer.SerializeToElement(new { userId = "alice" })
+        ];
+
+        foreach (object value in values)
+            Assert.Throws<NotSupportedException>(() => QueryKey(cache, "SELECT * FROM c WHERE c.shares = @a", [("@a", value)]));
+    }
+
+    [Fact]
+    public void QueryKey_PreservesScalarRuntimeTypes()
+    {
+        DocumentCache cache = new(new());
+        const string sql = "SELECT * FROM c WHERE c.value = @a";
+        DocumentCacheKey integer = QueryKey(cache, sql, [("@a", 1)]);
+        DocumentCacheKey floating = QueryKey(cache, sql, [("@a", 1.0)]);
+        DocumentCacheKey text = QueryKey(cache, sql, [("@a", "1")]);
+        DocumentCacheKey missing = QueryKey(cache, sql, [("@a", null)]);
+
+        Assert.NotEqual(integer, floating);
+        Assert.NotEqual(integer, text);
+        Assert.NotEqual(missing, QueryKey(cache, sql, [("@a", "null")]));
+    }
+
+    [Fact]
+    public void QueryKey_DistinguishesUnpairedSurrogatesInStrings()
+    {
+        DocumentCache cache = new(new());
+        const string sql = "SELECT * FROM c WHERE c.value = @a";
+
+        DocumentCacheKey first = QueryKey(cache, sql, [("@a", "\uD800")]);
+        DocumentCacheKey second = QueryKey(cache, sql, [("@a", "\uD801")]);
+        DocumentCacheKey replacement = QueryKey(cache, sql, [("@a", "\uFFFD")]);
+
+        Assert.NotEqual(first, second);
+        Assert.NotEqual(first, replacement);
+    }
+
+    [Fact]
     public void PointKey_DoesNotContainReadableInputs()
     {
         DocumentCache cache = new(new(TimeSpan.FromMinutes(5), 1000, cloneDocuments: true));

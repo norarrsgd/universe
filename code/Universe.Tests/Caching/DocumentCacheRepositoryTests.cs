@@ -1,6 +1,7 @@
 using System.Net;
 using System.Reflection;
 using Microsoft.Azure.Cosmos;
+using Universe.Builder.Options;
 using Universe.Attributes;
 using Universe.Extensions;
 using Universe.Interfaces;
@@ -12,6 +13,53 @@ namespace Universe.Tests.Caching;
 
 public sealed class DocumentCacheRepositoryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueryGet_AnonymousAuthorizationFilter_DoesNotReturnAnotherUsersDocument(bool projected)
+    {
+        QueryTestContainer container = new() { QueryItems = projected ? [new CacheProjection { Name = "alice-private" }] : [Entity("alice-private")] };
+        using TestGalaxy repo = new(container, new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache());
+        IGalaxy<CacheEntity> galaxy = repo;
+        Cluster[] alice = [new([new("shares", new { userId = "alice" }, Operator: Q.Operator.In) { PartialMatch = true }])];
+        Cluster[] bob = [new([new("shares", new { userId = "bob" }, Operator: Q.Operator.In) { PartialMatch = true }])];
+        if (projected)
+        {
+            await galaxy.Get<CacheProjection>(alice, ["Name"]);
+            container.QueryItems = [new CacheProjection { Name = "bob-private" }];
+            (Gravity gravity, CacheProjection result) = await galaxy.Get<CacheProjection>(bob, ["Name"]);
+            Assert.Equal("bob-private", result.Name);
+            Assert.Equal(7.25, gravity.RU);
+        }
+        else
+        {
+            await galaxy.Get(alice);
+            container.QueryItems = [Entity("bob-private")];
+            (Gravity gravity, CacheEntity result) = await galaxy.Get(bob);
+            Assert.Equal("bob-private", result.Name);
+            Assert.Equal(7.25, gravity.RU);
+        }
+
+        Assert.Equal(2, container.QueryCalls);
+    }
+
+    [Fact]
+    public async Task QueryGet_ComplexParameter_BypassesCacheReadsAndWrites()
+    {
+        QueryTestContainer container = new() { QueryItems = [Entity("first")] };
+        using TestGalaxy repo = new(container, new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache());
+        IGalaxy<CacheEntity> galaxy = repo;
+        Cluster[] clusters = [new([new("shares", new { userId = "alice" }, Operator: Q.Operator.In) { PartialMatch = true }])];
+        await galaxy.Get(clusters);
+        container.QueryItems = [Entity("changed")];
+
+        (Gravity gravity, CacheEntity result) = await galaxy.Get(clusters);
+
+        Assert.Equal("changed", result.Name);
+        Assert.Equal(7.25, gravity.RU);
+        Assert.Equal(2, container.QueryCalls);
+    }
+
     [Fact]
     public async Task QueryGet_QuotedAtFields_ExecuteDifferentPredicates()
     {
