@@ -1,3 +1,4 @@
+using System.Reflection;
 using Universe.Builder.Strategies;
 using Universe.Builder.Strategies.Storage;
 using Universe.Tests.Helpers;
@@ -166,6 +167,36 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 
     #region Batching
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Read_DrainsAllPendingBatchesWithoutBackgroundWriter(bool byHash)
+    {
+        string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-read-drain-{Guid.NewGuid()}.db");
+        using SqliteStatisticsStorage storage = new(dbPath, batchSize: 2, flushIntervalSeconds: 300);
+
+        try
+        {
+            // Hold background maintenance idle so the read must flush the entire backlog itself.
+            GetPrivateField<CancellationTokenSource>(storage, "_writerCancellation").Cancel();
+            await GetPrivateField<Task>(storage, "_writerTask").WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            for (int i = 0; i < 10; i++)
+                await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "read-drain"));
+
+            IList<QueryExecutionStatistics> loaded = byHash
+                ? await storage.GetByQueryHashAsync("read-drain", TimeSpan.FromHours(1))
+                : await storage.LoadRecentAsync(100);
+
+            Assert.Equal(10, loaded.Count);
+        }
+        finally
+        {
+            storage.Dispose();
+            TryDeleteFiles(dbPath);
+        }
+    }
+
     [Fact]
     public async Task BatchFlushing_DataPersistsCorrectly()
     {
@@ -175,7 +206,7 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         for (int i = 0; i < 5; i++)
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: $"batch-{i}"));
 
-        // Allow fire-and-forget flush triggered at batchSize threshold
+        // Allow the background writer flush triggered at batchSize threshold
         await Task.Delay(500, TestContext.Current.CancellationToken);
 
         IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(100);
@@ -228,6 +259,47 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
 
         storage2.Dispose();
         TryDeleteFiles(dbPath);
+    }
+
+    [Fact]
+    public async Task Dispose_WaitsForActiveBackgroundFlush()
+    {
+        string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-active-dispose-{Guid.NewGuid()}.db");
+        SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 300);
+        SemaphoreSlim writeLock = GetPrivateField<SemaphoreSlim>(storage, "_writeLock");
+        SemaphoreSlim flushSignal = GetPrivateField<SemaphoreSlim>(storage, "_flushSignal");
+        bool lockHeld = false;
+
+        try
+        {
+            await writeLock.WaitAsync(TestContext.Current.CancellationToken);
+            lockHeld = true;
+
+            await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "active-dispose"));
+            await WaitUntilAsync(() => flushSignal.CurrentCount == 0);
+
+            Task disposeTask = Task.Run(storage.Dispose, TestContext.Current.CancellationToken);
+            await WaitUntilAsync(() => GetPrivateField<int>(storage, "_disposeState") == 1);
+
+            Assert.False(disposeTask.IsCompleted);
+
+            writeLock.Release();
+            lockHeld = false;
+            await disposeTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            using SqliteStatisticsStorage reopened = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 60);
+            IList<QueryExecutionStatistics> loaded = await reopened.LoadRecentAsync(10);
+            Assert.Single(loaded);
+            Assert.Equal("active-dispose", loaded[0].QueryHash);
+        }
+        finally
+        {
+            if (lockHeld)
+                writeLock.Release();
+
+            storage.Dispose();
+            TryDeleteFiles(dbPath);
+        }
     }
 
     [Fact]
@@ -393,4 +465,23 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     }
 
     #endregion
+
+    private static T GetPrivateField<T>(SqliteStatisticsStorage storage, string fieldName)
+    {
+        FieldInfo field = typeof(SqliteStatisticsStorage).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"SqliteStatisticsStorage.{fieldName} was not found.");
+        return (T)field.GetValue(storage)!;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> predicate)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!predicate())
+        {
+            if (DateTime.UtcNow >= deadline)
+                throw new TimeoutException("The background flush did not start within five seconds.");
+
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+    }
 }

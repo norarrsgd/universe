@@ -8,7 +8,7 @@ namespace Universe.Builder.Strategies.Storage;
 /// <summary>
 /// SQLite-based storage for query statistics with high-performance features:
 /// - WAL mode for concurrent read/write
-/// - Non-blocking fire-and-forget writes
+/// - Non-blocking writes through a tracked background writer
 /// - Batched inserts for efficiency
 /// - Auto-cleanup of old data
 /// - Schema versioning for safe upgrades
@@ -22,9 +22,15 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     private readonly SqliteConnection _connection;
     private readonly ConcurrentQueue<QueryExecutionStatistics> _writeQueue = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly SemaphoreSlim _flushSignal = new(0, 1);
+    private readonly CancellationTokenSource _writerCancellation = new();
+    private readonly object _lifecycleLock = new();
+    private readonly Task _writerTask;
     private readonly Timer _flushTimer;
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
-    private bool _disposed;
+    private TaskCompletionSource<bool> _activeOperationsDrained;
+    private int _activeOperations;
+    private int _disposeState;
     private DateTime _lastCleanup = DateTime.UtcNow;
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
     private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(30);
@@ -94,12 +100,12 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         // Prepare statements
         PrepareStatements();
 
-        // Run initial cleanup
-        FireAndForget(CleanupOldRecordsAsync);
+        // Own all asynchronous maintenance work so disposal can wait for it.
+        _writerTask = WriterLoopAsync();
 
-        // Start flush timer
+        // Timer callbacks only signal the tracked writer; they never start async-void work.
         _flushTimer = new Timer(
-            _ => FireAndForget(FlushAsync),
+            _ => RequestFlush(),
             null,
             _flushInterval,
             _flushInterval);
@@ -259,15 +265,22 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// </summary>
     public Task SaveAsync(QueryExecutionStatistics stats)
     {
-        if (_disposed) return Task.CompletedTask;
+        if (!TryEnterOperation()) return Task.CompletedTask;
 
-        _writeQueue.Enqueue(stats);
+        try
+        {
+            _writeQueue.Enqueue(stats);
 
-        // Trigger flush if batch size reached
-        if (_writeQueue.Count >= _batchSize)
-            FireAndForget(FlushAsync);
+            // Trigger flush if batch size reached
+            if (_writeQueue.Count >= _batchSize)
+                RequestFlush();
 
-        return Task.CompletedTask;
+            return Task.CompletedTask;
+        }
+        finally
+        {
+            ExitOperation();
+        }
     }
 
     /// <summary>
@@ -276,24 +289,31 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
     public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
     {
-        if (_disposed) return [];
+        if (!TryEnterOperation()) return [];
 
-        // Flush pending writes first to ensure consistency
-        await FlushAsync();
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-            throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
         try
         {
-            _selectRecentCommand.Parameters.Clear();
-            _selectRecentCommand.Parameters.AddWithValue("@count", count);
+            // Flush pending writes first to ensure consistency
+            await FlushRemainingAsync();
 
-            using SqliteDataReader reader = await _selectRecentCommand.ExecuteReaderAsync();
-            return ReadStatistics(reader);
+            if (!await _writeLock.WaitAsync(LockTimeout).ConfigureAwait(false))
+                throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
+            try
+            {
+                _selectRecentCommand.Parameters.Clear();
+                _selectRecentCommand.Parameters.AddWithValue("@count", count);
+
+                using SqliteDataReader reader = await _selectRecentCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                return ReadStatistics(reader);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
         finally
         {
-            _writeLock.Release();
+            ExitOperation();
         }
     }
 
@@ -303,27 +323,34 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
     public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
     {
-        if (_disposed) return [];
+        if (!TryEnterOperation()) return [];
 
-        // Flush pending writes first to ensure consistency
-        await FlushAsync();
-
-        long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-            throw new TimeoutException("Lock acquisition timed out in GetByQueryHashAsync.");
         try
         {
-            _selectByHashCommand.Parameters.Clear();
-            _selectByHashCommand.Parameters.AddWithValue("@hash", queryHash);
-            _selectByHashCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
+            // Flush pending writes first to ensure consistency
+            await FlushRemainingAsync();
 
-            using SqliteDataReader reader = await _selectByHashCommand.ExecuteReaderAsync();
-            return ReadStatistics(reader);
+            long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
+
+            if (!await _writeLock.WaitAsync(LockTimeout).ConfigureAwait(false))
+                throw new TimeoutException("Lock acquisition timed out in GetByQueryHashAsync.");
+            try
+            {
+                _selectByHashCommand.Parameters.Clear();
+                _selectByHashCommand.Parameters.AddWithValue("@hash", queryHash);
+                _selectByHashCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
+
+                using SqliteDataReader reader = await _selectByHashCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                return ReadStatistics(reader);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
         finally
         {
-            _writeLock.Release();
+            ExitOperation();
         }
     }
 
@@ -333,21 +360,28 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
     public async Task ClearOldAsync(TimeSpan olderThan)
     {
-        if (_disposed) return;
+        if (!TryEnterOperation()) return;
 
-        long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(olderThan).ToUnixTimeSeconds();
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-            throw new TimeoutException("Lock acquisition timed out in ClearOldAsync.");
         try
         {
-            _deleteOldCommand.Parameters.Clear();
-            _deleteOldCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
-            await _deleteOldCommand.ExecuteNonQueryAsync();
+            long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(olderThan).ToUnixTimeSeconds();
+
+            if (!await _writeLock.WaitAsync(LockTimeout).ConfigureAwait(false))
+                throw new TimeoutException("Lock acquisition timed out in ClearOldAsync.");
+            try
+            {
+                _deleteOldCommand.Parameters.Clear();
+                _deleteOldCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
+                await _deleteOldCommand.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
         finally
         {
-            _writeLock.Release();
+            ExitOperation();
         }
     }
 
@@ -393,24 +427,17 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
     private async Task FlushAsync()
     {
-        if (_disposed || _writeQueue.IsEmpty) return;
-
-        // Collect items to write
         List<QueryExecutionStatistics> toWrite = [];
-        while (toWrite.Count < _batchSize * 2 && _writeQueue.TryDequeue(out QueryExecutionStatistics stat))
-        {
-            toWrite.Add(stat);
-        }
-
-        if (toWrite.Count == 0) return;
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-        {
-            RequeueWithRetryLimit(toWrite);
+        if (!await _writeLock.WaitAsync(LockTimeout).ConfigureAwait(false))
             throw new TimeoutException("Lock acquisition timed out in FlushAsync.");
-        }
         try
         {
+            // Keep dequeued batches visible to readers through the shared connection lock.
+            while (toWrite.Count < _batchSize * 2 && _writeQueue.TryDequeue(out QueryExecutionStatistics stat))
+                toWrite.Add(stat);
+
+            if (toWrite.Count == 0) return;
+
             using SqliteTransaction transaction = _connection.BeginTransaction();
 
             foreach (QueryExecutionStatistics stat in toWrite)
@@ -431,10 +458,10 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
                 _insertCommand.Parameters.AddWithValue("@hints",
                     stat.HintsUsed != null ? JsonSerializer.Serialize(stat.HintsUsed, _jsonOptions) : DBNull.Value);
 
-                await _insertCommand.ExecuteNonQueryAsync();
+                await _insertCommand.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await transaction.CommitAsync();
+            await transaction.CommitAsync().ConfigureAwait(false);
 
             // Clear retry tracking for successfully persisted items
             foreach (QueryExecutionStatistics stat in toWrite)
@@ -448,12 +475,6 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         finally
         {
             _writeLock.Release();
-        }
-
-        if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
-        {
-            _lastCleanup = DateTime.UtcNow;
-            FireAndForget(CleanupOldRecordsAsync);
         }
     }
 
@@ -474,45 +495,141 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         }
     }
 
-    /// <summary>
-    /// Runs an async task fire-and-forget, logging any exceptions instead of leaving them unobserved.
-    /// </summary>
-    private static async void FireAndForget(Func<Task> action)
+    private async Task WriterLoopAsync()
+    {
+        await RunBackgroundOperationAsync(CleanupOldRecordsAsync).ConfigureAwait(false);
+
+        try
+        {
+            while (true)
+            {
+                await _flushSignal.WaitAsync(_writerCancellation.Token).ConfigureAwait(false);
+                await RunBackgroundOperationAsync(FlushAsync).ConfigureAwait(false);
+
+                // A coalesced signal may represent more than one batch.
+                if (_writeQueue.Count >= _batchSize)
+                    RequestFlush();
+
+                if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
+                {
+                    _lastCleanup = DateTime.UtcNow;
+                    await RunBackgroundOperationAsync(CleanupOldRecordsAsync).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_writerCancellation.IsCancellationRequested)
+        {
+            // Disposal owns cancellation and waits for this task before releasing resources.
+        }
+    }
+
+    private static async Task RunBackgroundOperationAsync(Func<Task> action)
     {
         try
         {
-            await action();
+            await action().ConfigureAwait(false);
         }
-        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException)
+        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException or ObjectDisposedException)
         {
             Trace.TraceWarning($"[UniverseQuery] Background operation failed: {ex.Message}");
         }
     }
 
+    private void RequestFlush()
+    {
+        if (Volatile.Read(ref _disposeState) != 0) return;
+
+        try
+        {
+            _flushSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // One pending signal is enough; the writer reschedules while full batches remain.
+        }
+    }
+
+    private bool TryEnterOperation()
+    {
+        lock (_lifecycleLock)
+        {
+            if (_disposeState != 0) return false;
+            _activeOperations++;
+            return true;
+        }
+    }
+
+    private void ExitOperation()
+    {
+        TaskCompletionSource<bool> drained = null;
+
+        lock (_lifecycleLock)
+        {
+            _activeOperations--;
+            if (_disposeState != 0 && _activeOperations == 0)
+                drained = _activeOperationsDrained;
+        }
+
+        drained?.TrySetResult(true);
+    }
+
     private async Task CleanupOldRecordsAsync() => await ClearOldAsync(TimeSpan.FromDays(_retentionDays));
+
+    private async Task FlushRemainingAsync()
+    {
+        while (!_writeQueue.IsEmpty)
+            await FlushAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Dispose the storage, flushing any pending writes
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
+        Task operationsDrained;
+        lock (_lifecycleLock)
+        {
+            if (_disposeState != 0) return;
 
-        // Stop timer callbacks before final flush
+            Volatile.Write(ref _disposeState, 1);
+            if (_activeOperations == 0)
+            {
+                operationsDrained = Task.CompletedTask;
+            }
+            else
+            {
+                _activeOperationsDrained = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                operationsDrained = _activeOperationsDrained.Task;
+            }
+        }
+
+        // Stop timer callbacks and wait for callbacks already queued by the runtime.
         _flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _flushTimer?.Dispose();
+        _flushTimer.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
-        // Final flush BEFORE setting _disposed (FlushAsync checks _disposed and would skip)
+        // Stop and join the sole background writer before releasing shared resources.
+        _writerCancellation.Cancel();
         try
         {
-            FlushAsync().Wait(TimeSpan.FromSeconds(10));
+            _writerTask.GetAwaiter().GetResult();
         }
-        catch (System.Exception ex) when (ex is SqliteException or IOException or TimeoutException or AggregateException)
+        catch (System.Exception ex)
+        {
+            Trace.TraceWarning($"[UniverseQuery] Background writer stopped with an error: {ex.Message}");
+        }
+
+        // Operations admitted before disposal must leave the shared connection and commands first.
+        operationsDrained.GetAwaiter().GetResult();
+
+        // Persist every remaining batch after producers and the writer are quiescent.
+        try
+        {
+            FlushRemainingAsync().GetAwaiter().GetResult();
+        }
+        catch (System.Exception ex)
         {
             Trace.TraceWarning($"[UniverseQuery] Final flush during dispose failed: {ex.Message}");
         }
-
-        _disposed = true;
 
         _insertCommand?.Dispose();
         _selectRecentCommand?.Dispose();
@@ -520,5 +637,7 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         _deleteOldCommand?.Dispose();
         _connection?.Dispose();
         _writeLock?.Dispose();
+        _flushSignal.Dispose();
+        _writerCancellation.Dispose();
     }
 }
