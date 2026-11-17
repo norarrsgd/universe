@@ -88,6 +88,33 @@ public sealed class BatchBuilderTests
         Assert.Throws<UniverseException>(() => limit.Set(entity => entity.DisplayName, "eleven"));
     }
 
+    [Fact]
+    public void BulkBuilder_RejectsOperationsBeyondHardLimit()
+    {
+        BulkBatch<BatchEntity> batch = CreateBulkBatch();
+        for (int index = 0; index < BulkExecutionOptions.MaximumOperations; index++)
+            batch.Delete($"item-{index}", ["tenant"]);
+
+        UniverseException exception = Assert.Throws<UniverseException>(() => batch.Delete("overflow", ["tenant"]));
+
+        Assert.Contains(BulkExecutionOptions.MaximumOperations.ToString(), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BulkBuilder_RejectsPartitionsBeyondHardLimit()
+    {
+        BulkBatch<BatchEntity> batch = CreateBulkBatch();
+        for (int index = 0; index < BulkExecutionOptions.MaximumPartitions; index++)
+            batch.Delete($"item-{index}", [$"tenant-{index}"]);
+
+        UniverseException exception = Assert.Throws<UniverseException>(() => batch.Delete("overflow", ["overflow-partition"]));
+
+        Assert.Contains(BulkExecutionOptions.MaximumPartitions.ToString(), exception.Message, StringComparison.Ordinal);
+    }
+
+    private static BulkBatch<BatchEntity> CreateBulkBatch()
+        => new(null, (_, _, _) => throw new InvalidOperationException("Execution is not expected in builder tests."));
+
     private sealed record BatchEntity : CosmicEntity
     {
         [PartitionKey]

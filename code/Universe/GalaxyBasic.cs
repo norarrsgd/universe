@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using Universe.Builder;
 using Universe.Builder.Caching;
@@ -81,12 +82,12 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             if (!_allowBulk)
                 throw new UniverseException("Bulk create of documents is not configured properly.");
 
+            if (models.Count > 100)
+                throw new UniverseException("Bulk create can only handle up to 100 items at a time.");
+
             string payload = JsonSerializer.Serialize(models);
             if (Encoding.UTF8.GetByteCount(payload) > 2 * 1024 * 1024)
                 throw new UniverseException("Payload size exceeds the maximum allowed size of 2MB.");
-
-            if (models.Count > 100)
-                throw new UniverseException("Bulk create can only handle up to 100 items at a time.");
 
             List<BatchOperation<T>> operations = models
                 .Select((model, index) => BatchOperation<T>.Create(index, model, [.. model.PartitionKeys()]))
@@ -157,12 +158,12 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             if (!_allowBulk)
                 throw new UniverseException("Bulk modify of documents is not configured properly.");
 
+            if (models.Count > 100)
+                throw new UniverseException("Bulk modify can only handle up to 100 items at a time.");
+
             string payload = JsonSerializer.Serialize(models);
             if (Encoding.UTF8.GetByteCount(payload) > 2 * 1024 * 1024)
                 throw new UniverseException("Payload size exceeds the maximum allowed size of 2MB.");
-
-            if (models.Count > 100)
-                throw new UniverseException("Bulk modify can only handle up to 100 items at a time.");
 
             List<BatchOperation<T>> operations = models
                 .Select((model, index) => BatchOperation<T>.Replace(index, model, [.. model.PartitionKeys()], null))
@@ -326,8 +327,27 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         if (operations is null || operations.Count == 0)
             throw new UniverseException("A batch must contain at least one operation.");
-        if (options.MaxConcurrency < 1)
-            throw new UniverseException("Bulk batch concurrency must be at least one.");
+        ValidateBulkOptions(options);
+        if (operations.Count > options.MaxOperations)
+            throw new UniverseException($"Bulk batches can only contain up to {options.MaxOperations} operations for this execution.");
+
+        List<List<BatchOperation<T>>> partitionPipelines = [];
+        Dictionary<string, int> partitionIndexes = new(StringComparer.Ordinal);
+        foreach (BatchOperation<T> operation in operations)
+        {
+            string partitionGroup = PartitionKeyGroup(operation.PartitionKeys);
+            if (!partitionIndexes.TryGetValue(partitionGroup, out int partitionIndex))
+            {
+                if (partitionPipelines.Count >= options.MaxPartitions)
+                    throw new UniverseException($"Bulk batches can only contain up to {options.MaxPartitions} logical partitions for this execution.");
+
+                partitionIndex = partitionPipelines.Count;
+                partitionIndexes.Add(partitionGroup, partitionIndex);
+                partitionPipelines.Add([]);
+            }
+
+            partitionPipelines[partitionIndex].Add(operation);
+        }
 
         foreach (BatchOperation<T> operation in operations)
         {
@@ -337,34 +357,52 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         }
 
         ConcurrentBag<BatchChunkResult<T>> completed = [];
+        ConcurrentQueue<SystemException> failures = [];
         int anySuccessfulCommit = 0;
-        using SemaphoreSlim concurrency = new(options.MaxConcurrency, options.MaxConcurrency);
-        try
+        int nextPartition = -1;
+
+        async Task ProcessPartitionsAsync()
         {
-            await Task.WhenAll(operations
-                .GroupBy(operation => PartitionKeyGroup(operation.PartitionKeys))
-                .Select(async group =>
+            while (true)
+            {
+                int partitionIndex = Interlocked.Increment(ref nextPartition);
+                if (partitionIndex >= partitionPipelines.Count)
+                    return;
+
+                try
                 {
-                    await concurrency.WaitAsync(cancellationToken);
-                    try
+                    foreach (IReadOnlyList<BatchOperation<T>> chunk in Chunk(partitionPipelines[partitionIndex].OrderBy(operation => operation.Index)))
                     {
-                        foreach (IReadOnlyList<BatchOperation<T>> chunk in Chunk(group.OrderBy(operation => operation.Index)))
+                        cancellationToken.ThrowIfCancellationRequested();
+                        BatchChunkResult<T> result = await ExecuteCacheAwareChunkAsync(chunk, cancellationToken);
+                        completed.Add(result);
+                        if (result.Succeeded)
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            BatchChunkResult<T> result = await ExecuteCacheAwareChunkAsync(chunk, cancellationToken);
-                            completed.Add(result);
-                            if (result.Succeeded)
-                            {
-                                ApplySuccessfulCommit(chunk, result.Operations, clearQueryCache: false);
-                                Interlocked.Exchange(ref anySuccessfulCommit, 1);
-                            }
+                            ApplySuccessfulCommit(chunk, result.Operations, clearQueryCache: false);
+                            Interlocked.Exchange(ref anySuccessfulCommit, 1);
                         }
                     }
-                    finally
-                    {
-                        concurrency.Release();
-                    }
-                }));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (SystemException ex)
+                {
+                    failures.Enqueue(ex);
+                }
+            }
+        }
+
+        try
+        {
+            Task[] workers = Enumerable.Range(0, Math.Min(options.MaxConcurrency, partitionPipelines.Count))
+                .Select(_ => ProcessPartitionsAsync())
+                .ToArray();
+            await Task.WhenAll(workers);
+
+            if (failures.TryDequeue(out SystemException failure))
+                ExceptionDispatchInfo.Capture(failure).Throw();
         }
         finally
         {
@@ -384,6 +422,18 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             ? HttpStatusCode.OK
             : orderedResults.FirstOrDefault(result => !result.Succeeded)?.StatusCode ?? HttpStatusCode.InternalServerError;
         return new(new(totalRu, null), succeeded, statusCode, succeededCount > 0 && failedCount > 0, succeededCount, failedCount, orderedResults);
+    }
+
+    private static void ValidateBulkOptions(BulkExecutionOptions options)
+    {
+        if (options is null)
+            throw new UniverseException("Bulk execution options are required.");
+        if (options.MaxOperations < 1 || options.MaxOperations > BulkExecutionOptions.MaximumOperations)
+            throw new UniverseException($"Bulk batch operations must be between 1 and {BulkExecutionOptions.MaximumOperations}.");
+        if (options.MaxPartitions < 1 || options.MaxPartitions > BulkExecutionOptions.MaximumPartitions)
+            throw new UniverseException($"Bulk batch partitions must be between 1 and {BulkExecutionOptions.MaximumPartitions}.");
+        if (options.MaxConcurrency < 1 || options.MaxConcurrency > BulkExecutionOptions.MaximumConcurrency)
+            throw new UniverseException($"Bulk batch concurrency must be between 1 and {BulkExecutionOptions.MaximumConcurrency}.");
     }
 
     private static void ValidateAtomicOperations(IReadOnlyList<BatchOperation<T>> operations)
