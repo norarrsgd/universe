@@ -211,6 +211,8 @@ Gravity gravity = await galaxy.Modify(models);
 
 `Atomic(...)` executes mixed create, replace, patch, and delete operations as one ACID transaction in a single logical partition. `Bulk()` applies the same operations across partitions; each partition chunk is transactional, but the overall execution can partially succeed. Neither new API requires `AllowBulkExecution`.
 
+One `Bulk()` builder accepts at most 1,000 operations across 100 logical partitions, and execution uses at most 16 fixed workers with four workers by default. `BulkExecutionOptions.MaxOperations` and `MaxPartitions` can impose lower per-execution limits. These library ceilings do not replace HTTP request or deserialization limits: applications must reject oversized requests and collections before constructing models or adding operations to a batch.
+
 ```csharp
 // Point reads now include an ETag. Replacements, patches, and deletes can require it.
 (Gravity read, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
@@ -233,7 +235,7 @@ AtomicBatchResult<MyModel> patch = await galaxy
         condition => condition.Equal(item => item.Status, "active"))
     .ExecuteAsync();
 
-// Cross-partition work remains ordered per partition and uses four partition pipelines by default.
+// Cross-partition work remains ordered per partition and uses four fixed workers by default.
 BulkExecutionResult<MyModel> bulk = await galaxy
     .Bulk()
     .Create(new MyModel { /* partition-key properties and document fields */ })

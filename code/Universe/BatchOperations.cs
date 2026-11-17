@@ -41,6 +41,21 @@ public sealed record AtomicBatchResult<T>(
 /// <summary>Configures cross-partition bulk execution.</summary>
 public sealed record BulkExecutionOptions
 {
+    /// <summary>Gets the hard maximum number of operations retained by one bulk batch.</summary>
+    public const int MaximumOperations = 1000;
+
+    /// <summary>Gets the hard maximum number of logical partitions retained by one bulk batch.</summary>
+    public const int MaximumPartitions = 100;
+
+    /// <summary>Gets the hard maximum number of logical partition pipelines executing at once.</summary>
+    public const int MaximumConcurrency = 16;
+
+    /// <summary>Gets or sets the maximum number of operations accepted by this execution.</summary>
+    public int MaxOperations { get; init; } = MaximumOperations;
+
+    /// <summary>Gets or sets the maximum number of logical partitions accepted by this execution.</summary>
+    public int MaxPartitions { get; init; } = MaximumPartitions;
+
     /// <summary>Gets or sets the maximum number of logical partition pipelines executing at once.</summary>
     public int MaxConcurrency { get; init; } = 4;
 }

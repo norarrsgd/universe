@@ -61,6 +61,21 @@
         <member name="T:Universe.BulkExecutionOptions">
             <summary>Configures cross-partition bulk execution.</summary>
         </member>
+        <member name="F:Universe.BulkExecutionOptions.MaximumOperations">
+            <summary>Gets the hard maximum number of operations retained by one bulk batch.</summary>
+        </member>
+        <member name="F:Universe.BulkExecutionOptions.MaximumPartitions">
+            <summary>Gets the hard maximum number of logical partitions retained by one bulk batch.</summary>
+        </member>
+        <member name="F:Universe.BulkExecutionOptions.MaximumConcurrency">
+            <summary>Gets the hard maximum number of logical partition pipelines executing at once.</summary>
+        </member>
+        <member name="P:Universe.BulkExecutionOptions.MaxOperations">
+            <summary>Gets or sets the maximum number of operations accepted by this execution.</summary>
+        </member>
+        <member name="P:Universe.BulkExecutionOptions.MaxPartitions">
+            <summary>Gets or sets the maximum number of logical partitions accepted by this execution.</summary>
+        </member>
         <member name="P:Universe.BulkExecutionOptions.MaxConcurrency">
             <summary>Gets or sets the maximum number of logical partition pipelines executing at once.</summary>
         </member>
