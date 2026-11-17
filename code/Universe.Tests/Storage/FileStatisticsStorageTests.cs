@@ -81,6 +81,9 @@ public sealed class FileStatisticsStorageTests : IDisposable
             await _storage.SaveAsync(TestStatisticsFactory.Create(
                 queryHash: $"trunc-{i}",
                 timestamp: DateTime.UtcNow.AddSeconds(-i)));
+
+            if ((i + 1) % 100 == 0)
+                await _storage.LoadRecentAsync(1);
         }
 
         IList<QueryExecutionStatistics> loaded = await _storage.LoadRecentAsync(2000);
@@ -165,11 +168,12 @@ public sealed class FileStatisticsStorageTests : IDisposable
 
             _output.WriteLine($"FileStorage SaveAsync x{scale}: {sw.Elapsed.TotalMilliseconds:F2}ms ({sw.Elapsed.TotalMilliseconds / scale:F2}ms/call)");
 
+            storage.Dispose();
+
             try { File.Delete(filePath); }
             catch { /* best effort */ }
         }
 
-        // This test documents O(n) per-call growth (total is O(n^2))
-        // since each SaveAsync loads all existing records, appends, and writes back
+        // SaveAsync measures bounded, non-blocking admission; disposal drains batched rewrites.
     }
 }

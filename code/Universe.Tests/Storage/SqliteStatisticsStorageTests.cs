@@ -163,6 +163,34 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         await _storage.ClearOldAsync(TimeSpan.FromDays(1));
     }
 
+    [Fact]
+    public async Task Persistence_TrimsToHardRowLimit()
+    {
+        string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-bounded-{Guid.NewGuid()}.db");
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 100, flushIntervalSeconds: 300);
+        DateTime timestamp = DateTime.UtcNow;
+        int total = SqliteStatisticsStorage.MaxStoredRecords + 25;
+
+        for (int i = 0; i < total; i++)
+        {
+            await storage.SaveAsync(TestStatisticsFactory.Create(
+                queryHash: $"bounded-{i}",
+                timestamp: timestamp.AddSeconds(i)));
+
+            if ((i + 1) % 100 == 0)
+                await storage.LoadRecentAsync(1);
+        }
+
+        IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(total);
+
+        Assert.Equal(SqliteStatisticsStorage.MaxStoredRecords, loaded.Count);
+        Assert.Equal($"bounded-{total - 1}", loaded[0].QueryHash);
+        Assert.DoesNotContain(loaded, stat => stat.QueryHash == "bounded-0");
+
+        storage.Dispose();
+        TryDeleteFiles(dbPath);
+    }
+
     #endregion
 
     #region Batching
@@ -170,17 +198,13 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Read_DrainsAllPendingBatchesWithoutBackgroundWriter(bool byHash)
+    public async Task Read_DrainsAllPendingBatchesThroughWriter(bool byHash)
     {
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-read-drain-{Guid.NewGuid()}.db");
         using SqliteStatisticsStorage storage = new(dbPath, batchSize: 2, flushIntervalSeconds: 300);
 
         try
         {
-            // Hold background maintenance idle so the read must flush the entire backlog itself.
-            GetPrivateField<CancellationTokenSource>(storage, "_writerCancellation").Cancel();
-            await GetPrivateField<Task>(storage, "_writerTask").WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
             for (int i = 0; i < 10; i++)
                 await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "read-drain"));
 
@@ -267,7 +291,6 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-active-dispose-{Guid.NewGuid()}.db");
         SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 1, flushIntervalSeconds: 300);
         SemaphoreSlim writeLock = GetPrivateField<SemaphoreSlim>(storage, "_writeLock");
-        SemaphoreSlim flushSignal = GetPrivateField<SemaphoreSlim>(storage, "_flushSignal");
         bool lockHeld = false;
 
         try
@@ -276,10 +299,9 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
             lockHeld = true;
 
             await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "active-dispose"));
-            await WaitUntilAsync(() => flushSignal.CurrentCount == 0);
 
             Task disposeTask = Task.Run(storage.Dispose, TestContext.Current.CancellationToken);
-            await WaitUntilAsync(() => GetPrivateField<int>(storage, "_disposeState") == 1);
+            await WaitUntilAsync(() => GetPrivateField<int>(storage, "_disposed") == 1);
 
             Assert.False(disposeTask.IsCompleted);
 
@@ -297,6 +319,41 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
             if (lockHeld)
                 writeLock.Release();
 
+            storage.Dispose();
+            TryDeleteFiles(dbPath);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Dispose_WaitsForAdmittedRead(bool byHash)
+    {
+        string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-read-dispose-{Guid.NewGuid()}.db");
+        SqliteStatisticsStorage storage = new(dbPath, batchSize: 1, flushIntervalSeconds: 300);
+        SemaphoreSlim writeLock = GetPrivateField<SemaphoreSlim>(storage, "_writeLock");
+        bool lockHeld = false;
+        try
+        {
+            await writeLock.WaitAsync(TestContext.Current.CancellationToken);
+            lockHeld = true;
+            await storage.SaveAsync(TestStatisticsFactory.Create(queryHash: "read-dispose"));
+            Task<IList<QueryExecutionStatistics>> readTask = byHash
+                ? storage.GetByQueryHashAsync("read-dispose", TimeSpan.FromHours(1))
+                : storage.LoadRecentAsync(10);
+            Task disposeTask = Task.Run(storage.Dispose, TestContext.Current.CancellationToken);
+            await WaitUntilAsync(() => GetPrivateField<int>(storage, "_disposed") == 1);
+            Assert.False(disposeTask.IsCompleted);
+            writeLock.Release();
+            lockHeld = false;
+            IList<QueryExecutionStatistics> loaded = await readTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Single(loaded);
+            await disposeTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            if (lockHeld)
+                writeLock.Release();
             storage.Dispose();
             TryDeleteFiles(dbPath);
         }

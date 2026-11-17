@@ -43,6 +43,7 @@ public sealed class QueryExecutionTests
         Assert.Equal(1, Assert.Single(gravity.Query.Parameters).Item2);
         Assert.Equal(1, container.LastQueryOptions.MaxItemCount);
         Assert.Equal(1, container.LastQueryOptions.MaxBufferedItemCount);
+        tuner.Dispose(); // Drain background persistence before inspecting saved statistics.
         QueryExecutionStatistics stats = Assert.Single(storage.Saved);
         Assert.Equal(strategyName, stats.StrategyUsed);
         Assert.Equal(1, stats.ResultCount);
@@ -84,6 +85,7 @@ public sealed class QueryExecutionTests
 
         Assert.Equal(2, container.QueryPageReads);
         Assert.True(container.QueryIteratorDisposed);
+        tuner.Dispose(); // Drain background persistence before inspecting saved statistics.
         QueryExecutionStatistics stats = Assert.Single(storage.Saved);
         Assert.False(stats.Success);
         Assert.Equal(7.25, stats.RU);

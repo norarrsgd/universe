@@ -831,11 +831,12 @@ Data-driven recommendations:
 
 Storage behavior:
 
+- `QueryTuner` persists through a bounded background queue; disposal waits up to 10 seconds for accepted writes. Tests inspecting persisted statistics must wait for that drain before asserting.
 - `FileStatisticsStorage` writes at most the 1000 most recent entries.
 - `FileStatisticsStorage` logs and returns empty data if the JSON file is corrupt.
 - `SqliteStatisticsStorage` queues writes, flushes on batch size or timer, and retries failed flushes up to 3 times.
 - SQLite reads drain all pending batches; batches are dequeued under the connection lock so reads cannot overtake an in-flight flush.
-- `SqliteStatisticsStorage.Dispose()` stops the timer and tracked writer, waits for admitted operations, then drains remaining batches before closing commands and connection.
+- `SqliteStatisticsStorage.Dispose()` stops and joins timer callbacks, drains admitted operations while their ordered flush barriers can still use the bounded writer, then completes and joins the writer before closing commands and connection.
 - `PlatformDetection.IsAzureEnvironment()` checks `WEBSITE_INSTANCE_ID` and Functions environment variables.
 - `ValidateStoragePath` normalizes with `Path.GetFullPath`, rejects null bytes, and requires a rooted result.
 
