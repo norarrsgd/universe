@@ -1,13 +1,19 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace Universe.Builder.Strategies.Storage;
 
 /// <summary>
-/// File-based storage (JSON persistence)
+/// File-based storage with bounded, batched JSON persistence
 /// </summary>
 public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 {
+    private sealed record WriteRequest(
+        QueryExecutionStatistics Statistics,
+        TaskCompletionSource<bool> Completion = null,
+        bool IsPeriodicFlush = false);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -16,6 +22,19 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
 
     private readonly string _filePath;
     private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly Channel<WriteRequest> _writeQueue;
+    private readonly Task _writerTask;
+    private readonly Timer _flushTimer;
+    private int _disposed;
+    private int _periodicFlushQueued;
+    private long _droppedWriteCount;
+    private const int MaxStoredExecutions = 1000;
+    private const int WriteQueueCapacity = 1000;
+    private const int WriteBatchSize = 100;
+    private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(1);
+
+    internal int PendingWriteCount => _writeQueue.Reader.Count;
+    internal long DroppedWriteCount => Interlocked.Read(ref _droppedWriteCount);
 
     /// <summary>
     /// Create a new file-based statistics storage
@@ -35,6 +54,15 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
             Directory.CreateDirectory(directory);
             PlatformDetection.SetRestrictivePermissions(directory);
         }
+
+        _writeQueue = Channel.CreateBounded<WriteRequest>(new BoundedChannelOptions(WriteQueueCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
+        _writerTask = ProcessWritesAsync();
+        _flushTimer = new Timer(RequestPeriodicFlush, null, FlushInterval, FlushInterval);
     }
 
     /// <summary>
@@ -57,42 +85,18 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
     }
 
     /// <summary>
-    /// Save a query execution statistic
+    /// Queue a query execution statistic for best-effort persistence.
+    /// Records are dropped when the bounded telemetry queue is full.
     /// </summary>
-    public async Task SaveAsync(QueryExecutionStatistics stats)
+    public Task SaveAsync(QueryExecutionStatistics stats)
     {
-        await _lock.WaitAsync();
-        try
-        {
-            List<QueryExecutionStatistics> existing = await LoadAllAsync();
-            existing.Add(stats);
+        if (Volatile.Read(ref _disposed) != 0)
+            return Task.CompletedTask;
 
-            // Keep only last 1000 entries
-            List<QueryExecutionStatistics> toSave = [.. existing
-                .OrderByDescending(s => s.Timestamp)
-                .Take(1000)];
+        if (!_writeQueue.Writer.TryWrite(new WriteRequest(stats)))
+            Interlocked.Increment(ref _droppedWriteCount);
 
-            string json = JsonSerializer.Serialize(toSave, JsonOptions);
-
-            await File.WriteAllTextAsync(_filePath, json);
-            PlatformDetection.SetRestrictivePermissions(_filePath);
-        }
-        catch (JsonException ex)
-        {
-            Trace.TraceWarning($"[UniverseQuery] File statistics serialization failed: {ex.Message}");
-        }
-        catch (IOException ex)
-        {
-            Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            Trace.TraceWarning($"[UniverseQuery] File statistics save failed (access denied): {ex.Message}");
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -100,6 +104,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
     /// </summary>
     public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
     {
+        await FlushPendingAsync();
         await _lock.WaitAsync();
         try
         {
@@ -117,6 +122,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
     /// </summary>
     public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
     {
+        await FlushPendingAsync();
         await _lock.WaitAsync();
         try
         {
@@ -135,6 +141,7 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
     /// </summary>
     public async Task ClearOldAsync(TimeSpan olderThan)
     {
+        await FlushPendingAsync();
         await _lock.WaitAsync();
         try
         {
@@ -173,6 +180,114 @@ public sealed class FileStatisticsStorage : IQueryStatisticsStorage, IDisposable
         }
     }
 
+    private async Task ProcessWritesAsync()
+    {
+        List<QueryExecutionStatistics> batch = new(WriteBatchSize);
+
+        await foreach (WriteRequest request in _writeQueue.Reader.ReadAllAsync())
+        {
+            if (request.Statistics is not null)
+                batch.Add(request.Statistics);
+
+            if (batch.Count >= WriteBatchSize || request.Statistics is null)
+            {
+                await PersistBatchAsync(batch);
+                batch.Clear();
+            }
+
+            request.Completion?.TrySetResult(true);
+            if (request.IsPeriodicFlush)
+                Interlocked.Exchange(ref _periodicFlushQueued, 0);
+        }
+
+        await PersistBatchAsync(batch);
+    }
+
+    private async Task PersistBatchAsync(List<QueryExecutionStatistics> batch)
+    {
+        if (batch.Count == 0)
+            return;
+
+        await _lock.WaitAsync();
+        try
+        {
+            List<QueryExecutionStatistics> existing = await LoadAllAsync();
+            existing.AddRange(batch);
+
+            List<QueryExecutionStatistics> toSave = [.. existing
+                .OrderByDescending(s => s.Timestamp)
+                .Take(MaxStoredExecutions)];
+
+            string json = JsonSerializer.Serialize(toSave, JsonOptions);
+            await File.WriteAllTextAsync(_filePath, json);
+            PlatformDetection.SetRestrictivePermissions(_filePath);
+        }
+        catch (JsonException ex)
+        {
+            Trace.TraceWarning($"[UniverseQuery] File statistics serialization failed: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            Trace.TraceWarning($"[UniverseQuery] File statistics save failed: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Trace.TraceWarning($"[UniverseQuery] File statistics save failed (access denied): {ex.Message}");
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    private async Task FlushPendingAsync()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
+        TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            await _writeQueue.Writer.WriteAsync(new WriteRequest(null, completion));
+            await completion.Task;
+        }
+        catch (ChannelClosedException)
+        {
+            // Disposal drains every accepted write before closing the channel.
+        }
+    }
+
+    private void RequestPeriodicFlush(object state)
+    {
+        if (Volatile.Read(ref _disposed) != 0 || Interlocked.Exchange(ref _periodicFlushQueued, 1) != 0)
+            return;
+
+        if (!_writeQueue.Writer.TryWrite(new WriteRequest(null, IsPeriodicFlush: true)))
+            Interlocked.Exchange(ref _periodicFlushQueued, 0);
+    }
+
     /// <inheritdoc/>
-    public void Dispose() => _lock.Dispose();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        _flushTimer.Dispose();
+        _writeQueue.Writer.TryComplete();
+
+        bool writerStopped = false;
+        try
+        {
+            writerStopped = _writerTask.Wait(TimeSpan.FromSeconds(10));
+            if (!writerStopped)
+                Trace.TraceWarning("[UniverseQuery] Timed out draining file statistics during disposal.");
+        }
+        catch (AggregateException ex)
+        {
+            Trace.TraceWarning($"[UniverseQuery] Failed to drain file statistics during disposal: {ex.Message}");
+        }
+
+        if (writerStopped)
+            _lock.Dispose();
+    }
 }

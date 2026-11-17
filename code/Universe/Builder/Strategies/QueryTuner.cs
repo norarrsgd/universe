@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Threading.Channels;
 using Universe.Builder.Strategies.Storage;
 
 namespace Universe.Builder.Strategies;
@@ -12,9 +13,18 @@ internal sealed partial class QueryTuner : IDisposable
 {
     private readonly ConcurrentDictionary<QueryType, ConcurrentQueue<QueryExecutionStatistics>> _partitions;
     private readonly IQueryStatisticsStorage _storage;
+    private readonly Channel<QueryExecutionStatistics> _persistenceQueue;
+    private readonly Task _persistenceTask;
+    private readonly Task _loadTask;
     private int _totalCount;
+    private int _disposed;
+    private long _droppedPersistenceCount;
     private const int MaxStoredExecutions = 1000;
     private const int MinSampleSizeForRecommendations = 10;
+    internal const int PersistenceQueueCapacity = 1000;
+
+    internal int PendingPersistenceCount => _persistenceQueue.Reader.Count;
+    internal long DroppedPersistenceCount => Interlocked.Read(ref _droppedPersistenceCount);
 
     public QueryTuner(IQueryStatisticsStorage storage = null)
     {
@@ -23,8 +33,16 @@ internal sealed partial class QueryTuner : IDisposable
             _partitions[type] = new ConcurrentQueue<QueryExecutionStatistics>();
         _storage = storage ?? new InMemoryStatisticsStorage();
 
+        _persistenceQueue = Channel.CreateBounded<QueryExecutionStatistics>(new BoundedChannelOptions(PersistenceQueueCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
+        _persistenceTask = ProcessPersistenceAsync();
+
         // Load persisted statistics on startup (async, don't block constructor)
-        _ = Task.Run(LoadPersistedStatisticsAsync);
+        _loadTask = Task.Run(LoadPersistedStatisticsAsync);
     }
 
     /// <summary>
@@ -51,7 +69,8 @@ internal sealed partial class QueryTuner : IDisposable
             }
         }
 
-        _ = PersistAsync(stats);
+        if (!_persistenceQueue.Writer.TryWrite(stats))
+            Interlocked.Increment(ref _droppedPersistenceCount);
     }
 
     private int CountActual()
@@ -92,6 +111,12 @@ internal sealed partial class QueryTuner : IDisposable
         {
             Trace.TraceWarning($"[UniverseQuery] Failed to persist query statistics: {ex.Message}");
         }
+    }
+
+    private async Task ProcessPersistenceAsync()
+    {
+        await foreach (QueryExecutionStatistics stats in _persistenceQueue.Reader.ReadAllAsync())
+            await PersistAsync(stats);
     }
 
     /// <summary>
@@ -278,6 +303,21 @@ internal sealed partial class QueryTuner : IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        _persistenceQueue.Writer.TryComplete();
+
+        try
+        {
+            if (!Task.WhenAll(_persistenceTask, _loadTask).Wait(TimeSpan.FromSeconds(10)))
+                Trace.TraceWarning("[UniverseQuery] Timed out draining query statistics during disposal.");
+        }
+        catch (System.Exception ex) when (ex is AggregateException or IOException or InvalidOperationException)
+        {
+            Trace.TraceWarning($"[UniverseQuery] Failed to drain query statistics during disposal: {ex.Message}");
+        }
+
         if (_storage is IDisposable disposable)
             disposable.Dispose();
     }

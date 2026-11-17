@@ -271,7 +271,9 @@ The system automatically tracks detailed execution statistics for every query:
 **Statistics Retention**:
 - In-memory: Last 1000 executions
 - Time window: Last 24 hours for recommendations
-- File storage: Persisted across restarts (optional)
+- File storage: Last 1000 completed records, persisted across restarts (optional)
+- SQLite storage: Last 1000 completed rows plus fixed database and WAL growth ceilings
+- Persistence queues: Bounded best-effort telemetry; excess records are dropped during sustained overload
 
 **Privacy**: Only query structure is hashed, never raw query text or parameter values.
 

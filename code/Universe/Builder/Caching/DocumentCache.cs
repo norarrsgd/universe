@@ -15,6 +15,10 @@ internal enum DocumentCacheOperation
 
 internal sealed class DocumentCache(DocumentCacheOptions options)
 {
+    internal const int MaxQueryParameterSignatureBytes = 64 * 1024;
+    private const string ParameterTypeDomain = "parameter-type";
+    private const string ParameterValueDomain = "parameter-value";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -45,7 +49,14 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         => _clientNamespaces.GetValue(client, static _ => Guid.NewGuid().ToString("N"));
 
     internal string CreateScopeHash(string clientNamespace, string database, string container, Type sourceType)
-        => HashParts(["scope", clientNamespace, database, container, sourceType.AssemblyQualifiedName]);
+    {
+        using IncrementalHash hasher = CreateKeyHasher("scope");
+        AppendStringComponent(hasher, "client", clientNamespace);
+        AppendStringComponent(hasher, "database", database);
+        AppendStringComponent(hasher, "container", container);
+        AppendStringComponent(hasher, "source-type", sourceType.AssemblyQualifiedName);
+        return FinishHash(hasher);
+    }
 
     internal DocumentCacheKey CreatePointKey(
         string clientNamespace,
@@ -55,16 +66,18 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         Type resultType,
         string id,
         IReadOnlyList<string> partitionKeys)
-        => new(HashParts([
-            "point",
-            clientNamespace,
-            database,
-            container,
-            sourceType.AssemblyQualifiedName,
-            resultType.AssemblyQualifiedName,
-            id,
-            .. partitionKeys
-        ]));
+    {
+        using IncrementalHash hasher = CreateKeyHasher("point");
+        AppendStringComponent(hasher, "client", clientNamespace);
+        AppendStringComponent(hasher, "database", database);
+        AppendStringComponent(hasher, "container", container);
+        AppendStringComponent(hasher, "source-type", sourceType.AssemblyQualifiedName);
+        AppendStringComponent(hasher, "result-type", resultType.AssemblyQualifiedName);
+        AppendStringComponent(hasher, "id", id);
+        foreach (string partitionKey in partitionKeys)
+            AppendStringComponent(hasher, "partition-key", partitionKey);
+        return new(FinishHash(hasher));
+    }
 
     internal DocumentCacheKey CreateQueryKey(
         string clientNamespace,
@@ -76,27 +89,30 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         IReadOnlyList<(string Name, object Value)> parameters)
     {
         (string normalizedQuery, IReadOnlyList<string> parameterNames) = QueryParameterNormalizer.Normalize(queryText);
-        List<string> parts =
-        [
-            "query",
-            clientNamespace,
-            database,
-            container,
-            sourceType.AssemblyQualifiedName,
-            resultType.AssemblyQualifiedName,
-            normalizedQuery
-        ];
-
         Dictionary<string, object> bindings = parameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Value, StringComparer.Ordinal);
+        long signatureBytes = 0;
         foreach (string name in parameterNames)
         {
             if (!bindings.TryGetValue(name, out object value))
                 throw new InvalidOperationException("Cannot cache a query with an unresolved parameter binding.");
-            parts.Add(value?.GetType().AssemblyQualifiedName);
-            parts.Add(SerializeForKey(value));
+
+            long parameterBytes = GetParameterSignatureByteCount(value);
+            if (parameterBytes > MaxQueryParameterSignatureBytes - signatureBytes)
+                throw new NotSupportedException($"Query parameter signatures larger than {MaxQueryParameterSignatureBytes} bytes are not cached.");
+            signatureBytes += parameterBytes;
         }
 
-        return new(HashParts(parts));
+        using IncrementalHash hasher = CreateKeyHasher("query");
+        AppendStringComponent(hasher, "client", clientNamespace);
+        AppendStringComponent(hasher, "database", database);
+        AppendStringComponent(hasher, "container", container);
+        AppendStringComponent(hasher, "source-type", sourceType.AssemblyQualifiedName);
+        AppendStringComponent(hasher, "result-type", resultType.AssemblyQualifiedName);
+        AppendStringComponent(hasher, "query-text", normalizedQuery);
+        foreach (string name in parameterNames)
+            AppendParameter(hasher, bindings[name]);
+
+        return new(FinishHash(hasher));
     }
 
     internal bool TryGet<T>(DocumentCacheKey key, out T value)
@@ -123,7 +139,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
 
         try
         {
-            value = CloneIfNeeded<T>(entry.Value);
+            value = CloneIfNeeded<T>(entry.Value, entry.Serializer);
             eTag = entry.ETag;
             return true;
         }
@@ -139,16 +155,24 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         }
     }
 
-    internal void Set(DocumentCacheKey key, DocumentCacheOperation operation, string scopeHash, object value, string eTag = null, long? expectedGeneration = null)
+    internal void Set<T>(
+        DocumentCacheKey key,
+        DocumentCacheOperation operation,
+        string scopeHash,
+        T value,
+        string eTag = null,
+        long? expectedGeneration = null,
+        CosmosSerializer serializer = null,
+        bool normalize = false)
     {
         object valueToStore;
         int serializedBytes;
         try
         {
-            byte[] json = JsonSerializer.SerializeToUtf8Bytes(value, value?.GetType() ?? typeof(object), JsonOptions);
+            byte[] json = Serialize(value, serializer);
             serializedBytes = json.Length;
-            valueToStore = options.CloneDocuments && value is not null && serializedBytes <= options.MaxEntryBytes && serializedBytes <= options.MaxTotalBytes
-                ? JsonSerializer.Deserialize(json, value.GetType(), JsonOptions)
+            valueToStore = (options.CloneDocuments || normalize) && value is not null && serializedBytes <= options.MaxEntryBytes && serializedBytes <= options.MaxTotalBytes
+                ? Deserialize(json, value, serializer)
                 : value;
         }
         catch (SystemException)
@@ -172,7 +196,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
                 return;
             }
 
-            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag, serializedBytes);
+            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag, serializedBytes, serializer);
             if (node is not null)
             {
                 _serializedBytes -= node.Value.SerializedBytes;
@@ -222,36 +246,172 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         _insertionOrder.Remove(node);
     }
 
-    private T CloneIfNeeded<T>(object value)
+    private T CloneIfNeeded<T>(object value, CosmosSerializer serializer)
     {
         if (!options.CloneDocuments || value is null)
             return (T)value;
+
+        if (serializer is not null)
+        {
+            byte[] payload = Serialize((T)value, serializer);
+            return Deserialize<T>(payload, serializer);
+        }
 
         Type valueType = value.GetType();
         string json = JsonSerializer.Serialize(value, valueType, JsonOptions);
         return (T)JsonSerializer.Deserialize(json, valueType, JsonOptions);
     }
 
-    private static string SerializeForKey(object value)
+    private static byte[] Serialize<T>(T value, CosmosSerializer serializer)
     {
-        if (value is null)
-            return "null";
+        if (serializer is null)
+            return JsonSerializer.SerializeToUtf8Bytes(value, value is null ? typeof(T) : value.GetType(), JsonOptions);
 
-        // Preserve exact UTF-16 code units; JSON serialization replaces unpaired surrogates.
-        if (value is string text)
-            return Convert.ToHexString(MemoryMarshal.AsBytes(text.AsSpan()));
-
-        // Object/collection serialization can differ from Cosmos parameter serialization; bypass caching rather than risk a collision.
-        if (value is not (bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal))
-            throw new NotSupportedException("Query caching supports only null, string, boolean, and built-in numeric parameter values.");
-
-        return JsonSerializer.Serialize(value, value.GetType(), JsonOptions);
+        using Stream payload = serializer.ToStream(value) ?? throw new InvalidOperationException("The Cosmos serializer returned no document stream.");
+        using MemoryStream copy = new();
+        payload.CopyTo(copy);
+        return copy.ToArray();
     }
 
-    private static string HashParts(IEnumerable<string> parts)
+    private static object Deserialize<T>(byte[] payload, T value, CosmosSerializer serializer)
     {
-        string payload = JsonSerializer.Serialize(parts, JsonOptions);
-        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
+        if (serializer is not null)
+            return Deserialize<T>(payload, serializer);
+
+        return JsonSerializer.Deserialize(payload, value.GetType(), JsonOptions);
+    }
+
+    private static T Deserialize<T>(byte[] payload, CosmosSerializer serializer)
+    {
+        using MemoryStream stream = new(payload, writable: false);
+        return serializer.FromStream<T>(stream);
+    }
+
+    private static long GetParameterSignatureByteCount(object value)
+    {
+        Type type = value?.GetType();
+        string typeName = type?.AssemblyQualifiedName ?? type?.FullName ?? type?.Name;
+        long valueBytes = value switch
+        {
+            null => 0,
+            string text => (long)text.Length * sizeof(char),
+            bool or byte or sbyte => sizeof(byte),
+            short or ushort => sizeof(short),
+            int or uint or float => sizeof(int),
+            long or ulong or double => sizeof(long),
+            decimal => sizeof(decimal),
+            _ => throw new NotSupportedException("Query caching supports only null, string, boolean, and built-in numeric parameter values.")
+        };
+
+        long typeNameBytes = (long)(typeName?.Length ?? 0) * sizeof(char);
+        return GetComponentByteCount(ParameterTypeDomain, typeNameBytes)
+            + GetComponentByteCount(ParameterValueDomain, valueBytes);
+    }
+
+    private static long GetComponentByteCount(string domain, long valueBytes)
+        => ((long)domain.Length * sizeof(char)) + valueBytes + (2 * sizeof(long));
+
+    private static IncrementalHash CreateKeyHasher(string operation)
+    {
+        IncrementalHash hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        AppendStringComponent(hasher, "operation", operation);
+        return hasher;
+    }
+
+    private static void AppendParameter(IncrementalHash hasher, object value)
+    {
+        Type type = value?.GetType();
+        AppendStringComponent(hasher, ParameterTypeDomain, type?.AssemblyQualifiedName ?? type?.FullName ?? type?.Name);
+
+        switch (value)
+        {
+            case null:
+                AppendStringComponent(hasher, ParameterValueDomain, null);
+                break;
+            case string text:
+                // Hash exact UTF-16 code units so unpaired surrogates remain distinct.
+                AppendStringComponent(hasher, ParameterValueDomain, text);
+                break;
+            case bool number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case byte number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case sbyte number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case short number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case ushort number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case int number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case uint number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case long number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case ulong number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case float number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case double number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            case decimal number:
+                AppendUnmanagedComponent(hasher, ParameterValueDomain, number);
+                break;
+            default:
+                throw new NotSupportedException("Query caching supports only null, string, boolean, and built-in numeric parameter values.");
+        }
+    }
+
+    private static void AppendStringComponent(IncrementalHash hasher, string domain, string value)
+    {
+        AppendUtf16(hasher, domain);
+        AppendUtf16(hasher, value);
+    }
+
+    private static void AppendUnmanagedComponent<T>(IncrementalHash hasher, string domain, T value) where T : unmanaged
+    {
+        AppendUtf16(hasher, domain);
+        Span<T> values = stackalloc T[1];
+        values[0] = value;
+        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(values);
+        AppendLength(hasher, bytes.Length);
+        hasher.AppendData(bytes);
+    }
+
+    private static void AppendUtf16(IncrementalHash hasher, string value)
+    {
+        if (value is null)
+        {
+            AppendLength(hasher, -1);
+            return;
+        }
+
+        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(value.AsSpan());
+        AppendLength(hasher, bytes.Length);
+        hasher.AppendData(bytes);
+    }
+
+    private static void AppendLength(IncrementalHash hasher, long length)
+    {
+        Span<long> values = stackalloc long[1];
+        values[0] = length;
+        hasher.AppendData(MemoryMarshal.AsBytes(values));
+    }
+
+    private static string FinishHash(IncrementalHash hasher)
+    {
+        byte[] hash = hasher.GetHashAndReset();
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
@@ -262,5 +422,6 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         DocumentCacheOperation Operation,
         string ScopeHash,
         string ETag,
-        int SerializedBytes);
+        int SerializedBytes,
+        CosmosSerializer Serializer);
 }

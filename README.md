@@ -33,7 +33,7 @@ public class MyRepository : Galaxy<MyModel>
     }
 }
 
-// If you want to see debug information such as the full Query text executed, use the format below:
+// For local development, enable query diagnostics with the format below:
 public class MyRepository : Galaxy<MyModel>
 {
     public MyRepository(CosmosClient client, string database, string container, IReadOnlyList<string> partitionKey) : base(client, database, container, partitionKey, true)
@@ -41,6 +41,8 @@ public class MyRepository : Galaxy<MyModel>
     }
 }
 ```
+
+> **Warning:** Passing `true` enables `recordQueries`, which includes full query text and raw parameter values in `Gravity`. Use it only for local development, never enable it in production, and never write recorded values to logs.
 
 3. In your Startup.cs / Main method / Program.cs, configure the CosmosClient like so:
 ```csharp
@@ -109,7 +111,7 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
 ));
 ```
 
-The cache is process-local memory. Repositories share entries only when they use the same `CosmosClient` instance and cache options, with matching database, container, and entity types. Different client instances are isolated even when they connect to the same endpoint. Use separate clients for different authorization contexts; if a client's authority changes, recreate it or disable document caching.
+The cache is process-local memory. Repositories share entries only when they use the same `CosmosClient` instance and cache options, with matching database, container, and entity types. Different client instances are isolated even when they connect to the same endpoint. Use separate clients for different authorization contexts; if a client's authority changes, recreate it or disable document caching. When a client supplies a custom `CosmosSerializer`, cache cloning and write normalization use that same serializer so cache hits preserve the persisted document contract.
 
 `maxEntries` bounds both retained documents and eviction records. The default serialized UTF-8 budgets are 1 MiB per entry and 32 MiB total; oversized entries are skipped and the oldest entries are evicted to satisfy both limits. Configure custom budgets with `WithDocumentCache(timeToLive, maxEntries, cloneDocuments, maxEntryBytes, maxTotalBytes)`. These budgets measure serialized size at insertion, not managed heap usage; with cloning disabled, callers can mutate retained instances afterward. Eviction follows first-insertion order; overwrites refresh the value, ETag, and TTL without changing that order. Query-cache keys preserve quoted field names and associate each SQL parameter occurrence with its bound value.
 
@@ -125,6 +127,8 @@ Generated parameter names are opaque and may change between versions. `Catalyst.
 
 The `Gravity` object is returned by all operations and contains valuable information:
 
+Recorded parameters can contain PII, tenant identifiers, search terms, or secrets. Keep query recording disabled in production. The local-development example below logs query metadata without logging parameter values:
+
 ```csharp
 (Gravity gravity, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
 
@@ -138,13 +142,10 @@ string continuationToken = gravity.ContinuationToken;
 if (gravity.Query.HasValue)
 {
     string queryText = gravity.Query.Value.Text;
-    IEnumerable<(string, object)> parameters = gravity.Query.Value.Parameters;
+    IReadOnlyList<(string, object)> parameters = gravity.Query.Value.Parameters;
 
     Console.WriteLine($"Query: {queryText}");
-    foreach ((string name, object value) in parameters)
-    {
-        Console.WriteLine($"Parameter: {name} = {value}");
-    }
+    Console.WriteLine($"Parameter count: {parameters.Count}");
 }
 ```
 
@@ -211,6 +212,8 @@ Gravity gravity = await galaxy.Modify(models);
 
 `Atomic(...)` executes mixed create, replace, patch, and delete operations as one ACID transaction in a single logical partition. `Bulk()` applies the same operations across partitions; each partition chunk is transactional, but the overall execution can partially succeed. Neither new API requires `AllowBulkExecution`.
 
+One `Bulk()` builder accepts at most 1,000 operations across 100 logical partitions, and execution uses at most 16 fixed workers with four workers by default. `BulkExecutionOptions.MaxOperations` and `MaxPartitions` can impose lower per-execution limits. These library ceilings do not replace HTTP request or deserialization limits: applications must reject oversized requests and collections before constructing models or adding operations to a batch.
+
 ```csharp
 // Point reads now include an ETag. Replacements, patches, and deletes can require it.
 (Gravity read, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
@@ -233,7 +236,7 @@ AtomicBatchResult<MyModel> patch = await galaxy
         condition => condition.Equal(item => item.Status, "active"))
     .ExecuteAsync();
 
-// Cross-partition work remains ordered per partition and uses four partition pipelines by default.
+// Cross-partition work remains ordered per partition and uses four fixed workers by default.
 BulkExecutionResult<MyModel> bulk = await galaxy
     .Bulk()
     .Create(new MyModel { /* partition-key properties and document fields */ })
@@ -421,7 +424,7 @@ catch (Exception ex)
 - **Bulk Operations**: Enable `AllowBulkExecution` in the CosmosClientOptions for efficient batch processing.
 - **RU Tracking**: The `Gravity` object provides RU consumption information for cost optimization.
 - **Column Selection**: Select only the columns you need to reduce data transfer.
-- **Debug Mode**: The debug mode (enabled by passing `true` to the Galaxy constructor) provides query details but adds overhead.
+- **Debug Mode**: Passing `true` to the Galaxy constructor exposes full query text and raw parameter values in `Gravity`. Use it only for local development, never in production, and never log raw recorded values.
 - **Partition Key**: Always consider your partition strategy for best performance.
 
 ## Documentation

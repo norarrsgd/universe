@@ -78,6 +78,7 @@ public sealed class BulkBatch<T> where T : ICosmicEntity
     private readonly Func<IReadOnlyList<BatchOperation<T>>, BulkExecutionOptions, CancellationToken, Task<BulkExecutionResult<T>>> _execute;
     private readonly JsonNamingPolicy _namingPolicy;
     private readonly List<BatchOperation<T>> _operations = [];
+    private readonly HashSet<string> _partitionGroups = new(StringComparer.Ordinal);
 
     internal BulkBatch(
         JsonNamingPolicy namingPolicy,
@@ -93,8 +94,9 @@ public sealed class BulkBatch<T> where T : ICosmicEntity
         if (model is null)
             throw new UniverseException("A batch model is required.");
 
-        _operations.Add(BatchOperation<T>.Create(_operations.Count, model, [.. model.PartitionKeys()]));
-        return this;
+        string[] partitionKeys = [.. model.PartitionKeys()];
+        string partitionGroup = ValidateCapacity(partitionKeys);
+        return Add(BatchOperation<T>.Create(_operations.Count, model, partitionKeys), partitionGroup);
     }
 
     /// <summary>Adds a replacement operation. The partition key is derived from the model.</summary>
@@ -103,8 +105,9 @@ public sealed class BulkBatch<T> where T : ICosmicEntity
         if (model is null)
             throw new UniverseException("A batch model is required.");
 
-        _operations.Add(BatchOperation<T>.Replace(_operations.Count, model, [.. model.PartitionKeys()], eTag));
-        return this;
+        string[] partitionKeys = [.. model.PartitionKeys()];
+        string partitionGroup = ValidateCapacity(partitionKeys);
+        return Add(BatchOperation<T>.Replace(_operations.Count, model, partitionKeys, eTag), partitionGroup);
     }
 
     /// <summary>Adds a patch operation. Partition keys are required because no model is supplied.</summary>
@@ -115,20 +118,43 @@ public sealed class BulkBatch<T> where T : ICosmicEntity
         string eTag = null,
         Action<PatchConditionBuilder<T>> condition = null)
     {
-        _operations.Add(BatchOperationFactory.CreatePatch(_operations.Count, id, partitionKeys, _namingPolicy, patch, eTag, condition));
-        return this;
+        string partitionGroup = ValidateCapacity(partitionKeys);
+        return Add(BatchOperationFactory.CreatePatch(_operations.Count, id, partitionKeys, _namingPolicy, patch, eTag, condition), partitionGroup);
     }
 
     /// <summary>Adds a delete operation. Partition keys are required because no model is supplied.</summary>
     public BulkBatch<T> Delete(string id, string[] partitionKeys, string eTag = null)
     {
-        _operations.Add(BatchOperation<T>.Delete(_operations.Count, id, partitionKeys, eTag));
-        return this;
+        string partitionGroup = ValidateCapacity(partitionKeys);
+        return Add(BatchOperation<T>.Delete(_operations.Count, id, partitionKeys, eTag), partitionGroup);
     }
 
     /// <summary>Executes ordered partition pipelines with bounded cross-partition concurrency.</summary>
     public Task<BulkExecutionResult<T>> ExecuteAsync(BulkExecutionOptions options = null, CancellationToken cancellationToken = default)
         => _execute(_operations, options ?? new(), cancellationToken);
+
+    private string ValidateCapacity(string[] partitionKeys)
+    {
+        if (_operations.Count >= BulkExecutionOptions.MaximumOperations)
+            throw new UniverseException($"Bulk batches can only contain up to {BulkExecutionOptions.MaximumOperations} operations.");
+        if (partitionKeys is null || partitionKeys.Length == 0)
+            throw new UniverseException("Partition key cannot be null or empty.");
+        if (partitionKeys.Any(string.IsNullOrWhiteSpace))
+            throw new UniverseException("Partition key value cannot be null or empty.");
+
+        string partitionGroup = JsonSerializer.Serialize(partitionKeys);
+        if (!_partitionGroups.Contains(partitionGroup) && _partitionGroups.Count >= BulkExecutionOptions.MaximumPartitions)
+            throw new UniverseException($"Bulk batches can only contain up to {BulkExecutionOptions.MaximumPartitions} logical partitions.");
+
+        return partitionGroup;
+    }
+
+    private BulkBatch<T> Add(BatchOperation<T> operation, string partitionGroup)
+    {
+        _operations.Add(operation);
+        _partitionGroups.Add(partitionGroup);
+        return this;
+    }
 }
 
 internal static class BatchOperationFactory

@@ -1,6 +1,9 @@
 using System.Net;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Azure.Cosmos;
+using Universe.Builder.Caching;
 using Universe.Builder.Options;
 using Universe.Attributes;
 using Universe.Extensions;
@@ -13,6 +16,28 @@ namespace Universe.Tests.Caching;
 
 public sealed class DocumentCacheRepositoryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Create_CustomSerializerOmission_IsHonoredByCache(bool cloneDocuments)
+    {
+        QueryTestContainer container = new();
+        CacheEntity submitted = Entity("created");
+        submitted.TransientSecret = "cache-must-not-return-this";
+        using CosmosClient client = CreateClient(serializer: new OmitTransientSecretSerializer());
+        using TestGalaxy repository = new(
+            container,
+            new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache(cloneDocuments: cloneDocuments),
+            client: client);
+
+        await repository.CreateEntity(submitted);
+        (Gravity gravity, CacheEntity cached) = await repository.PointGet(submitted.id, submitted.TenantId);
+
+        Assert.Equal(0, gravity.RU);
+        Assert.Null(cached.TransientSecret);
+        Assert.Equal(0, container.ReadItemCalls);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -54,6 +79,22 @@ public sealed class DocumentCacheRepositoryTests
         container.QueryItems = [Entity("changed")];
 
         (Gravity gravity, CacheEntity result) = await galaxy.Get(clusters);
+
+        Assert.Equal("changed", result.Name);
+        Assert.Equal(7.25, gravity.RU);
+        Assert.Equal(2, container.QueryCalls);
+    }
+
+    [Fact]
+    public async Task QueryGet_OverBudgetScalar_BypassesCacheWithoutRejectingQuery()
+    {
+        QueryTestContainer container = new() { QueryItems = [Entity("first")] };
+        using TestGalaxy repo = new(container, new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache());
+        string oversized = new('a', DocumentCache.MaxQueryParameterSignatureBytes);
+        await repo.QueryGet(oversized);
+        container.QueryItems = [Entity("changed")];
+
+        (Gravity gravity, CacheEntity result) = await repo.QueryGet(oversized);
 
         Assert.Equal("changed", result.Name);
         Assert.Equal(7.25, gravity.RU);
@@ -204,8 +245,12 @@ public sealed class DocumentCacheRepositoryTests
 
     private static CacheEntity Entity(string name) => new() { id = "id-1", TenantId = "tenant-1", Name = name };
 
-    private static CosmosClient CreateClient(string endpoint = "https://localhost:8081")
-        => new(endpoint, Convert.ToBase64String(new byte[64]), new CosmosClientOptions { AllowBulkExecution = true });
+    private static CosmosClient CreateClient(string endpoint = "https://localhost:8081", CosmosSerializer serializer = null)
+        => new(endpoint, Convert.ToBase64String(new byte[64]), new CosmosClientOptions
+        {
+            AllowBulkExecution = true,
+            Serializer = serializer
+        });
 
     [Fact]
     public async Task PointGet_CacheDisabled_ReadsContainerEveryTime()
@@ -378,6 +423,9 @@ public sealed class DocumentCacheRepositoryTests
         public Task<(Gravity, CacheEntity)> ModifyEntity(CacheEntity entity)
             => ((IGalaxyBasic<CacheEntity>)this).Modify(entity);
 
+        public Task<(Gravity, string)> CreateEntity(CacheEntity entity)
+            => ((IGalaxyBasic<CacheEntity>)this).Create(entity);
+
         public Task<Gravity> RemoveEntity(string id, string tenantId)
             => ((IGalaxyBasic<CacheEntity>)this).Remove(id, tenantId);
 
@@ -394,6 +442,35 @@ public sealed class DocumentCacheRepositoryTests
         public string TenantId { get; set; }
 
         public string Name { get; set; }
+
+        public string TransientSecret { get; set; }
+    }
+
+    private sealed class OmitTransientSecretSerializer : CosmosSerializer
+    {
+        public override T FromStream<T>(Stream stream)
+        {
+            using (stream)
+                return JsonSerializer.Deserialize<T>(stream);
+        }
+
+        public override Stream ToStream<T>(T input)
+        {
+            JsonNode node = JsonSerializer.SerializeToNode(input, typeof(T));
+            if (node is JsonObject document)
+                document.Remove(nameof(CacheEntity.TransientSecret));
+
+            MemoryStream stream = new();
+            using (Utf8JsonWriter writer = new(stream))
+            {
+                if (node is null)
+                    writer.WriteNullValue();
+                else
+                    node.WriteTo(writer);
+            }
+            stream.Position = 0;
+            return stream;
+        }
     }
 
 }

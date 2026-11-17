@@ -86,7 +86,7 @@ public sealed class UniverseOptions
 
     /// <summary>
     /// Creates Universe options with SQLite-based persistence for high-performance statistics storage.
-    /// Features WAL mode for concurrent access, batched writes, and automatic cleanup.
+    /// Features WAL mode, bounded batched writes, and row, file-growth, and age retention limits.
     /// </summary>
     /// <param name="path">Optional custom path for the SQLite database file. If null, uses 'universe-stats.db' in the application directory.</param>
     /// <param name="retentionDays">Number of days to retain statistics. Older records are automatically cleaned up. Default is 7 days.</param>
