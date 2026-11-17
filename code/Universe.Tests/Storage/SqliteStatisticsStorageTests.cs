@@ -162,6 +162,34 @@ public sealed class SqliteStatisticsStorageTests : IDisposable
         await _storage.ClearOldAsync(TimeSpan.FromDays(1));
     }
 
+    [Fact]
+    public async Task Persistence_TrimsToHardRowLimit()
+    {
+        string dbPath = Path.Combine(AppContext.BaseDirectory, $"test-bounded-{Guid.NewGuid()}.db");
+        using SqliteStatisticsStorage storage = new SqliteStatisticsStorage(dbPath, batchSize: 100, flushIntervalSeconds: 300);
+        DateTime timestamp = DateTime.UtcNow;
+        int total = SqliteStatisticsStorage.MaxStoredRecords + 25;
+
+        for (int i = 0; i < total; i++)
+        {
+            await storage.SaveAsync(TestStatisticsFactory.Create(
+                queryHash: $"bounded-{i}",
+                timestamp: timestamp.AddSeconds(i)));
+
+            if ((i + 1) % 100 == 0)
+                await storage.LoadRecentAsync(1);
+        }
+
+        IList<QueryExecutionStatistics> loaded = await storage.LoadRecentAsync(total);
+
+        Assert.Equal(SqliteStatisticsStorage.MaxStoredRecords, loaded.Count);
+        Assert.Equal($"bounded-{total - 1}", loaded[0].QueryHash);
+        Assert.DoesNotContain(loaded, stat => stat.QueryHash == "bounded-0");
+
+        storage.Dispose();
+        TryDeleteFiles(dbPath);
+    }
+
     #endregion
 
     #region Batching

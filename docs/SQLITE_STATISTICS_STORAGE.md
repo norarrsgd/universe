@@ -13,9 +13,10 @@ SQLite statistics storage is a lightweight, high-performance option for persisti
 ## Key Features
 
 - **WAL Mode**: Write-Ahead Logging for concurrent read/write performance
-- **Non-blocking Writes**: Fire-and-forget pattern doesn't slow down query execution
+- **Bounded Non-blocking Writes**: Best-effort telemetry is dropped when the fixed-capacity queue is full
 - **Batched Inserts**: Configurable batching for efficient disk I/O
-- **Auto-cleanup**: Automatic removal of old statistics based on retention policy
+- **Single Writer**: One tracked writer loop prevents overlapping flush callbacks
+- **Bounded Retention**: Age cleanup, a 1000-row ceiling, and SQLite page/WAL limits bound growth
 - **Indexed Queries**: Fast lookups by query hash and timestamp
 - **Single File**: All data stored in one portable `.db` file
 
@@ -66,7 +67,7 @@ UniverseOptions options = UniverseOptions.WithSqlitePersistence(
 |-----------|------|---------|-------------|
 | `path` | `string` | `{AppDirectory}/universe-stats.db` | Path to SQLite database file |
 | `retentionDays` | `int` | `7` | Days to retain statistics before auto-cleanup |
-| `batchSize` | `int` | `10` | Number of records to batch before flushing |
+| `batchSize` | `int` | `10` | Number of records to batch before flushing, capped at the 1000-entry queue capacity |
 | `flushIntervalSeconds` | `int` | `5` | Seconds between automatic flushes |
 
 ## Architecture
@@ -94,22 +95,23 @@ CREATE INDEX idx_timestamp ON query_statistics(timestamp);
 
 ### Write Strategy
 
-The SQLite storage uses a non-blocking write pattern:
+The SQLite storage uses a bounded, non-blocking write pattern:
 
-1. **Enqueue**: `SaveAsync()` adds statistics to an in-memory queue and returns immediately
-2. **Batch**: Records accumulate until batch size is reached
-3. **Flush**: Batched records are written in a single transaction
-4. **Timer**: A background timer ensures data is flushed even with low query volume
+1. **Admit**: `SaveAsync()` attempts to add statistics to a 1000-entry queue and returns immediately
+2. **Drop**: New best-effort telemetry is discarded when that queue is full
+3. **Batch**: One writer loop accumulates records until batch size is reached
+4. **Flush**: Batched records and row-limit cleanup run in one transaction
+5. **Timer**: A background timer signals the same writer so low-volume data is flushed without overlapping callbacks
 
 ```
 Query Execution
       |
       v
-  SaveAsync() ──> Queue ──> Batch Full? ──> FlushAsync()
-      |                         |                |
-      v                         v                v
-   Return                    Timer           Transaction
-  Immediately              (5 sec)            Commit
+  SaveAsync() ──> Bounded Queue ──> Single Writer ──> Transaction
+      |               |                 ^               |
+      v               v                 |               v
+   Return        Drop When Full      Timer Signal    Commit + Trim
+  Immediately
 ```
 
 ### Read Strategy
@@ -133,7 +135,7 @@ IList<QueryExecutionStatistics> forQuery = await storage.GetByQueryHashAsync(
 
 | Aspect | File Storage | SQLite Storage |
 |--------|--------------|----------------|
-| Write latency | Blocking | Non-blocking |
+| Write latency | Queued, non-blocking | Queued, non-blocking |
 | Write throughput | ~10-50/sec | ~1000+/sec |
 | Read by hash | O(n) scan | O(log n) index |
 | Concurrent access | Lock contention | WAL mode |
@@ -200,7 +202,7 @@ UniverseOptions options = UniverseOptions.WithSqlitePersistence(
 
 ### Automatic Cleanup
 
-Old records are automatically deleted on startup:
+Old records are automatically deleted on startup and during periodic writer cleanup. Every successful write transaction also retains only the 1000 newest rows, regardless of `retentionDays`:
 
 ```csharp
 // Records older than retentionDays are deleted when storage initializes
@@ -216,12 +218,7 @@ await storage.ClearOldAsync(TimeSpan.FromDays(3));
 
 ### Database Size
 
-Typical record size: ~200-500 bytes
-
-Estimated sizes:
-- 10,000 records: ~3-5 MB
-- 100,000 records: ~30-50 MB
-- 1,000,000 records: ~300-500 MB
+The storage configures a 64 MiB SQLite page ceiling, a 4 MiB WAL journal-size limit, automatic WAL checkpoints, and a 1000-row retention ceiling. SQLite may retain already allocated free pages; an existing oversized database can require a maintenance `VACUUM` to shrink its physical file.
 
 ## Disposal
 
@@ -257,9 +254,9 @@ If recent statistics aren't appearing:
 ### Large Database Size
 
 If the database grows too large:
-- Reduce `retentionDays`
+- Confirm the process is using the current bounded storage implementation
 - Run `VACUUM` command manually: `sqlite3 universe-stats.db "VACUUM;"`
-- Consider archiving old data before deletion
+- Check whether the file predated the page and row ceilings
 
 ## API Reference
 

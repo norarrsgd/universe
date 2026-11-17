@@ -106,6 +106,26 @@ public sealed class QueryTunerTests
         Assert.Equal(100, vecRec.SampleSize);
     }
 
+    [Fact]
+    public void RecordExecution_BoundsPersistenceBacklogAndCountsDrops()
+    {
+        BlockingStorage storage = new BlockingStorage();
+        using QueryTuner tuner = new QueryTuner(storage);
+
+        try
+        {
+            for (int i = 0; i < QueryTuner.PersistenceQueueCapacity + 500; i++)
+                tuner.RecordExecution(TestStatisticsFactory.Create(queryHash: $"blocked-{i}"));
+
+            Assert.InRange(tuner.PendingPersistenceCount, 0, QueryTuner.PersistenceQueueCapacity);
+            Assert.True(tuner.DroppedPersistenceCount > 0);
+        }
+        finally
+        {
+            storage.ReleaseWrites();
+        }
+    }
+
     #endregion
 
     #region Recommendations: rule-based vs data-driven
@@ -409,6 +429,19 @@ public sealed class QueryTunerTests
             => Task.FromResult<IList<QueryExecutionStatistics>>([]);
         public Task ClearOldAsync(TimeSpan olderThan) => Task.CompletedTask;
         public void Dispose() => IsDisposed = true;
+    }
+
+    private sealed class BlockingStorage : IQueryStatisticsStorage
+    {
+        private readonly TaskCompletionSource<bool> _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task SaveAsync(QueryExecutionStatistics stats) => _release.Task;
+        public Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
+            => Task.FromResult<IList<QueryExecutionStatistics>>([]);
+        public Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
+            => Task.FromResult<IList<QueryExecutionStatistics>>([]);
+        public Task ClearOldAsync(TimeSpan olderThan) => Task.CompletedTask;
+        public void ReleaseWrites() => _release.TrySetResult(true);
     }
 
     #endregion
