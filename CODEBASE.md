@@ -351,7 +351,7 @@ dotnet run
 
 ## Target Runtime And Packages
 
-The current package version is `3.5.2-preview.2` (prerelease), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
+The current package version is `3.5.2-preview.3` (prerelease), declared in `VERSION` and `code/Universe/UniverseQuery.csproj`.
 
 The main library currently targets:
 
