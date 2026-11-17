@@ -57,6 +57,13 @@ public sealed class UniverseOptions
         return this;
     }
 
+    /// <summary>Enables the optional cache with explicit byte budgets and lifetime settings.</summary>
+    public UniverseOptions WithDocumentCache(TimeSpan? timeToLive, int maxEntries, bool cloneDocuments, int maxEntryBytes, long maxTotalBytes)
+    {
+        DocumentCache = new(timeToLive, maxEntries, cloneDocuments, maxEntryBytes, maxTotalBytes);
+        return this;
+    }
+
     /// <summary>
     /// Disables the optional document cache.
     /// </summary>

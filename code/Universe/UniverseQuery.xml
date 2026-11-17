@@ -1199,8 +1199,23 @@
         <member name="P:Universe.DocumentCacheOptions.CloneDocuments">
             <summary>Whether cache reads and writes clone document instances.</summary>
         </member>
+        <member name="F:Universe.DocumentCacheOptions.DefaultMaxEntryBytes">
+            <summary>Default maximum serialized size of one entry (1 MiB).</summary>
+        </member>
+        <member name="F:Universe.DocumentCacheOptions.DefaultMaxTotalBytes">
+            <summary>Default total serialized size budget (32 MiB).</summary>
+        </member>
+        <member name="P:Universe.DocumentCacheOptions.MaxEntryBytes">
+            <summary>Maximum serialized UTF-8 size of one cached document.</summary>
+        </member>
+        <member name="P:Universe.DocumentCacheOptions.MaxTotalBytes">
+            <summary>Maximum total serialized UTF-8 size retained by the cache.</summary>
+        </member>
         <member name="M:Universe.DocumentCacheOptions.#ctor(System.Nullable{System.TimeSpan},System.Int32,System.Boolean)">
             <summary>Create document cache options.</summary>
+        </member>
+        <member name="M:Universe.DocumentCacheOptions.#ctor(System.Nullable{System.TimeSpan},System.Int32,System.Boolean,System.Int32,System.Int64)">
+            <summary>Create cache options with serialized byte budgets in addition to the entry limit.</summary>
         </member>
         <member name="T:Universe.Exception.UniverseException">
             <summary></summary>
@@ -1702,6 +1717,9 @@
             <param name="maxEntries">Maximum number of entries retained by the cache. Defaults to 1000.</param>
             <param name="cloneDocuments">Whether cached documents should be cloned before storing and returning. Defaults to true.</param>
             <returns>The same UniverseOptions instance for fluent configuration.</returns>
+        </member>
+        <member name="M:Universe.UniverseOptions.WithDocumentCache(System.Nullable{System.TimeSpan},System.Int32,System.Boolean,System.Int32,System.Int64)">
+            <summary>Enables the optional cache with explicit byte budgets and lifetime settings.</summary>
         </member>
         <member name="M:Universe.UniverseOptions.WithoutDocumentCache">
             <summary>

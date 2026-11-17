@@ -316,7 +316,7 @@ Nuances:
 - CI uses `.NET 10.x` preview via `actions/setup-dotnet`.
 - CI test command excludes tests tagged `Category=Performance`.
 - `nuget-publish.yml` runs on pushes to `prod` and `beta`, builds, tests, packs `code/Universe/UniverseQuery.csproj`, and pushes to NuGet using OIDC Trusted Publishing through `NuGet/login`. Repository secret `NUGET_USER` contains the nuget.org profile username, and the publish job requires `id-token: write`. Configure a nuget.org Trusted Publishing policy for GitHub owner `norarrsgd`, repository `universe`, workflow filename `nuget-publish.yml`, and package `UniverseQuery`; leave the policy environment empty because the workflow does not use one. The temporary API key is requested immediately before publishing; `NUGET_KEY` is no longer used.
-- Semgrep runs on PRs and on pushes to `dev` and `prod`.
+- Semgrep runs on PRs and on pushes to `dev` and `prod`. All workflow actions use full commit SHAs; Semgrep 1.185.0 uses an immutable container digest and the upstream C# rules snapshot at `a5ad1714f00c9f7fde980cab0ea1d6dc6d414fd2`. The rules checkout is excluded from targets. Scanner and rule updates require reviewed pin changes; workflows do not install the latest package or load `--config auto`.
 - `dependabot.yml` schedules daily NuGet updates for `code/Universe`, `code/Universe.Tests`, and `code/DarkMatter`.
 - `CODEOWNERS` covers the active `/code/` tree, Markdown documentation, and `.github/` configuration.
 
@@ -521,14 +521,14 @@ When `UniverseOptions.WithDocumentCache(...)` is configured, direct id reads are
 - Calls `GetItemQueryIterator` directly instead of going through strategy selector.
 - Supplies `MaxItemCount = page.Size`.
 - Supplies the continuation token if non-blank.
-- Reads pages until it gets a non-empty page, then returns that continuation token and breaks, except for `GROUP BY` queries.
+- Rejects grouping using structured `QueryContext.HasGrouping` before opening an iterator; grouped results should use `List`. Reads until the first non-empty page, then returns its continuation token and breaks.
 - Returns generated query details only when `_recordQuery` is true.
 
 Nuances:
 
 - Paged queries do not currently record `QueryTuner` statistics.
 - Paged queries do not apply `QueryHints`.
-- `GROUP BY` has special continuation behavior because the loop does not break when query text contains `GROUP BY`.
+- A quoted property containing `GROUP BY` has no effect on paging; control flow does not inspect rendered SQL substrings.
 
 ### Generate Query
 
@@ -616,13 +616,13 @@ Parameter binding:
 Identifier handling has two pieces:
 
 - `ValidateIdentifier(...)` validates the raw identifier before query text is built.
-- `FormatProperty(alias, column)` splits the column on dots and JSON-quotes each non-empty segment after applying the naming policy, escaping backslashes and policy-generated quotes.
+- `FormatProperty(alias, column)` validates the alias and path, then JSON-quotes every segment after applying the naming policy, escaping backslashes and policy-generated quotes.
 - Raw grouping paths are kept separate from formatted SQL. The same formatted group list supplies wildcard projections and `GROUP BY`, retaining deduplication and root/join aliases without inferring formatting from bracket characters.
 
 Validation currently rejects:
 
 - Null/blank identifiers.
-- Identifiers consisting only of dots.
+- Empty or whitespace dotted path segments, including leading/trailing dots.
 - Semicolons.
 - `--`
 - `/*`
@@ -635,7 +635,7 @@ Validation currently rejects:
 Nuance:
 
 - Opening brackets are not independently rejected because a closing bracket is required to break out of bracket notation. The protection relies on rejecting closing brackets and double quotes.
-- Dotted paths support nested JSON access; empty path segments are skipped by `FormatProperty`.
+- Dotted paths support nested JSON access; every segment must be nonblank. Explicit empty/whitespace catalyst aliases are rejected; null retains the implicit `c` default.
 - Naming policy conversion is applied per path segment.
 
 ## Query Builder Map
@@ -657,7 +657,7 @@ Important constraints:
 
 - Values must stay parameterized with `QueryDefinition.WithParameter`.
 - Identifiers are not parameters in Cosmos SQL, so they must be validated and bracket-formatted.
-- `ValidateIdentifier` rejects empty identifiers, only-dot identifiers, SQL comment/statement separators, double quotes, closing brackets, excessive length, and control characters.
+- `ValidateIdentifier` rejects empty identifiers or path segments, SQL comment/statement separators, double quotes, closing brackets, excessive length, and control characters. Query construction caps clusters/catalysts/shaping fields at 1024, rank expressions at 64, full-text terms at 64 per expression and 1024 per query, each term at 4096 UTF-8 bytes, combined rank/full-text parameter bytes at 1 MiB, and generated SQL at 256 KiB. Projection nesting is limited to 32. Ordinary parameter objects remain unmodified and are not serialized to enforce these rank-specific budgets; see `docs/DECLARATIVE_QUERY_SYNTAX.md`.
 - Weighted RRF sort values are validated as numeric comma-separated content before being inserted into SQL.
 - `GenerateQuery` intentionally returns query text and parameters without executing the query.
 
@@ -861,7 +861,8 @@ Invalidation behavior:
 - Successful create/modify/remove operations clear same-repository single-document query cache entries.
 - Successful create/modify operations update known point-read entries.
 - Successful remove operations delete known point-read entries.
-- Bulk create and bulk modify update known submitted point entries and clear same-repository query entries after all batches succeed.
+- Legacy bulk create/modify reconcile each committed partition before reporting any sibling failure. Indeterminate batch transport failures evict submitted point keys and invalidate query entries; successful newer bulk/atomic operations use the same cache-aware execution path.
+- Read misses capture a mutation generation before Cosmos I/O; cache insertion verifies it atomically, so a delayed read cannot undo an intervening write invalidation. A fixed 256-stripe generation array bounds metadata; collisions conservatively suppress unrelated fills.
 - External writers are not observed; they rely on cache time-to-live expiration.
 
 Cache keys are SHA-256 hashes built from an opaque Cosmos client namespace, operation kind, database, container, source entity type, result type, and operation inputs. A cache-owned `ConditionalWeakTable<CosmosClient, string>` assigns namespaces by exact client-instance identity without retaining credentials or preventing client collection. Point keys, query keys, and invalidation scopes all include that namespace. Repositories sharing the same client and cache options can share matching entries; different client instances are isolated even at the same endpoint. A client must represent one stable authorization context; recreate it or disable caching when its authority changes.
@@ -870,7 +871,7 @@ Raw ids, partition-key values, query text, and parameter values are not retained
 
 Query parameter signatures are restricted to null, string, boolean, and built-in numeric values and include runtime type identity. Object and collection parameters, including anonymous-object partial-match authorization filters, bypass query caching because the cache cannot guarantee equivalence with Cosmos parameter serialization. This prevents distinct filters from collapsing into the same key when document-cloning options omit getter-only properties, nulls, or serializer-specific members. Point reads retain their existing cache behavior.
 
-The cache holds one linked-list node per dictionary entry under a short structural lock, so `MaxEntries` bounds eviction metadata as well as documents. Overwrites refresh TTL/value/ETag in their original FIFO position; remove/reinsert joins the tail. Reads take an entry snapshot under the lock and clone outside it. A clone failure removes only that exact snapshot, never a concurrent replacement. Expiration, explicit removal, and query invalidation remove their list nodes too.
+The cache holds one linked-list node per dictionary entry under a short structural lock, so `MaxEntries` bounds eviction metadata as well as documents. Serialized UTF-8 budgets default to 1 MiB per entry and 32 MiB total; oversized entries are skipped before cloning, and FIFO eviction enforces count and total bytes together. These budgets measure serialized size rather than exact managed heap usage. The existing three-argument options constructor and `WithDocumentCache` remain available; five-argument overloads expose custom budgets. Overwrites refresh TTL/value/ETag in their original FIFO position; remove/reinsert joins the tail. Reads take an entry snapshot under the lock and clone outside it. A clone failure removes only that exact snapshot, never a concurrent replacement. Expiration, explicit removal, and query invalidation remove their list nodes too.
 
 The query tuner uses the same quote-aware normalizer while retaining the existing `@p` substitution for ordinary query hashes. Existing JSON/SQLite statistics and their schemas are retained; only hashes for previously misnormalized quoted text can change.
 
@@ -1083,7 +1084,7 @@ coderabbit review
 - `recordQueries` is convenient but can expose sensitive parameter values.
 - Document caching is disabled by default; enabling it creates process-local state and external writers are visible after TTL expiration, not through distributed invalidation.
 - `DarkMatter` examples intentionally use debug-style logging and should not define production logging standards.
-- `Paged()` stops after the first non-empty page except for `GROUP BY`, where continuation token behavior is different.
+- `Paged()` stops after the first non-empty page and rejects grouped queries before execution; use `List()` for grouped results.
 - Query hints are not accepted with fluent paged queries.
 - `GetAsync()` without `Project` does not apply most list-shaping options.
 - `ColumnOptions.Top` is required for rank/vector operators.

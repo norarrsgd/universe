@@ -60,6 +60,32 @@ public sealed class DocumentCacheRepositoryTests
         Assert.Equal(2, container.QueryCalls);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadFill_OverlappingModify_DoesNotRestoreOldDocument(bool query)
+    {
+        TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        QueryTestContainer container = new() { ReadItemResult = Entity("before"), QueryItems = [Entity("before")], ReplaceItemResult = Entity("after") };
+        if (query)
+            container.QueryReadGate = release.Task;
+        else
+            container.PointReadGate = release.Task;
+        using TestGalaxy repository = new(container, new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache());
+        Task<(Gravity, CacheEntity)> staleRead = query ? repository.QueryGet("same") : repository.PointGet("id-1", "tenant-1");
+        Assert.Equal(1, query ? container.QueryCalls : container.ReadItemCalls);
+        await repository.ModifyEntity(Entity("after"));
+        release.SetResult();
+        await staleRead;
+        container.QueryItems = [Entity("after")];
+        container.ReadItemResult = Entity("after");
+
+        (_, CacheEntity result) = query ? await repository.QueryGet("same") : await repository.PointGet("id-1", "tenant-1");
+
+        Assert.Equal("after", result.Name);
+        Assert.Equal(query ? 2 : 1, query ? container.QueryCalls : container.ReadItemCalls);
+    }
+
     [Fact]
     public async Task QueryGet_QuotedAtFields_ExecuteDifferentPredicates()
     {

@@ -81,9 +81,10 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
             if (!bypassCache && TryGetQueryCache(query, out TArgType cached, out IReadOnlyList<(string, object)> cacheParameters))
                 return (new(0, null, _recordQuery ? (query.QueryText, cacheParameters) : default), cached);
 
+            long? generation = bypassCache ? null : DocumentCache?.CaptureGeneration(DocumentCacheScopeHash(typeof(T)));
             (Gravity gravity, TArgType result) = await QBuilder.GetOneFromQuery<TArgType>(_container, query, context);
             if (!bypassCache)
-                SetQueryCache(query, result);
+                SetQueryCache(query, result, generation);
             return (gravity, result);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -114,7 +115,9 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         ValidateReadOptions(readOptions);
         try
         {
-            QueryDefinition query = QBuilder.CreateQuery(clusters: clusters, columnOptions: columnOptions, sorting: sorting, groups: group);
+            QueryDefinition query = QBuilder.CreateQuery(clusters, out QueryContext context, columnOptions, sorting, group);
+            if (context.HasGrouping)
+                throw new UniverseException("Paged queries do not support GROUP BY; use List instead.");
 
             double requestUnit = 0;
             string continuationToken = string.Empty;
@@ -128,7 +131,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
                 FeedResponse<TArgType> next = await queryResponse.ReadNextAsync();
                 collection.AddRange(next);
                 requestUnit += next.RequestCharge;
-                if (next.Count > 0 && !query.QueryText.Contains("GROUP BY"))
+                if (next.Count > 0)
                 {
                     continuationToken = next.ContinuationToken;
                     break;
@@ -165,7 +168,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         return cache.TryGet(key, out value);
     }
 
-    private void SetQueryCache<TArgType>(QueryDefinition query, TArgType value)
+    private void SetQueryCache<TArgType>(QueryDefinition query, TArgType value, long? generation)
     {
         DocumentCache cache = DocumentCache;
         if (cache is null)
@@ -174,7 +177,7 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         if (!TryCreateQueryCacheKey<TArgType>(cache, query, out DocumentCacheKey key, out _))
             return;
 
-        cache.Set(key, DocumentCacheOperation.SingleQuery, DocumentCacheScopeHash(typeof(T)), value);
+        cache.Set(key, DocumentCacheOperation.SingleQuery, DocumentCacheScopeHash(typeof(T)), value, expectedGeneration: generation);
     }
 
     private bool TryCreateQueryCacheKey<TArgType>(

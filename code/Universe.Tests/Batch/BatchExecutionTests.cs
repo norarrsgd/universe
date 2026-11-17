@@ -16,6 +16,57 @@ namespace Universe.Tests.Batch;
 public sealed class BatchExecutionTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacyBulk_PartialFailure_ReconcilesCommittedPointCache(bool create)
+    {
+        InMemoryCosmosContainer<BatchEntity> container = new();
+        BatchEntity committed = Entity("good", "tenant-a", 1, "before");
+        BatchEntity failed = Entity("bad", "tenant-b", 1, "before");
+        container.Seed(committed);
+        if (create)
+            container.Seed(failed);
+        using TestGalaxy repository = CreateRepository(container, cache: true);
+        await repository.PointGet(committed.id, committed.TenantId);
+        if (create)
+            await repository.Atomic("tenant-a").Delete(committed.id).ExecuteAsync(TestContext.Current.CancellationToken);
+        else
+            committed.Quantity = 9;
+        committed.Status = "after";
+
+        await Assert.ThrowsAsync<UniverseException>(() => create
+            ? ((IGalaxyBasic<BatchEntity>)repository).Create([committed, failed])
+            : ((IGalaxyBasic<BatchEntity>)repository).Modify([committed, failed]));
+        (Gravity gravity, BatchEntity actual) = await repository.PointGet(committed.id, committed.TenantId);
+
+        Assert.Equal("after", actual.Status);
+        Assert.Equal(0, gravity.RU);
+        Assert.Equal(create ? 1 : 9, actual.Quantity);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacyBulk_TransportFailure_EvictsSubmittedPointCache(bool create)
+    {
+        InMemoryCosmosContainer<BatchEntity> container = new();
+        BatchEntity submitted = Entity("id", "tenant-a", 1, "before");
+        container.Seed(submitted);
+        using TestGalaxy repository = CreateRepository(container, cache: true);
+        await repository.PointGet(submitted.id, submitted.TenantId);
+        container.Seed(Entity("id", "tenant-a", 9, "after"));
+        container.FailNextExecution(new InvalidOperationException("transport"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => create
+            ? ((IGalaxyBasic<BatchEntity>)repository).Create([submitted])
+            : ((IGalaxyBasic<BatchEntity>)repository).Modify([submitted]));
+        (_, BatchEntity actual) = await repository.PointGet(submitted.id, submitted.TenantId);
+
+        Assert.Equal(9, actual.Quantity);
+        Assert.Equal(2, container.ReadItemCalls);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]

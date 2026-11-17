@@ -19,6 +19,7 @@ internal sealed class QueryTestContainer : Container
     public ItemRequestOptions LastItemOptions { get; private set; }
     public string LastContinuationToken { get; private set; }
     public List<QueryRequestOptions> QueryOptionsHistory { get; } = [];
+    public Task PointReadGate { get; set; } = Task.CompletedTask;
     public Task QueryReadGate { get; set; } = Task.CompletedTask;
     public string ETag { get; set; } = "fake-etag";
     public CosmosException ReadException { get; set; }
@@ -30,13 +31,15 @@ internal sealed class QueryTestContainer : Container
     public override Conflicts Conflicts => throw new NotSupportedException();
     public override Scripts Scripts => throw new NotSupportedException();
 
-    public override Task<ItemResponse<T>> ReadItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
+    public override async Task<ItemResponse<T>> ReadItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)
     {
         ReadItemCalls++;
         LastItemOptions = requestOptions;
         if (ReadException is not null)
             throw ReadException;
-        return Task.FromResult<ItemResponse<T>>(new FakeItemResponse<T>((T)ReadItemResult, 9.5, ETag));
+        FakeItemResponse<T> response = new((T)ReadItemResult, 9.5, ETag);
+        await PointReadGate;
+        return response;
     }
 
     public override Task<ItemResponse<T>> ReplaceItemAsync<T>(T item, string id, PartitionKey? partitionKey = null, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = default)

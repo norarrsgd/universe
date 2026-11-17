@@ -174,6 +174,36 @@ public sealed class QueryExecutionTests
         Assert.Equal(1, container.LastQueryOptions.MaxBufferedItemCount);
     }
 
+    [Fact]
+    public async Task Paged_QuotedGroupingText_StopsAtFirstNonemptyPage()
+    {
+        using CosmosClient client = new("https://localhost:8081", Convert.ToBase64String(new byte[64]));
+        QueryTestContainer container = new() { QueryPages = [[], [new Entity()], [new Entity()]], ThrowOnQueryPage = 3 };
+        using TestGalaxy repository = new(client, container);
+
+        (Gravity gravity, IList<Entity> results) = await ((IGalaxy<Entity>)repository).Paged(new(10), [new([new("GROUP BY", "value")])]);
+
+        Assert.Single(results);
+        Assert.Equal(2, container.QueryPageReads);
+        Assert.True(container.QueryIteratorDisposed);
+        Assert.Equal(14.5, gravity.RU);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Paged_Grouping_IsRejectedBeforeIteratorCreation(bool aggregate)
+    {
+        using CosmosClient client = new("https://localhost:8081", Convert.ToBase64String(new byte[64]));
+        QueryTestContainer container = new();
+        using TestGalaxy repository = new(client, container);
+
+        ColumnOptions? columns = aggregate ? new(["Tenant"], Aggregates: [new("id", Q.Aggregate.Count)]) : null;
+        await Assert.ThrowsAsync<Universe.Exception.UniverseException>(() => ((IGalaxy<Entity>)repository).Paged(new(10), null, columns, group: aggregate ? null : ["Tenant"]));
+
+        Assert.Equal(0, container.QueryCalls);
+    }
+
     private static QueryContext Context(string strategy) => new(
         strategy == "VectorSearch" ? QueryType.VectorSearch : QueryType.Simple,
         Hints: new Dictionary<string, object> { [nameof(QueryHints.ForceStrategy)] = strategy });

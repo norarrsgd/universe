@@ -39,6 +39,13 @@ internal partial class UniverseBuilder : IDisposable
         "WHERE"
     };
 
+    private const int MaxCatalysts = 1024;
+    private const int MaxRankExpressions = 64;
+    private const int MaxFullTextTerms = 64;
+    private const int MaxTermBytes = 4096;
+    private const int MaxQueryBytes = 256 * 1024;
+    private const int MaxRankParameterBytes = 1024 * 1024;
+
     private readonly bool _recordQueries;
     private readonly QueryTuner _queryTuner;
     private readonly QueryStrategySelector _strategySelector;
@@ -71,6 +78,7 @@ internal partial class UniverseBuilder : IDisposable
 
     internal QueryDefinition CreateQuery(IReadOnlyList<Cluster> clusters, out QueryContext context, ColumnOptions? columnOptions = null, IReadOnlyList<Sorting.Option> sorting = null, IReadOnlyList<string> groups = null)
     {
+        ValidateInputBudgets(clusters, columnOptions, sorting, groups);
         // Sanitize and validate input identifiers
         SanitizeInputs(clusters, columnOptions, sorting, groups);
         Dictionary<Catalyst, string> parameterNames = CreateParameterNames(clusters);
@@ -141,11 +149,14 @@ internal partial class UniverseBuilder : IDisposable
                 switch (vectorDistanceCatalysts.Count)
                 {
                     case > 1:
-                        columnsInQuery = vectorDistanceCatalysts.Aggregate(columnsInQuery, (current, catalyst) =>
+                        StringBuilder vectorColumns = new(columnsInQuery);
+                        for (int index = 0; index < vectorDistanceCatalysts.Count; index++)
                         {
+                            Catalyst catalyst = vectorDistanceCatalysts[index];
                             string alias = catalyst.Alias ?? "c";
-                            return $"{current}, {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst, vectorDistanceCatalysts.IndexOf(catalyst))}";
-                        });
+                            vectorColumns.Append($", {catalyst.Operator.Value()}({FormatProperty(alias, catalyst.Column)}, @{parameterNames[catalyst]}) AS {BuildVectorScoreAlias(catalyst, index)}");
+                        }
+                        columnsInQuery = vectorColumns.ToString();
                         break;
                     case 1:
                         {
@@ -284,9 +295,10 @@ internal partial class UniverseBuilder : IDisposable
             {
                 queryBuilder.Append(" ORDER BY RANK RRF(");
 
-                foreach (Catalyst catalyst in rankCatalysts)
+                for (int index = 0; index < rankCatalysts.Count; index++)
                 {
-                    if (rankCatalysts.IndexOf(catalyst) > 0)
+                    Catalyst catalyst = rankCatalysts[index];
+                    if (index > 0)
                         queryBuilder.Append(", ");
 
                     if (catalyst.Operator is Q.Operator.VectorDistance)
@@ -294,9 +306,8 @@ internal partial class UniverseBuilder : IDisposable
                     else if (catalyst.Operator is Q.Operator.FTScore)
                     {
                         queryBuilder.Append($"{catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
-                        if (catalyst.Value is IEnumerable<string> stringVals)
+                        if (catalyst.Value is string[] vals)
                         {
-                            string[] vals = stringVals.ToArray();
                             queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{parameterNames[catalyst]}_ft{i}")));
                         }
                         else
@@ -333,9 +344,8 @@ internal partial class UniverseBuilder : IDisposable
                 if (catalyst.Operator is Q.Operator.FTScore)
                 {
                     queryBuilder.Append($" ORDER BY RANK {catalyst.Operator.Value()}({FormatProperty("c", catalyst.Column)}, ");
-                    if (catalyst.Value is IEnumerable<string> stringVals)
+                    if (catalyst.Value is string[] vals)
                     {
-                        string[] vals = stringVals.ToArray();
                         queryBuilder.Append(string.Join(", ", vals.Select((_, i) => $"@{parameterNames[catalyst]}_ft{i}")));
                     }
 
@@ -357,7 +367,10 @@ internal partial class UniverseBuilder : IDisposable
         // 	throw new UniverseException("ORDER BY is not supported in presence of GROUP BY");
 
         // Parameters Builder
-        QueryDefinition query = new(queryBuilder.ToString());
+        string queryText = queryBuilder.ToString();
+        if (Encoding.UTF8.GetByteCount(queryText) > MaxQueryBytes)
+            throw new UniverseException($"Generated query exceeds the {MaxQueryBytes}-byte SQL budget.");
+        QueryDefinition query = new(queryText);
 
         if (clusters is not null && clusters.Any())
         {
@@ -365,9 +378,8 @@ internal partial class UniverseBuilder : IDisposable
             {
                 if (!catalyst.BindsValue)
                     continue;
-                if (catalyst.Operator is Q.Operator.FTScore && catalyst.Value is IEnumerable<string> ftValues)
+                if (catalyst.Operator is Q.Operator.FTScore && catalyst.Value is string[] vals)
                 {
-                    string[] vals = ftValues.ToArray();
                     for (int i = 0; i < vals.Length; i++)
                     {
                         query = query.WithParameter($"@{parameterName}_ft{i}", vals[i]);
@@ -382,6 +394,87 @@ internal partial class UniverseBuilder : IDisposable
 
         context = QueryTypeDetector.CreateContext(clusters, columnOptions, formattedGroups, query.QueryText);
         return query;
+    }
+
+    // Bound attacker-controlled collections and values before hashing or expanding them into SQL.
+    private static void ValidateInputBudgets(IReadOnlyList<Cluster> clusters, ColumnOptions? options, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups)
+    {
+        int catalysts = 0;
+        int ranks = 0;
+        int terms = 0;
+        long rankParameterBytes = 0;
+        long fields = (long)(options?.Names?.Count ?? 0) + (options?.Aggregates?.Count ?? 0)
+            + (options?.Join?.Columns?.Count ?? 0) + (options?.Join?.Aggregates?.Count ?? 0)
+            + (sorting?.Count ?? 0) + (groups?.Count ?? 0);
+        if (clusters?.Count > MaxCatalysts || fields > MaxCatalysts)
+            throw new UniverseException($"Queries support at most {MaxCatalysts} clusters or shaping fields.");
+        Stack<(QueryProjection Projection, int Depth)> projections = new();
+        if (options?.Projection is QueryProjection projection)
+            projections.Push((projection, 1));
+        while (projections.TryPop(out (QueryProjection Projection, int Depth) entry))
+        {
+            if (entry.Depth > 32 || entry.Projection.Items.Count > MaxCatalysts - fields)
+                throw new UniverseException("Projection exceeds the query field or nesting budget.");
+            fields += entry.Projection.Items.Count;
+            foreach (ProjectionItem item in entry.Projection.Items)
+            {
+                if (item.Name?.Length > 255)
+                    throw new UniverseException("Projection output names cannot exceed 255 characters.");
+                if (item.Object is not null)
+                    projections.Push((item.Object, entry.Depth + 1));
+            }
+        }
+        foreach (Sorting.Option sort in sorting ?? [])
+            if (sort.Direction == Sorting.Direction.WEIGHTED && sort.Column?.Length > MaxTermBytes)
+                throw new UniverseException("Rank weights exceed the query size budget.");
+        foreach (Cluster cluster in clusters ?? [])
+        {
+            if ((cluster.Catalysts?.Count ?? 0) > MaxCatalysts - catalysts)
+                throw new UniverseException($"Queries support at most {MaxCatalysts} catalysts.");
+            catalysts += cluster.Catalysts?.Count ?? 0;
+            foreach (Catalyst catalyst in cluster.Catalysts ?? [])
+            {
+                if (catalyst.CatalystId?.Length > 128)
+                    throw new UniverseException("Catalyst identifiers cannot exceed 128 characters.");
+                if (catalyst.Operator is Q.Operator.VectorDistance or Q.Operator.FTScore && ++ranks > MaxRankExpressions)
+                    throw new UniverseException($"Queries support at most {MaxRankExpressions} rank expressions.");
+                if (catalyst.Operator is Q.Operator.FTScore or Q.Operator.FTContainsAll or Q.Operator.NotFTContainsAll or Q.Operator.FTContainsAny or Q.Operator.NotFTContainsAny
+                    && catalyst.Value is string[] values)
+                {
+                    if (values.Length > MaxFullTextTerms || values.Length > MaxCatalysts - terms)
+                        throw new UniverseException($"Full-text searches support {MaxFullTextTerms} terms per expression and {MaxCatalysts} terms per query.");
+                    terms += values.Length;
+                    foreach (string term in values)
+                    {
+                        if (term?.Length > MaxTermBytes)
+                            throw new UniverseException($"Full-text terms cannot exceed {MaxTermBytes} UTF-8 bytes.");
+                        int bytes = term is null ? 0 : Encoding.UTF8.GetByteCount(term);
+                        if (bytes > MaxTermBytes)
+                            throw new UniverseException($"Full-text terms cannot exceed {MaxTermBytes} UTF-8 bytes.");
+                        rankParameterBytes += bytes;
+                    }
+                }
+                if (catalyst.Operator is Q.Operator.FTContains or Q.Operator.NotFTContains && catalyst.Value is string text)
+                {
+                    if (text.Length > MaxTermBytes)
+                        throw new UniverseException($"Full-text terms cannot exceed {MaxTermBytes} UTF-8 bytes.");
+                    int bytes = Encoding.UTF8.GetByteCount(text);
+                    if (bytes > MaxTermBytes)
+                        throw new UniverseException($"Full-text terms cannot exceed {MaxTermBytes} UTF-8 bytes.");
+                    rankParameterBytes += bytes;
+                    if (++terms > MaxCatalysts)
+                        throw new UniverseException($"Full-text searches support at most {MaxCatalysts} terms per query.");
+                }
+                if (catalyst.Operator == Q.Operator.VectorDistance && catalyst.Value is float[] vector)
+                {
+                    if (vector.Length > 4096 || vector.Any(value => !float.IsFinite(value)))
+                        throw new UniverseException("Vectors require at most 4096 finite components.");
+                    rankParameterBytes += JsonSerializer.SerializeToUtf8Bytes(vector).Length;
+                }
+                if (rankParameterBytes > MaxRankParameterBytes)
+                    throw new UniverseException($"Rank and full-text parameters exceed the {MaxRankParameterBytes}-byte total budget.");
+            }
+        }
     }
 
     private static void SanitizeInputs(IReadOnlyList<Cluster> clusters, ColumnOptions? columnOptions, IReadOnlyList<Sorting.Option> sorting, IReadOnlyList<string> groups)
@@ -431,7 +524,7 @@ internal partial class UniverseBuilder : IDisposable
                 foreach (Catalyst catalyst in cluster.Catalysts)
                 {
                     ValidateIdentifier(catalyst.Column, "Catalyst.Column");
-                    if (!string.IsNullOrWhiteSpace(catalyst.Alias))
+                    if (catalyst.Alias is not null)
                         ValidateSqlAlias(catalyst.Alias, "Catalyst.Alias");
                     foreach (QueryOperand operand in new[] { catalyst.LeftOperand, catalyst.RightOperand })
                     {
@@ -503,10 +596,14 @@ internal partial class UniverseBuilder : IDisposable
         if (string.IsNullOrWhiteSpace(identifier))
             throw new UniverseException($"{parameterName} cannot be null or empty.");
 
-        // Reject identifiers that consist solely of dots (e.g., ".", "..", "...")
-        // These would produce invalid SQL when processed by FormatProperty
-        if (identifier.All(c => c == '.'))
-            throw new UniverseException($"{parameterName} cannot consist solely of dots.");
+        // Ensure the identifier doesn't exceed a reasonable length
+        // Per Azure Cosmos DB documentation: database/container names are limited to 255 characters
+        // Document properties have no practical limit, but we enforce this as a sanity check
+        if (identifier.Length > 255)
+            throw new UniverseException($"{parameterName} exceeds maximum identifier length of 255 characters.");
+
+        if (identifier.Split('.').Any(string.IsNullOrWhiteSpace))
+            throw new UniverseException($"{parameterName} cannot contain empty or whitespace path segments.");
 
         // Check for suspicious patterns that might indicate SQL injection attempts
         if (identifier.Contains(';') || identifier.Contains("--") || identifier.Contains("/*") || identifier.Contains("*/"))
@@ -522,12 +619,6 @@ internal partial class UniverseBuilder : IDisposable
             throw new UniverseException($"{parameterName} contains double-quote (\") characters, which are not allowed in identifiers.");
         if (identifier.Contains(']'))
             throw new UniverseException($"{parameterName} contains closing bracket (]) characters, which are not allowed in identifiers.");
-
-        // Ensure the identifier doesn't exceed a reasonable length
-        // Per Azure Cosmos DB documentation: database/container names are limited to 255 characters
-        // Document properties have no practical limit, but we enforce this as a sanity check
-        if (identifier.Length > 255)
-            throw new UniverseException($"{parameterName} exceeds maximum identifier length of 255 characters.");
 
         // Reject control characters which could lead to query corruption
         if (identifier.Any(char.IsControl))
@@ -678,13 +769,14 @@ internal partial class UniverseBuilder : IDisposable
         // Example: "metadata.sku" becomes alias["metadata"]["sku"]
         // Naming policy is applied to each segment to match serialized document field names
 
+        ValidateSqlAlias(alias, "Property.Alias");
+        ValidateIdentifier(column, "Property.Column");
         string[] segments = column.Split('.');
         StringBuilder result = new(alias);
 
         foreach (string segment in segments)
         {
-            if (!string.IsNullOrWhiteSpace(segment))
-                result.Append($"[{JsonSerializer.Serialize(ConvertName(segment))}]");
+            result.Append($"[{JsonSerializer.Serialize(ConvertName(segment))}]");
         }
 
         return result.ToString();

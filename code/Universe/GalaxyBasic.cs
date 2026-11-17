@@ -52,6 +52,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 model.id = Guid.CreateVersion7().ToString();
             model.AddedOn = DateTime.UtcNow;
 
+            InvalidatePointWrite(model);
             ItemResponse<T> response = await _container.CreateItemAsync(
                 model,
                 model.BuildPartitionKey(),
@@ -95,7 +96,14 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             BatchChunkResult<T>[] batches = await Task.WhenAll(operations
                 .GroupBy(operation => PartitionKeyGroup(operation.PartitionKeys))
-                .Select(group => TransactionalBatchExecutor<T>.ExecuteAsync(_container, group.ToArray(), CancellationToken.None)));
+                .Select(async group =>
+                {
+                    BatchOperation<T>[] chunk = group.ToArray();
+                    BatchChunkResult<T> result = await ExecuteCacheAwareChunkAsync(chunk, CancellationToken.None);
+                    if (result.Succeeded)
+                        ApplySuccessfulCommit(chunk, result.Operations, clearQueryCache: true);
+                    return result;
+                }));
 
             BatchChunkResult<T> failed = batches.FirstOrDefault(batch => !batch.Succeeded);
             if (failed is not null)
@@ -108,10 +116,6 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             double totalRu = batches.Sum(batch => batch.RU);
 
-            foreach (T model in models)
-                SetPointCache(model);
-
-            ClearQueryCache();
             return new(totalRu, string.Empty);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
@@ -130,6 +134,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             model.ModifiedOn = DateTime.UtcNow;
 
+            InvalidatePointWrite(model);
             ItemResponse<T> response = await _container.ReplaceItemAsync(model, model.id, model.BuildPartitionKey());
             SetPointCache(response.Resource ?? model, response.ETag);
             ClearQueryCache();
@@ -167,7 +172,14 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             BatchChunkResult<T>[] batches = await Task.WhenAll(operations
                 .GroupBy(operation => PartitionKeyGroup(operation.PartitionKeys))
-                .Select(group => TransactionalBatchExecutor<T>.ExecuteAsync(_container, group.ToArray(), CancellationToken.None)));
+                .Select(async group =>
+                {
+                    BatchOperation<T>[] chunk = group.ToArray();
+                    BatchChunkResult<T> result = await ExecuteCacheAwareChunkAsync(chunk, CancellationToken.None);
+                    if (result.Succeeded)
+                        ApplySuccessfulCommit(chunk, result.Operations, clearQueryCache: true);
+                    return result;
+                }));
 
             BatchChunkResult<T> failed = batches.FirstOrDefault(batch => !batch.Succeeded);
             if (failed is not null)
@@ -175,10 +187,6 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             double totalRu = batches.Sum(batch => batch.RU);
 
-            foreach (T model in models)
-                SetPointCache(model);
-
-            ClearQueryCache();
             return new(totalRu, string.Empty);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -212,6 +220,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         try
         {
+            InvalidatePointWrite(id, partitionKey);
             ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, BuildPartitionKey(partitionKey), requestOptions: new()
             {
                 EnableContentResponseOnWrite = false
@@ -234,6 +243,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
     {
         try
         {
+            InvalidatePointWrite(id, [partitionKey]);
             ItemResponse<T> response = await _container.DeleteItemAsync<T>(id, new(partitionKey), requestOptions: new()
             {
                 EnableContentResponseOnWrite = false
@@ -269,9 +279,10 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             if (!bypassCache && TryGetPointCache(id, partitionKey, out T cached, out string cachedETag))
                 return (new(0, null) { ETag = cachedETag }, cached);
 
+            long? generation = bypassCache ? null : DocumentCache?.CaptureGeneration(DocumentCacheScopeHash(typeof(T)));
             ItemResponse<T> response = await _container.ReadItemAsync<T>(id, key, bypassCache ? new() { ConsistencyLevel = readOptions.ConsistencyLevel } : null);
             if (!bypassCache)
-                SetPointCache(id, partitionKey, response.Resource, response.ETag);
+                SetPointCache(id, partitionKey, response.Resource, response.ETag, generation);
             return (new(response.RequestCharge, null) { ETag = response.ETag }, response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -301,7 +312,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             operation.PrepareForExecution();
         ValidatePayload(operations);
 
-        BatchChunkResult<T> result = await TransactionalBatchExecutor<T>.ExecuteAsync(_container, operations, cancellationToken);
+        BatchChunkResult<T> result = await ExecuteCacheAwareChunkAsync(operations, cancellationToken);
         if (result.Succeeded)
             ApplySuccessfulCommit(operations, result.Operations, clearQueryCache: true);
 
@@ -340,7 +351,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                         foreach (IReadOnlyList<BatchOperation<T>> chunk in Chunk(group.OrderBy(operation => operation.Index)))
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            BatchChunkResult<T> result = await TransactionalBatchExecutor<T>.ExecuteAsync(_container, chunk, cancellationToken);
+                            BatchChunkResult<T> result = await ExecuteCacheAwareChunkAsync(chunk, cancellationToken);
                             completed.Add(result);
                             if (result.Succeeded)
                             {
@@ -425,6 +436,38 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             yield return current;
     }
 
+    private void InvalidatePointWrite(T model)
+    {
+        if (DocumentCache is null)
+            return;
+        InvalidatePointWrite(model.id, [.. model.PartitionKeys()]);
+    }
+
+    private void InvalidatePointWrite(string id, IReadOnlyList<string> partitionKeys)
+    {
+        RemovePointCache(id, partitionKeys);
+        ClearQueryCache();
+    }
+
+    private async Task<BatchChunkResult<T>> ExecuteCacheAwareChunkAsync(IReadOnlyList<BatchOperation<T>> operations, CancellationToken cancellationToken)
+    {
+        ClearQueryCache();
+        try
+        {
+            return await TransactionalBatchExecutor<T>.ExecuteAsync(_container, operations, cancellationToken);
+        }
+        catch
+        {
+            foreach (BatchOperation<T> operation in operations)
+                RemovePointCache(operation.Id, operation.PartitionKeys);
+            throw;
+        }
+        finally
+        {
+            ClearQueryCache();
+        }
+    }
+
     private void ApplySuccessfulCommit(
         IReadOnlyList<BatchOperation<T>> operations,
         IReadOnlyList<BatchOperationResult<T>> results,
@@ -467,14 +510,14 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         SetPointCache(model.id, [.. model.PartitionKeys()], model, eTag);
     }
 
-    private void SetPointCache(string id, IReadOnlyList<string> partitionKeys, T model, string eTag = null)
+    private void SetPointCache(string id, IReadOnlyList<string> partitionKeys, T model, string eTag = null, long? expectedGeneration = null)
     {
         DocumentCache cache = DocumentCache;
         if (cache is null || model is null)
             return;
 
         DocumentCacheKey key = cache.CreatePointKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
-        cache.Set(key, DocumentCacheOperation.PointRead, DocumentCacheScopeHash(typeof(T)), model, eTag);
+        cache.Set(key, DocumentCacheOperation.PointRead, DocumentCacheScopeHash(typeof(T)), model, eTag, expectedGeneration);
     }
 
     private void RemovePointCache(string id, IReadOnlyList<string> partitionKeys)
@@ -484,7 +527,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
             return;
 
         DocumentCacheKey key = cache.CreatePointKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
-        cache.Remove(key);
+        cache.Remove(key, DocumentCacheScopeHash(typeof(T)));
     }
 
     private void ClearQueryCache()

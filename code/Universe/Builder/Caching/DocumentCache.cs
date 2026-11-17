@@ -29,6 +29,18 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
     private readonly LinkedList<DocumentCacheEntry> _insertionOrder = [];
     private readonly ConditionalWeakTable<CosmosClient, string> _clientNamespaces = new();
 
+    // Fixed stripes bound mutation metadata; hash collisions only suppress an unrelated read fill.
+    private readonly long[] _generations = new long[256];
+    private long _serializedBytes;
+
+    internal long CaptureGeneration(string scopeHash)
+    {
+        lock (_sync)
+            return _generations[GenerationIndex(scopeHash)];
+    }
+
+    private static int GenerationIndex(string scopeHash) => (int)((uint)StringComparer.Ordinal.GetHashCode(scopeHash) % 256);
+
     internal string GetClientNamespace(CosmosClient client)
         => _clientNamespaces.GetValue(client, static _ => Guid.NewGuid().ToString("N"));
 
@@ -127,12 +139,17 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         }
     }
 
-    internal void Set(DocumentCacheKey key, DocumentCacheOperation operation, string scopeHash, object value, string eTag = null)
+    internal void Set(DocumentCacheKey key, DocumentCacheOperation operation, string scopeHash, object value, string eTag = null, long? expectedGeneration = null)
     {
         object valueToStore;
+        int serializedBytes;
         try
         {
-            valueToStore = options.CloneDocuments ? CloneIfNeeded<object>(value) : value;
+            byte[] json = JsonSerializer.SerializeToUtf8Bytes(value, value?.GetType() ?? typeof(object), JsonOptions);
+            serializedBytes = json.Length;
+            valueToStore = options.CloneDocuments && value is not null && serializedBytes <= options.MaxEntryBytes && serializedBytes <= options.MaxTotalBytes
+                ? JsonSerializer.Deserialize(json, value.GetType(), JsonOptions)
+                : value;
         }
         catch (SystemException)
         {
@@ -141,21 +158,42 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
 
         lock (_sync)
         {
-            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag);
-            if (_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node))
+            int generationIndex = GenerationIndex(scopeHash);
+            if (expectedGeneration.HasValue && expectedGeneration.Value != _generations[generationIndex])
+                return;
+            if (!expectedGeneration.HasValue)
+                _generations[generationIndex]++;
+
+            _entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node);
+            if (serializedBytes > options.MaxEntryBytes || serializedBytes > options.MaxTotalBytes)
+            {
+                if (node is not null)
+                    RemoveNode(node);
+                return;
+            }
+
+            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag, serializedBytes);
+            if (node is not null)
+            {
+                _serializedBytes -= node.Value.SerializedBytes;
                 node.Value = entry;
+            }
             else
                 _entries.Add(key, _insertionOrder.AddLast(entry));
-
-            while (_entries.Count > options.MaxEntries)
+            _serializedBytes += serializedBytes;
+            while (_entries.Count > options.MaxEntries || _serializedBytes > options.MaxTotalBytes)
                 RemoveNode(_insertionOrder.First!);
         }
     }
 
-    internal void Remove(DocumentCacheKey key)
+    internal void Remove(DocumentCacheKey key, string scopeHash = null)
     {
         lock (_sync)
         {
+            if (scopeHash is not null)
+                _generations[GenerationIndex(scopeHash)]++;
+            else if (_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> existing))
+                _generations[GenerationIndex(existing.Value.ScopeHash)]++;
             if (_entries.TryGetValue(key, out LinkedListNode<DocumentCacheEntry> node))
                 RemoveNode(node);
         }
@@ -165,6 +203,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
     {
         lock (_sync)
         {
+            _generations[GenerationIndex(scopeHash)]++;
             LinkedListNode<DocumentCacheEntry> node = _insertionOrder.First;
             while (node is not null)
             {
@@ -178,6 +217,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
 
     private void RemoveNode(LinkedListNode<DocumentCacheEntry> node)
     {
+        _serializedBytes -= node.Value.SerializedBytes;
         _entries.Remove(node.Value.Key);
         _insertionOrder.Remove(node);
     }
@@ -221,5 +261,6 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         DateTimeOffset CreatedOn,
         DocumentCacheOperation Operation,
         string ScopeHash,
-        string ETag);
+        string ETag,
+        int SerializedBytes);
 }

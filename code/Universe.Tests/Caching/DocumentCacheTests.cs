@@ -11,6 +11,73 @@ namespace Universe.Tests.Caching;
 public sealed class DocumentCacheTests
 {
     [Fact]
+    public void Set_ExactByteBoundaryExpiresAndRemovesAccounting()
+    {
+        DocumentCache cache = new(new(TimeSpan.FromMilliseconds(10), 10, false, 5, 5));
+        DocumentCacheKey key = new("key");
+        cache.Set(key, DocumentCacheOperation.SingleQuery, "scope", "abc");
+        Assert.True(cache.TryGet(key, out string _));
+        Thread.Sleep(20);
+        Assert.False(cache.TryGet(key, out string _));
+        cache.Set(key, DocumentCacheOperation.SingleQuery, "scope", "abc");
+        Assert.True(cache.TryGet(key, out string _));
+        cache.ClearQueries("scope");
+        cache.Set(new("next"), DocumentCacheOperation.PointRead, "scope", "abc");
+        Assert.True(cache.TryGet(new("next"), out string _));
+    }
+
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(10, 0)]
+    [InlineData(-1, 10)]
+    public void Options_RejectNonpositiveByteBudgets(int entryBytes, long totalBytes)
+    {
+        Assert.Throws<Universe.Exception.UniverseException>(() => new DocumentCacheOptions(null, 10, true, entryBytes, totalBytes));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Set_EnforcesSerializedByteLimitsAndReplacementAccounting(bool clone)
+    {
+        DocumentCache cache = new(new(null, 10, clone, maxEntryBytes: 100, maxTotalBytes: 100));
+        DocumentCacheKey first = new("first");
+        DocumentCacheKey second = new("second");
+        cache.Set(first, DocumentCacheOperation.PointRead, "scope", new string('a', 60));
+        cache.Set(second, DocumentCacheOperation.PointRead, "scope", new string('b', 60));
+        Assert.False(cache.TryGet(first, out string _));
+        Assert.True(cache.TryGet(second, out string _));
+        cache.Set(second, DocumentCacheOperation.PointRead, "scope", "small");
+        cache.Set(first, DocumentCacheOperation.PointRead, "scope", new string('a', 60));
+        Assert.True(cache.TryGet(second, out string _));
+        cache.Set(first, DocumentCacheOperation.PointRead, "scope", new string('a', 101));
+        Assert.False(cache.TryGet(first, out string _));
+        cache.Remove(second);
+        cache.Set(first, DocumentCacheOperation.PointRead, "scope", new string('a', 90));
+        Assert.True(cache.TryGet(first, out string _));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Set_ReadFillCannotUndoMutation(bool query)
+    {
+        DocumentCache cache = new(new());
+        DocumentCacheKey key = new("key");
+        DocumentCacheOperation operation = query ? DocumentCacheOperation.SingleQuery : DocumentCacheOperation.PointRead;
+        long generation = cache.CaptureGeneration("scope");
+        cache.Set(key, operation, "scope", "updated");
+        cache.Set(key, operation, "scope", "stale", expectedGeneration: generation);
+        Assert.True(cache.TryGet(key, out string actual));
+        Assert.Equal("updated", actual);
+        generation = cache.CaptureGeneration("scope");
+        cache.Remove(key);
+        cache.ClearQueries("scope");
+        cache.Set(key, operation, "scope", "stale", expectedGeneration: generation);
+        Assert.False(cache.TryGet(key, out string _));
+    }
+
+    [Fact]
     public async Task CloneFailure_DoesNotEvictAConcurrentReplacement()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

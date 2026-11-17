@@ -1,5 +1,15 @@
 # Declarative Query Syntax Reference (Cluster / Catalyst)
 
+## Query validation and resource limits
+
+Explicit empty or whitespace aliases and empty dotted-path segments are rejected with `UniverseException`; a null catalyst alias still uses `c`. These rules apply to filters, operands, selected fields, joins, aggregates, sorting, grouping, and projections.
+
+The builder enforces fixed safety budgets before rank/full-text expansion: 1,024 catalysts and clusters per query, 64 rank expressions, 64 terms per full-text array, 1,024 full-text terms across the query, and 4,096 UTF-8 bytes per term. Rank/full-text inputs share a 1 MiB parameter budget, measured as full-text UTF-8 content plus serialized vector bytes. Repeated expressions count toward input budgets even when parameter bindings are shared. Ordinary scalar/object parameter values keep their existing SDK serialization behavior.
+
+Generated SQL is limited to 256 KiB of UTF-8 text. Query shaping allows 1,024 fields across selected columns, aggregates, join outputs, sorting, grouping, and structured projections; projections allow 32 nested levels and 255-character output names. Catalyst IDs allow 128 characters and rank weight text allows 4,096 characters. Queries exceeding a budget fail locally with `UniverseException`; there are no settings to disable these limits.
+
+`Paged` rejects actual `GROUP BY` queries before opening a Cosmos iterator because grouped queries do not support continuation tokens; use `List` for grouped results. For supported queries, paging reads through empty pages and stops at the first nonempty page, returning its continuation token and consumed request charge. Property names containing the text `GROUP BY` do not change paging behavior.
+
 ## Extended predicates, operands, projections, and read options
 
 String and type operators are `Q.Operator.StartsWith`, `StringContains`, `StringEquals`, `IsNull`, and `IsString`. Set `IgnoreCase = true` only on the string predicates. Unary type predicates accept no value. Missing and null properties remain distinct: use `NotDefined OR IsNull` when both should match. For partial-object array membership, use `In`/`NotIn` with `PartialMatch = true`; bind the object itself as the value. Existing Contains semantics do not change.

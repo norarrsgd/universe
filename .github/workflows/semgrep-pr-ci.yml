@@ -9,17 +9,28 @@ jobs:
     name: Semgrep PR Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Install latest Semgrep
-        run: pip install --upgrade semgrep
+      - name: Check out reviewed C# rules
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: semgrep/semgrep-rules
+          ref: a5ad1714f00c9f7fde980cab0ea1d6dc6d414fd2
+          path: .security-rules
+          sparse-checkout: csharp
+          persist-credentials: false
 
       - name: Run Semgrep scan
-        run: semgrep scan . --config auto --sarif --output semgrep.sarif
+        run: >-
+          docker run --rm --network none
+          --volume "$GITHUB_WORKSPACE:/src" --workdir /src
+          semgrep/semgrep:1.185.0@sha256:67518c174185a2043fdbed16c70631b79209499b3671178e7194379b48295a0d
+          semgrep scan . --config .security-rules/csharp --exclude .security-rules
+          --metrics off --disable-version-check --sarif --output semgrep.sarif
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           sarif_file: semgrep.sarif
