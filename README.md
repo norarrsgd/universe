@@ -109,7 +109,7 @@ _ = services.AddScoped<IGalaxy<MyModel>, MyRepository>(service => new MyReposito
 ));
 ```
 
-The cache is process-local memory. Repositories share entries only when they use the same `CosmosClient` instance and cache options, with matching database, container, and entity types. Different client instances are isolated even when they connect to the same endpoint. Use separate clients for different authorization contexts; if a client's authority changes, recreate it or disable document caching.
+The cache is process-local memory. Repositories share entries only when they use the same `CosmosClient` instance and cache options, with matching database, container, and entity types. Different client instances are isolated even when they connect to the same endpoint. Use separate clients for different authorization contexts; if a client's authority changes, recreate it or disable document caching. When a client supplies a custom `CosmosSerializer`, cache cloning and write normalization use that same serializer so cache hits preserve the persisted document contract.
 
 `maxEntries` bounds both retained documents and eviction records. The default serialized UTF-8 budgets are 1 MiB per entry and 32 MiB total; oversized entries are skipped and the oldest entries are evicted to satisfy both limits. Configure custom budgets with `WithDocumentCache(timeToLive, maxEntries, cloneDocuments, maxEntryBytes, maxTotalBytes)`. These budgets measure serialized size at insertion, not managed heap usage; with cloning disabled, callers can mutate retained instances afterward. Eviction follows first-insertion order; overwrites refresh the value, ETag, and TTL without changing that order. Query-cache keys preserve quoted field names and associate each SQL parameter occurrence with its bound value.
 
@@ -211,6 +211,8 @@ Gravity gravity = await galaxy.Modify(models);
 
 `Atomic(...)` executes mixed create, replace, patch, and delete operations as one ACID transaction in a single logical partition. `Bulk()` applies the same operations across partitions; each partition chunk is transactional, but the overall execution can partially succeed. Neither new API requires `AllowBulkExecution`.
 
+One `Bulk()` builder accepts at most 1,000 operations across 100 logical partitions, and execution uses at most 16 fixed workers with four workers by default. `BulkExecutionOptions.MaxOperations` and `MaxPartitions` can impose lower per-execution limits. These library ceilings do not replace HTTP request or deserialization limits: applications must reject oversized requests and collections before constructing models or adding operations to a batch.
+
 ```csharp
 // Point reads now include an ETag. Replacements, patches, and deletes can require it.
 (Gravity read, MyModel model) = await galaxy.Get("document-id", "partition-key-value");
@@ -233,7 +235,7 @@ AtomicBatchResult<MyModel> patch = await galaxy
         condition => condition.Equal(item => item.Status, "active"))
     .ExecuteAsync();
 
-// Cross-partition work remains ordered per partition and uses four partition pipelines by default.
+// Cross-partition work remains ordered per partition and uses four fixed workers by default.
 BulkExecutionResult<MyModel> bulk = await galaxy
     .Bulk()
     .Create(new MyModel { /* partition-key properties and document fields */ })

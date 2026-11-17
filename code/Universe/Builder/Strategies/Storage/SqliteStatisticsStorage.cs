@@ -30,6 +30,9 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     private readonly Timer _flushTimer;
     private readonly Task _writerTask;
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
+    private readonly object _lifecycleLock = new();
+    private TaskCompletionSource<bool> _activeOperationsDrained;
+    private int _activeOperations;
     private int _disposed;
     private int _periodicFlushQueued;
     private long _droppedWriteCount;
@@ -320,13 +323,19 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// </summary>
     public Task SaveAsync(QueryExecutionStatistics stats)
     {
-        if (Volatile.Read(ref _disposed) != 0)
+        if (!TryEnterOperation()) return Task.CompletedTask;
+
+        try
+        {
+            if (!_writeQueue.Writer.TryWrite(new WriteRequest(stats)))
+                Interlocked.Increment(ref _droppedWriteCount);
+
             return Task.CompletedTask;
-
-        if (!_writeQueue.Writer.TryWrite(new WriteRequest(stats)))
-            Interlocked.Increment(ref _droppedWriteCount);
-
-        return Task.CompletedTask;
+        }
+        finally
+        {
+            ExitOperation();
+        }
     }
 
     /// <summary>
@@ -335,24 +344,31 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
     public async Task<IList<QueryExecutionStatistics>> LoadRecentAsync(int count)
     {
-        if (Volatile.Read(ref _disposed) != 0) return [];
+        if (!TryEnterOperation()) return [];
 
-        // Flush pending writes first to ensure consistency
-        await FlushPendingAsync();
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-            throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
         try
         {
-            _selectRecentCommand.Parameters.Clear();
-            _selectRecentCommand.Parameters.AddWithValue("@count", count);
+            // Flush pending writes first to ensure consistency
+            await FlushPendingAsync();
 
-            using SqliteDataReader reader = await _selectRecentCommand.ExecuteReaderAsync();
-            return ReadStatistics(reader);
+            if (!await _writeLock.WaitAsync(LockTimeout))
+                throw new TimeoutException("Lock acquisition timed out in LoadRecentAsync.");
+            try
+            {
+                _selectRecentCommand.Parameters.Clear();
+                _selectRecentCommand.Parameters.AddWithValue("@count", count);
+
+                using SqliteDataReader reader = await _selectRecentCommand.ExecuteReaderAsync();
+                return ReadStatistics(reader);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
         finally
         {
-            _writeLock.Release();
+            ExitOperation();
         }
     }
 
@@ -362,27 +378,34 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
     public async Task<IList<QueryExecutionStatistics>> GetByQueryHashAsync(string queryHash, TimeSpan window)
     {
-        if (Volatile.Read(ref _disposed) != 0) return [];
+        if (!TryEnterOperation()) return [];
 
-        // Flush pending writes first to ensure consistency
-        await FlushPendingAsync();
-
-        long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-            throw new TimeoutException("Lock acquisition timed out in GetByQueryHashAsync.");
         try
         {
-            _selectByHashCommand.Parameters.Clear();
-            _selectByHashCommand.Parameters.AddWithValue("@hash", queryHash);
-            _selectByHashCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
+            // Flush pending writes first to ensure consistency
+            await FlushPendingAsync();
 
-            using SqliteDataReader reader = await _selectByHashCommand.ExecuteReaderAsync();
-            return ReadStatistics(reader);
+            long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(window).ToUnixTimeSeconds();
+
+            if (!await _writeLock.WaitAsync(LockTimeout))
+                throw new TimeoutException("Lock acquisition timed out in GetByQueryHashAsync.");
+            try
+            {
+                _selectByHashCommand.Parameters.Clear();
+                _selectByHashCommand.Parameters.AddWithValue("@hash", queryHash);
+                _selectByHashCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
+
+                using SqliteDataReader reader = await _selectByHashCommand.ExecuteReaderAsync();
+                return ReadStatistics(reader);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
         finally
         {
-            _writeLock.Release();
+            ExitOperation();
         }
     }
 
@@ -392,27 +415,34 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// <exception cref="TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
     public async Task ClearOldAsync(TimeSpan olderThan)
     {
-        if (Volatile.Read(ref _disposed) != 0) return;
+        if (!TryEnterOperation()) return;
 
-        await FlushPendingAsync();
-
-        long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(olderThan).ToUnixTimeSeconds();
-
-        if (!await _writeLock.WaitAsync(LockTimeout))
-            throw new TimeoutException("Lock acquisition timed out in ClearOldAsync.");
         try
         {
-            _deleteOldCommand.Parameters.Clear();
-            _deleteOldCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
-            await _deleteOldCommand.ExecuteNonQueryAsync();
+            await FlushPendingAsync();
 
-            _deleteOverflowCommand.Parameters.Clear();
-            _deleteOverflowCommand.Parameters.AddWithValue("@maxRows", MaxStoredRecords);
-            await _deleteOverflowCommand.ExecuteNonQueryAsync();
+            long cutoffTimestamp = DateTimeOffset.UtcNow.Subtract(olderThan).ToUnixTimeSeconds();
+
+            if (!await _writeLock.WaitAsync(LockTimeout))
+                throw new TimeoutException("Lock acquisition timed out in ClearOldAsync.");
+            try
+            {
+                _deleteOldCommand.Parameters.Clear();
+                _deleteOldCommand.Parameters.AddWithValue("@cutoff", cutoffTimestamp);
+                await _deleteOldCommand.ExecuteNonQueryAsync();
+
+                _deleteOverflowCommand.Parameters.Clear();
+                _deleteOverflowCommand.Parameters.AddWithValue("@maxRows", MaxStoredRecords);
+                await _deleteOverflowCommand.ExecuteNonQueryAsync();
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
         finally
         {
-            _writeLock.Release();
+            ExitOperation();
         }
     }
 
@@ -564,9 +594,6 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
 
     private async Task FlushPendingAsync()
     {
-        if (Volatile.Read(ref _disposed) != 0)
-            return;
-
         TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         try
         {
@@ -577,6 +604,28 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
         {
             // Disposal drains every accepted write before closing the channel.
         }
+    }
+
+    private bool TryEnterOperation()
+    {
+        lock (_lifecycleLock)
+        {
+            if (_disposed != 0) return false;
+            _activeOperations++;
+            return true;
+        }
+    }
+
+    private void ExitOperation()
+    {
+        TaskCompletionSource<bool> drained = null;
+        lock (_lifecycleLock)
+        {
+            _activeOperations--;
+            if (_disposed != 0 && _activeOperations == 0)
+                drained = _activeOperationsDrained;
+        }
+        drained?.TrySetResult(true);
     }
 
     private void RequestPeriodicFlush(object state)
@@ -593,26 +642,33 @@ public sealed class SqliteStatisticsStorage : IQueryStatisticsStorage, IDisposab
     /// </summary>
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
+        Task operationsDrained;
+        lock (_lifecycleLock)
+        {
+            if (_disposed != 0) return;
+            Volatile.Write(ref _disposed, 1);
+            if (_activeOperations == 0)
+                operationsDrained = Task.CompletedTask;
+            else
+            {
+                _activeOperationsDrained = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                operationsDrained = _activeOperationsDrained.Task;
+            }
+        }
 
-        _flushTimer.Dispose();
+        _flushTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        _flushTimer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        // Admitted readers need the writer alive to complete their ordered flush barriers.
+        operationsDrained.GetAwaiter().GetResult();
         _writeQueue.Writer.TryComplete();
-
-        bool writerStopped = false;
         try
         {
-            writerStopped = _writerTask.Wait(TimeSpan.FromSeconds(10));
-            if (!writerStopped)
-                Trace.TraceWarning("[UniverseQuery] Timed out draining SQLite statistics during disposal.");
+            _writerTask.GetAwaiter().GetResult();
         }
-        catch (AggregateException ex)
+        catch (System.Exception ex)
         {
             Trace.TraceWarning($"[UniverseQuery] Failed to drain SQLite statistics during disposal: {ex.Message}");
         }
-
-        if (!writerStopped)
-            return;
 
         _insertCommand?.Dispose();
         _selectRecentCommand?.Dispose();

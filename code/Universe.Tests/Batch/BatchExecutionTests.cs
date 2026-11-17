@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
@@ -15,6 +16,24 @@ namespace Universe.Tests.Batch;
 
 public sealed class BatchExecutionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacyBulk_RejectsOverHundredBeforeEnumeration(bool create)
+    {
+        InMemoryCosmosContainer<BatchEntity> container = new();
+        using TestGalaxy repository = CreateRepository(container);
+        CountingReadOnlyList<BatchEntity> models = new(101);
+
+        UniverseException exception = await Assert.ThrowsAsync<UniverseException>(() => create
+            ? ((IGalaxyBasic<BatchEntity>)repository).Create(models)
+            : ((IGalaxyBasic<BatchEntity>)repository).Modify(models));
+
+        Assert.Contains("up to 100", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, models.EnumerationCount);
+        Assert.Empty(container.Executions);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -278,6 +297,51 @@ public sealed class BatchExecutionTests
     }
 
     [Fact]
+    public async Task Bulk_RejectsConfiguredOperationAndPartitionLimitsBeforeExecution()
+    {
+        InMemoryCosmosContainer<BatchEntity> container = new();
+        TestGalaxy repository = CreateRepository(container);
+        BulkBatch<BatchEntity> operationLimited = repository.Bulk()
+            .Create(Entity("first", "tenant-a", 1, "new"))
+            .Create(Entity("second", "tenant-a", 2, "new"));
+        BulkBatch<BatchEntity> partitionLimited = repository.Bulk()
+            .Create(Entity("third", "tenant-b", 3, "new"))
+            .Create(Entity("fourth", "tenant-c", 4, "new"));
+
+        await Assert.ThrowsAsync<UniverseException>(() => operationLimited.ExecuteAsync(
+            new() { MaxOperations = 1 },
+            TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UniverseException>(() => partitionLimited.ExecuteAsync(
+            new() { MaxPartitions = 1 },
+            TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UniverseException>(() => operationLimited.ExecuteAsync(
+            new() { MaxOperations = BulkExecutionOptions.MaximumOperations + 1 },
+            TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UniverseException>(() => partitionLimited.ExecuteAsync(
+            new() { MaxPartitions = BulkExecutionOptions.MaximumPartitions + 1 },
+            TestContext.Current.CancellationToken));
+
+        Assert.Empty(container.Executions);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(BulkExecutionOptions.MaximumConcurrency + 1)]
+    public async Task Bulk_RejectsConcurrencyOutsideHardLimits(int maxConcurrency)
+    {
+        InMemoryCosmosContainer<BatchEntity> container = new();
+        TestGalaxy repository = CreateRepository(container);
+        BulkBatch<BatchEntity> batch = repository.Bulk()
+            .Create(Entity("item", "tenant-a", 1, "new"));
+
+        await Assert.ThrowsAsync<UniverseException>(() => batch.ExecuteAsync(
+            new() { MaxConcurrency = maxConcurrency },
+            TestContext.Current.CancellationToken));
+
+        Assert.Empty(container.Executions);
+    }
+
+    [Fact]
     public async Task Batch_PreCancellationPerformsNoOperations()
     {
         InMemoryCosmosContainer<BatchEntity> container = new();
@@ -362,5 +426,20 @@ public sealed class BatchExecutionTests
 
         public int Quantity { get; set; }
         public string Status { get; set; }
+    }
+
+    private sealed class CountingReadOnlyList<T>(int count) : IReadOnlyList<T>
+    {
+        public int EnumerationCount { get; private set; }
+        public int Count => count;
+        public T this[int index] => throw new InvalidOperationException("The oversized list must not be indexed.");
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            EnumerationCount++;
+            throw new InvalidOperationException("The oversized list must not be enumerated.");
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

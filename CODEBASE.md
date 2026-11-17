@@ -835,7 +835,8 @@ Storage behavior:
 - `FileStatisticsStorage` writes at most the 1000 most recent entries.
 - `FileStatisticsStorage` logs and returns empty data if the JSON file is corrupt.
 - `SqliteStatisticsStorage` queues writes, flushes on batch size or timer, and retries failed flushes up to 3 times.
-- `SqliteStatisticsStorage.Dispose()` attempts a final flush before closing commands and connection.
+- SQLite reads drain all pending batches; batches are dequeued under the connection lock so reads cannot overtake an in-flight flush.
+- `SqliteStatisticsStorage.Dispose()` stops and joins timer callbacks, drains admitted operations while their ordered flush barriers can still use the bounded writer, then completes and joins the writer before closing commands and connection.
 - `PlatformDetection.IsAzureEnvironment()` checks `WEBSITE_INSTANCE_ID` and Functions environment variables.
 - `ValidateStoragePath` normalizes with `Path.GetFullPath`, rejects null bytes, and requires a rooted result.
 
@@ -868,7 +869,7 @@ Invalidation behavior:
 
 Cache keys are SHA-256 hashes built from an opaque Cosmos client namespace, operation kind, database, container, source entity type, result type, and operation inputs. A cache-owned `ConditionalWeakTable<CosmosClient, string>` assigns namespaces by exact client-instance identity without retaining credentials or preventing client collection. Point keys, query keys, and invalidation scopes all include that namespace. Repositories sharing the same client and cache options can share matching entries; different client instances are isolated even at the same endpoint. A client must represent one stable authorization context; recreate it or disable caching when its authority changes.
 
-Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with `System.Text.Json` settings aligned with `UniverseSerializer`; clone failures skip or evict the affected cache entry. Writes through another client namespace rely on TTL expiry for visibility.
+Raw ids, partition-key values, query text, and parameter values are not retained as readable dictionary keys. Cached values are cloned by default with the owning client's custom `CosmosSerializer`, or with `System.Text.Json` settings aligned with `UniverseSerializer` when the client has no custom serializer. Submitted create and batch models are normalized through that codec before cache insertion, including when ordinary read cloning is disabled. Clone failures skip or evict the affected cache entry. Writes through another client namespace rely on TTL expiry for visibility.
 
 Query parameter signatures are restricted to null, string, boolean, and built-in numeric values and include runtime type identity. Object and collection parameters, including anonymous-object partial-match authorization filters, bypass query caching because the cache cannot guarantee equivalence with Cosmos parameter serialization. This prevents distinct filters from collapsing into the same key when document-cloning options omit getter-only properties, nulls, or serializer-specific members. Point reads retain their existing cache behavior.
 

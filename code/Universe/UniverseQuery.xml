@@ -61,6 +61,21 @@
         <member name="T:Universe.BulkExecutionOptions">
             <summary>Configures cross-partition bulk execution.</summary>
         </member>
+        <member name="F:Universe.BulkExecutionOptions.MaximumOperations">
+            <summary>Gets the hard maximum number of operations retained by one bulk batch.</summary>
+        </member>
+        <member name="F:Universe.BulkExecutionOptions.MaximumPartitions">
+            <summary>Gets the hard maximum number of logical partitions retained by one bulk batch.</summary>
+        </member>
+        <member name="F:Universe.BulkExecutionOptions.MaximumConcurrency">
+            <summary>Gets the hard maximum number of logical partition pipelines executing at once.</summary>
+        </member>
+        <member name="P:Universe.BulkExecutionOptions.MaxOperations">
+            <summary>Gets or sets the maximum number of operations accepted by this execution.</summary>
+        </member>
+        <member name="P:Universe.BulkExecutionOptions.MaxPartitions">
+            <summary>Gets or sets the maximum number of logical partitions accepted by this execution.</summary>
+        </member>
         <member name="P:Universe.BulkExecutionOptions.MaxConcurrency">
             <summary>Gets or sets the maximum number of logical partition pipelines executing at once.</summary>
         </member>
@@ -959,7 +974,7 @@
         </member>
         <member name="T:Universe.Builder.Strategies.Storage.FileStatisticsStorage">
             <summary>
-            File-based storage (JSON persistence)
+            File-based storage with bounded, batched JSON persistence
             </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.#ctor(System.String)">
@@ -986,7 +1001,8 @@
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>
-            Save a query execution statistic
+            Queue a query execution statistic for best-effort persistence.
+            Records are dropped when the bounded telemetry queue is full.
             </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.FileStatisticsStorage.LoadRecentAsync(System.Int32)">
@@ -1110,9 +1126,9 @@
             <summary>
             SQLite-based storage for query statistics with high-performance features:
             - WAL mode for concurrent read/write
-            - Non-blocking fire-and-forget writes
+            - Bounded, non-blocking writes through one tracked writer
             - Batched inserts for efficiency
-            - Auto-cleanup of old data
+            - Hard row, database-page, and WAL limits in addition to age cleanup
             - Schema versioning for safe upgrades
             </summary>
         </member>
@@ -1143,7 +1159,8 @@
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.SaveAsync(Universe.Builder.Strategies.QueryExecutionStatistics)">
             <summary>
-            Queue a statistic for saving (non-blocking)
+            Queue a statistic for best-effort saving without blocking query execution.
+            Records are dropped when the bounded telemetry queue is full.
             </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.LoadRecentAsync(System.Int32)">
@@ -1163,11 +1180,6 @@
             Clear old statistics (older than specified timespan)
             </summary>
             <exception cref="T:System.TimeoutException">Thrown when the write lock cannot be acquired within the timeout period.</exception>
-        </member>
-        <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.FireAndForget(System.Func{System.Threading.Tasks.Task})">
-            <summary>
-            Runs an async task fire-and-forget, logging any exceptions instead of leaving them unobserved.
-            </summary>
         </member>
         <member name="M:Universe.Builder.Strategies.Storage.SqliteStatisticsStorage.Dispose">
             <summary>
@@ -1737,7 +1749,7 @@
         <member name="M:Universe.UniverseOptions.WithSqlitePersistence(System.String,System.Int32,System.Int32,System.Int32)">
             <summary>
             Creates Universe options with SQLite-based persistence for high-performance statistics storage.
-            Features WAL mode for concurrent access, batched writes, and automatic cleanup.
+            Features WAL mode, bounded batched writes, and row, file-growth, and age retention limits.
             </summary>
             <param name="path">Optional custom path for the SQLite database file. If null, uses 'universe-stats.db' in the application directory.</param>
             <param name="retentionDays">Number of days to retain statistics. Older records are automatically cleaned up. Default is 7 days.</param>
