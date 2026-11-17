@@ -155,8 +155,29 @@ jobs:
             exit 1
           fi
 
-          package_id=$(unzip -p "$package_path" "${nuspec_files[0]}" | sed -n 's:.*<id>\([^<]*\)</id>.*:\1:p')
-          package_version=$(unzip -p "$package_path" "${nuspec_files[0]}" | sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p')
+          # expat does not resolve external entities; DOCTYPE is rejected outright as defense in depth.
+          nuspec_identity=$(unzip -p "$package_path" "${nuspec_files[0]}" | python3 -I -c '
+          import sys
+          import xml.etree.ElementTree as ET
+
+          data = sys.stdin.buffer.read()
+          if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
+              sys.exit("NuSpec must not contain a DTD.")
+          root = ET.fromstring(data)
+          if root.tag.rpartition("}")[2] != "package":
+              sys.exit("NuSpec root element must be package.")
+          metadata = root.findall("{*}metadata")
+          if len(metadata) != 1:
+              sys.exit("NuSpec must contain exactly one metadata element.")
+          values = []
+          for name in ("id", "version"):
+              found = metadata[0].findall("{*}" + name)
+              if len(found) != 1 or not (found[0].text or "").strip():
+                  sys.exit("NuSpec must contain exactly one non-empty metadata " + name + " element.")
+              values.append(found[0].text.strip())
+          print("\t".join(values))
+          ') || { echo "NuSpec identity could not be parsed."; exit 1; }
+          IFS=$'\t' read -r package_id package_version <<< "$nuspec_identity"
           if [[ "$package_id" != "UniverseQuery" || "$package_version" != "$EXPECTED_VERSION" ]]; then
             echo "NuSpec identity does not match the expected package and version."
             exit 1
