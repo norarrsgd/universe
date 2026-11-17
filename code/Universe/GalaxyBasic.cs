@@ -60,7 +60,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
                 {
                     EnableContentResponseOnWrite = false
                 });
-            SetPointCache(model, response.ETag);
+            SetPointCache(model, response.ETag, normalize: true);
             ClearQueryCache();
             return (new(response.RequestCharge, null) { ETag = response.ETag }, model.id);
         }
@@ -136,7 +136,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
 
             InvalidatePointWrite(model);
             ItemResponse<T> response = await _container.ReplaceItemAsync(model, model.id, model.BuildPartitionKey());
-            SetPointCache(response.Resource ?? model, response.ETag);
+            SetPointCache(response.Resource ?? model, response.ETag, normalize: response.Resource is null);
             ClearQueryCache();
             return (new(response.RequestCharge, null) { ETag = response.ETag }, response.Resource);
         }
@@ -478,7 +478,7 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         {
             BatchOperationResult<T> result = resultsByIndex[operation.Index];
             if (operation.Kind is BatchOperationKind.Create or BatchOperationKind.Replace)
-                SetPointCache(operation.Model, result.ETag);
+                SetPointCache(operation.Model, result.ETag, normalize: true);
             else
                 RemovePointCache(operation.Id, operation.PartitionKeys);
         }
@@ -501,23 +501,37 @@ public class GalaxyBasic<T> : GalaxyCore, IGalaxyBasic<T> where T : class, ICosm
         return cache.TryGet(key, out value, out eTag);
     }
 
-    private void SetPointCache(T model, string eTag = null)
+    private void SetPointCache(T model, string eTag = null, bool normalize = false)
     {
         DocumentCache cache = DocumentCache;
         if (cache is null || model is null)
             return;
 
-        SetPointCache(model.id, [.. model.PartitionKeys()], model, eTag);
+        SetPointCache(model.id, [.. model.PartitionKeys()], model, eTag, normalize: normalize);
     }
 
-    private void SetPointCache(string id, IReadOnlyList<string> partitionKeys, T model, string eTag = null, long? expectedGeneration = null)
+    private void SetPointCache(
+        string id,
+        IReadOnlyList<string> partitionKeys,
+        T model,
+        string eTag = null,
+        long? expectedGeneration = null,
+        bool normalize = false)
     {
         DocumentCache cache = DocumentCache;
         if (cache is null || model is null)
             return;
 
         DocumentCacheKey key = cache.CreatePointKey(_documentCacheNamespace, _databaseName, _containerName, typeof(T), typeof(T), id, partitionKeys);
-        cache.Set(key, DocumentCacheOperation.PointRead, DocumentCacheScopeHash(typeof(T)), model, eTag, expectedGeneration);
+        cache.Set(
+            key,
+            DocumentCacheOperation.PointRead,
+            DocumentCacheScopeHash(typeof(T)),
+            model,
+            eTag,
+            expectedGeneration,
+            _documentCacheSerializer,
+            normalize);
     }
 
     private void RemovePointCache(string id, IReadOnlyList<string> partitionKeys)

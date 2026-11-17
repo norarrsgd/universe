@@ -139,7 +139,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
 
         try
         {
-            value = CloneIfNeeded<T>(entry.Value);
+            value = CloneIfNeeded<T>(entry.Value, entry.Serializer);
             eTag = entry.ETag;
             return true;
         }
@@ -155,16 +155,24 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         }
     }
 
-    internal void Set(DocumentCacheKey key, DocumentCacheOperation operation, string scopeHash, object value, string eTag = null, long? expectedGeneration = null)
+    internal void Set<T>(
+        DocumentCacheKey key,
+        DocumentCacheOperation operation,
+        string scopeHash,
+        T value,
+        string eTag = null,
+        long? expectedGeneration = null,
+        CosmosSerializer serializer = null,
+        bool normalize = false)
     {
         object valueToStore;
         int serializedBytes;
         try
         {
-            byte[] json = JsonSerializer.SerializeToUtf8Bytes(value, value?.GetType() ?? typeof(object), JsonOptions);
+            byte[] json = Serialize(value, serializer);
             serializedBytes = json.Length;
-            valueToStore = options.CloneDocuments && value is not null && serializedBytes <= options.MaxEntryBytes && serializedBytes <= options.MaxTotalBytes
-                ? JsonSerializer.Deserialize(json, value.GetType(), JsonOptions)
+            valueToStore = (options.CloneDocuments || normalize) && value is not null && serializedBytes <= options.MaxEntryBytes && serializedBytes <= options.MaxTotalBytes
+                ? Deserialize(json, value, serializer)
                 : value;
         }
         catch (SystemException)
@@ -188,7 +196,7 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
                 return;
             }
 
-            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag, serializedBytes);
+            DocumentCacheEntry entry = new(key, valueToStore, DateTimeOffset.UtcNow, operation, scopeHash, eTag, serializedBytes, serializer);
             if (node is not null)
             {
                 _serializedBytes -= node.Value.SerializedBytes;
@@ -238,14 +246,45 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         _insertionOrder.Remove(node);
     }
 
-    private T CloneIfNeeded<T>(object value)
+    private T CloneIfNeeded<T>(object value, CosmosSerializer serializer)
     {
         if (!options.CloneDocuments || value is null)
             return (T)value;
 
+        if (serializer is not null)
+        {
+            byte[] payload = Serialize((T)value, serializer);
+            return Deserialize<T>(payload, serializer);
+        }
+
         Type valueType = value.GetType();
         string json = JsonSerializer.Serialize(value, valueType, JsonOptions);
         return (T)JsonSerializer.Deserialize(json, valueType, JsonOptions);
+    }
+
+    private static byte[] Serialize<T>(T value, CosmosSerializer serializer)
+    {
+        if (serializer is null)
+            return JsonSerializer.SerializeToUtf8Bytes(value, value is null ? typeof(T) : value.GetType(), JsonOptions);
+
+        using Stream payload = serializer.ToStream(value) ?? throw new InvalidOperationException("The Cosmos serializer returned no document stream.");
+        using MemoryStream copy = new();
+        payload.CopyTo(copy);
+        return copy.ToArray();
+    }
+
+    private static object Deserialize<T>(byte[] payload, T value, CosmosSerializer serializer)
+    {
+        if (serializer is not null)
+            return Deserialize<T>(payload, serializer);
+
+        return JsonSerializer.Deserialize(payload, value.GetType(), JsonOptions);
+    }
+
+    private static T Deserialize<T>(byte[] payload, CosmosSerializer serializer)
+    {
+        using MemoryStream stream = new(payload, writable: false);
+        return serializer.FromStream<T>(stream);
     }
 
     private static long GetParameterSignatureByteCount(object value)
@@ -383,5 +422,6 @@ internal sealed class DocumentCache(DocumentCacheOptions options)
         DocumentCacheOperation Operation,
         string ScopeHash,
         string ETag,
-        int SerializedBytes);
+        int SerializedBytes,
+        CosmosSerializer Serializer);
 }

@@ -17,6 +17,7 @@ public abstract class GalaxyCore : IDisposable
     internal readonly string _containerName;
     internal readonly DocumentCacheOptions _documentCacheOptions;
     internal readonly string _documentCacheNamespace;
+    internal readonly CosmosSerializer _documentCacheSerializer;
     private readonly bool _hasReadConsistencyStrategy;
 
     /// <summary>
@@ -78,6 +79,7 @@ public abstract class GalaxyCore : IDisposable
         _documentCacheNamespace = DocumentCache?.GetClientNamespace(client);
         if (client.ClientOptions is not null)
         {
+            _documentCacheSerializer = client.ClientOptions.Serializer;
             _allowBulk = client.ClientOptions.AllowBulkExecution;
             _hasReadConsistencyStrategy = client.ClientOptions.ReadConsistencyStrategy.HasValue;
             if (client.ClientOptions.Serializer is UniverseSerializer universeSerializer)

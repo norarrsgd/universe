@@ -177,7 +177,13 @@ public abstract class Galaxy<T> : GalaxyBasic<T>, IGalaxy<T> where T : class, IC
         if (!TryCreateQueryCacheKey<TArgType>(cache, query, out DocumentCacheKey key, out _))
             return;
 
-        cache.Set(key, DocumentCacheOperation.SingleQuery, DocumentCacheScopeHash(typeof(T)), value, expectedGeneration: generation);
+        cache.Set(
+            key,
+            DocumentCacheOperation.SingleQuery,
+            DocumentCacheScopeHash(typeof(T)),
+            value,
+            expectedGeneration: generation,
+            serializer: _documentCacheSerializer);
     }
 
     private bool TryCreateQueryCacheKey<TArgType>(
