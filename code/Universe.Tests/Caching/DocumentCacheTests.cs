@@ -277,6 +277,19 @@ public sealed class DocumentCacheTests
         Assert.Throws<InvalidOperationException>(() => QueryKey(cache, "SELECT * FROM c WHERE c.id = @missing", []));
     }
 
+    [Fact]
+    public void QueryKey_CombinedParameterSignatureOverBudget_CannotProduceCacheEntry()
+    {
+        DocumentCache cache = new(new());
+        string first = new('a', DocumentCache.MaxQueryParameterSignatureBytes / 4);
+        string second = new('b', DocumentCache.MaxQueryParameterSignatureBytes / 4);
+
+        Assert.Throws<NotSupportedException>(() => QueryKey(
+            cache,
+            "SELECT * FROM c WHERE c.first = @a AND c.second = @b",
+            [("@a", first), ("@b", second)]));
+    }
+
     private static DocumentCacheKey QueryKey(DocumentCache cache, string sql, IReadOnlyList<(string, object)> parameters)
         => cache.CreateQueryKey("client", "db", "container", typeof(CacheEntity), typeof(CacheEntity), sql, parameters);
 

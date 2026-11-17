@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Azure.Cosmos;
+using Universe.Builder.Caching;
 using Universe.Builder.Options;
 using Universe.Attributes;
 using Universe.Extensions;
@@ -78,6 +79,22 @@ public sealed class DocumentCacheRepositoryTests
         container.QueryItems = [Entity("changed")];
 
         (Gravity gravity, CacheEntity result) = await galaxy.Get(clusters);
+
+        Assert.Equal("changed", result.Name);
+        Assert.Equal(7.25, gravity.RU);
+        Assert.Equal(2, container.QueryCalls);
+    }
+
+    [Fact]
+    public async Task QueryGet_OverBudgetScalar_BypassesCacheWithoutRejectingQuery()
+    {
+        QueryTestContainer container = new() { QueryItems = [Entity("first")] };
+        using TestGalaxy repo = new(container, new UniverseOptions().WithAutoProvisioning(false).WithDocumentCache());
+        string oversized = new('a', DocumentCache.MaxQueryParameterSignatureBytes);
+        await repo.QueryGet(oversized);
+        container.QueryItems = [Entity("changed")];
+
+        (Gravity gravity, CacheEntity result) = await repo.QueryGet(oversized);
 
         Assert.Equal("changed", result.Name);
         Assert.Equal(7.25, gravity.RU);
